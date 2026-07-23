@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-sao-bg: #08070c;
+  --color-sao-panel: #0a0e27;
+  --color-sao-accent: #00d4ff;
+  --color-sao-mint: #7ed3c1;
+  --color-sao-violet: #8b5cf6;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background-color: var(--color-sao-bg);
+  color: #e2e8f0;
+  font-family: var(--font-sans);
+}
