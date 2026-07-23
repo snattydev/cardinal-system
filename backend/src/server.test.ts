@@ -10,7 +10,7 @@ const TEST_KEY = generateKey();
 const LOCAL_KEY = generateKey();
 
 let server: ReturnType<typeof createServer>;
-let port: number;
+let port = 0;
 let db: Database;
 
 function testConfig(hash: string): Config {
@@ -33,7 +33,7 @@ beforeAll(async () => {
   registerAgent(db, "localbot", "agent");
   createAgentKey(db, { keyHash: hashKey(LOCAL_KEY), agentName: "localbot" });
   server = createServer(testConfig(passwordHash), db);
-  port = server.port;
+  port = server.port!;
 });
 
 afterAll(() => {

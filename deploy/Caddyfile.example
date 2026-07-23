@@ -1,0 +1,9 @@
+# Production (VPS): uncomment once the domain is ready
+# cardinal.snatty.dev {
+# 	reverse_proxy 127.0.0.1:8787
+# }
+
+# Local: proxies the dev container locally (podman publishes 127.0.0.1:8787)
+:8080 {
+	reverse_proxy 127.0.0.1:8787
+}

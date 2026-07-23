@@ -9,7 +9,7 @@ import { getSessionUser } from "./auth/session";
 import { Hub, type ConnData } from "./ws/hub";
 import { serveStatic } from "./static";
 
-export function createServer(config: Config, db: Database): Server {
+export function createServer(config: Config, db: Database): Server<ConnData> {
   const hub = new Hub(db, { pingIntervalMs: config.pingIntervalMs });
 
   return Bun.serve<ConnData>({
