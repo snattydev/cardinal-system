@@ -1,0 +1,14 @@
+{
+  "name": "cardinal-system",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev:backend": "bun --watch backend/src/index.ts",
+    "dev:frontend": "bun --cwd frontend run dev",
+    "build": "bun --cwd frontend run build",
+    "start": "bun backend/src/index.ts",
+    "test": "bun test backend/src",
+    "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
+    "keygen": "bun backend/src/keys/cli.ts"
+  }
+}
