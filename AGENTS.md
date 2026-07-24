@@ -49,15 +49,11 @@ fix/*    ──→ dev ──→ main
 ## 🔢 Versionado
 
 - **Source of truth:** campo `version` en `package.json` raíz
-- **Formato:** [Semver](https://semver.org/) — `MAJOR.MINOR.PATCH` (ej: `0.1.2`)
-- **MAJOR = 0** hasta que el sistema sea estable → `1.0.0`
-- **Bump version solo en el PR `dev → main`** — en `dev` no se toca
-
-| Cambios acumulados en el PR | Bump |
-|---|---|
-| Fixes, security patches, docs, chores | PATCH (`0.0.2` → `0.0.3`) |
-| Nuevas features (sin breaking) | MINOR (`0.0.3` → `0.1.0`) |
-| Breaking changes | MAJOR (`0.1.0` → `1.0.0`)
+- **Formato:** `MAJOR.FASE.PATCH` — ej: `0.0.2`
+  - **MAJOR**: `0` hasta que el sistema sea estable → `1.0.0`
+  - **FASE**: fase actual del roadmap (0, 1, 2...), se bump ea en el PR `dev → main`
+  - **PATCH**: incrementos incrementales dentro de la fase (features, fixes, docs)
+- **Regla:** en `dev` solo se bump ea PATCH; la FASE se bump ea una sola vez en el PR `dev → main`
 
 ---
 
