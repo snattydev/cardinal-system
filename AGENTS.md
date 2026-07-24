@@ -84,6 +84,16 @@ SOULs y prompts: [`docs/agents/`](./docs/agents/)
 
 ---
 
+## 📝 Documentación
+
+- **Cada feature, commit o push debe ser documentado** en el vault
+- Ruta: `/home/snatty/Data/The Archive/for-my-agents/docs-agents/`
+- Formato: un archivo `.md` por feature o decisión arquitectónica significativa
+- El doc debe incluir: qué se hizo, por qué, decisiones tomadas, y archivos creados/modificados
+- No hace falta documentar bumps de versión ni cambios triviales de una línea
+
+---
+
 ## 📁 Estructura
 
 Ver `CONTEXT.md` para el árbol completo del repositorio.
