@@ -27,7 +27,7 @@ Tipos: `feat/`, `fix/`, `chore/`, `docs/`
 
 - Delegar implementación a subagente one-shot
 - Verificar resultado: archivos, coherencia, leaks
-- Documentar en vault (`for-my-agents/docs-agents/`)
+- Documentar en `docs/features/` (crear el .md)
 
 ### 3. Version bump
 
@@ -87,5 +87,6 @@ Llenar con `.github/PULL_REQUEST_TEMPLATE.md` — resumen ejecutivo, el detalle 
 - [ ] Versión bump si aplica
 - [ ] Commit message en formato conventional commits, cuerpo en español
 - [ ] PR template lleno
-- [ ] Doc en vault creado
+- [ ] Doc en `docs/features/` creado
 - [ ] PR apunta a `dev` (no a `main`)
+- [ ] Skills sincronizadas: `bash skills/sync-skills.sh`

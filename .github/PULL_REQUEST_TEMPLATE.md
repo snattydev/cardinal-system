@@ -24,13 +24,13 @@
 
 ## 🗂️ Documentación
 
-<!-- Link al doc completo en vault. Acá va TODO el detalle. -->
+<!-- Link al doc completo en docs/features/. Acá va TODO el detalle. -->
 
 - 
 
 ## ✅ Checklist
 
 - [ ] Versión bump en `package.json`
-- [ ] Documentado en vault (completo: qué, por qué, decisiones, archivos)
+- [ ] Documentado en `docs/features/` (completo: qué, por qué, decisiones, archivos)
 - [ ] Sin leaks (keys, tokens, paths, emails)
 - [ ] Probado localmente

@@ -117,10 +117,10 @@ chore: bump version to 0.1.0 — model router MVP
 
 ## 📝 Documentación
 
-- **Cada feature, fix o patch debe tener doc completo en vault**
-- Ruta: `/home/snatty/Data/The Archive/for-my-agents/docs-agents/`
+- **Cada feature, fix o patch debe tener doc completo en el repo**
+- Ruta: `docs/features/<nombre>.md` dentro del repo
 - Incluir: qué, por qué, decisiones, alternativas, archivos
-- La PR template es solo resumen — el detalle vive en el doc de vault
+- La PR template es solo resumen — el detalle vive en el doc de la feature
 - No documentar bumps ni cambios triviales de una línea
 
 ---
