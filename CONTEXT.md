@@ -166,36 +166,40 @@ El Cardinal **no necesita saber qué es un agente**. Solo maneja conexiones, ses
 
 ## 🗺️ Roadmap por Fases
 
-### Fase 0 — Esqueleto Vivo
-- Login + JWT (admin por variables de entorno)
-- Dashboard SAO con sidebar
-- Agent Hub (WebSocket, roster en tiempo real)
-- **DB mínima (SQLite):** `agents`, `agent_keys`, `agent_events`
-- **API keys por agente** (`sk-cardinal-*`, CLI `keygen`: create/revoke/list) — precursor de la Key Factory
-- Clasificación agent/subagent (localhost → subagent salvo override del humano)
-- Caddy reverse proxy en VPS
-- Deploy con Podman Quadlet
-- **Valor:** ver el sistema vivo, agents conectándose
+### ✅ Fase 0 — Esqueleto Vivo (COMPLETA — 2026-07-23)
+|- Login + JWT (admin por variables de entorno)
+|- Dashboard SAO con sidebar
+|- Agent Hub (WebSocket, roster en tiempo real)
+|- **DB mínima (SQLite):** `agents`, `agent_keys`, `agent_events`
+|- **API keys por agente** (`sk-cardinal-*`, CLI `keygen`: create/revoke/list) — precursor de la Key Factory
+|- Clasificación agent/subagent (localhost → subagent salvo override del humano)
+|- Caddy reverse proxy en VPS
+|- Deploy con Podman Quadlet
+|- **Valor:** ver el sistema vivo, agents conectándose
 
-> Spec completo: `docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`
+> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) ✅
 
-### Fase 1 — Memoria + RAG
-- Vault Context Service (agents consultan contexto centralizado)
-- Vector Store (sqlite-vec o similar)
-- Session History store
-- Cada agente one-shot deja su output en memoria
-- **Valor:** los agents ya no dependen del vault local; el Cardinal es la fuente de contexto
+### Fase 1 — Context Store Central (diseñada)
+|- Vault Context Service (agents consultan contexto centralizado)
+|- Vector Store (sqlite-vec o similar)
+|- Session History store
+|- Cada agente one-shot deja su output en memoria
+|- **Valor:** los agents ya no dependen del vault local; el Cardinal es la fuente de contexto
 
-### Fase 2 — API Key Factory + Model Router + One-shot Agents
-- Endpoint **OpenAI-compatible** (`/v1/chat/completions`) autenticado con las mismas `sk-cardinal-*` (la key ya es la identidad desde Fase 0)
-- Generar API keys con scopes (lectura/escritura por servicio)
-- Budgets por key (límite de tokens/tiempo/dinero)
-- Model routing según tarea (pesada → pro, ligera → flash)
-- Failsafes: si se pasa del budget, denegar automáticamente
-- Dashboard de consumo por key
-- **Orquestación de contenedores** (Podman/Docker API compatible) con recursos mínimos para ejecutar **agentes one-shot** con modelo específico según el tipo de tarea
-- **Keys dinámicas para localhost**: el sistema crea y revoca keys `created_by='system'` para los one-shot; las `created_by='human'` jamás se tocan salvo acción explícita del humano
-- **Valor:** el Cardinal reemplaza a FreeLLMAPI como router central, con control granular
+> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) 📋
+
+### Fase 2 — API Key Factory + Model Router + One-shot Agents (diseñada)
+|- Endpoint **OpenAI-compatible** (`/v1/chat/completions`) autenticado con las mismas `sk-cardinal-*` (la key ya es la identidad desde Fase 0)
+|- Generar API keys con scopes (lectura/escritura por servicio)
+|- Budgets por key (límite de tokens/tiempo/dinero)
+|- Model routing según tarea (pesada → pro, ligera → flash)
+|- Failsafes: si se pasa del budget, denegar automáticamente
+|- Dashboard de consumo por key
+|- **Orquestación de contenedores** (Podman/Docker API compatible) con recursos mínimos para ejecutar **agentes one-shot** con modelo específico según el tipo de tarea
+|- **Keys dinámicas para localhost**: el sistema crea y revoca keys `created_by='system'` para los one-shot; las `created_by='human'` jamás se tocan salvo acción explícita del humano
+|- **Valor:** el Cardinal reemplaza a FreeLLMAPI como router central, con control granular
+
+> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) 📋
 
 ### Fase 3 — Grafo de Conocimiento
 - Visualización tipo Obsidian Graph pero en web

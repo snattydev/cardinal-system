@@ -37,8 +37,8 @@ export default function AgentDetail() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Link to="/" className="self-start font-mono text-sm text-slate-400 transition-colors hover:text-sao-accent">
-        ← hub
+      <Link to="/agents" className="self-start font-mono text-sm text-slate-400 transition-colors hover:text-sao-accent">
+        ← agents
       </Link>
 
       <div className="flex flex-col gap-1">

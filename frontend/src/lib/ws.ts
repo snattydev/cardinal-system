@@ -7,8 +7,7 @@ export function connectRoster(onEvent: (ev: ServerEvent) => void): () => void {
 
   function connect() {
     if (disposed) return;
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    socket = new WebSocket(`${proto}://${location.host}/ws`);
+    socket = new WebSocket(`ws://127.0.0.1:8787/ws`);
 
     socket.onopen = () => {
       attempt = 0;
