@@ -1,0 +1,33 @@
+# Node
+node_modules/
+
+# Git
+.git/
+.gitignore
+
+# Docs (not needed in the runtime image)
+docs/
+
+# Deploy configuration (not needed in runtime images, except nginx.conf for frontend build)
+deploy/
+# Frontend build needs deploy/nginx.conf — allowlist it
+!deploy/nginx.conf
+
+# Markdown documentation
+*.md
+
+# Environment files
+.env
+.env.*
+
+# Build artifacts (built fresh in CI/pipeline)
+dist/
+
+# OS metadata
+.DS_Store
+
+# Development databases (production DB lives on the volume)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

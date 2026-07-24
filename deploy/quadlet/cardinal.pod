@@ -1,0 +1,13 @@
+[Unit]
+Description=Cardinal System pod — backend, frontend, and Caddy reverse proxy
+After=network-online.target
+
+[Pod]
+PodName=cardinal
+# Publish Caddy's port 80 to host 127.0.0.1:8080 (local dev)
+# For production, add :443 to expose HTTPS:
+# PublishPort=127.0.0.1:443:443
+PublishPort=127.0.0.1:8080:80
+
+[Install]
+WantedBy=default.target

@@ -1,9 +1,28 @@
+# Cardinal System — Caddy configuration (host-level alternative)
+#
+# If you are NOT using the containerized Caddy inside the cardinal pod,
+# you can run Caddy directly on the host and proxy to the pod's exposed port.
+#
+# With the pod running, the backend is available at 127.0.0.1:8080 (mapped
+# from the pod's port 80 via cardinal-caddy).
+
 # Production (VPS): uncomment once the domain is ready
-# cardinal.snatty.dev {
-# 	reverse_proxy 127.0.0.1:8787
+# cardinal.snatdy.dev {
+#     reverse_proxy 127.0.0.1:8080
 # }
 
-# Local: proxies the dev container locally (podman publishes 127.0.0.1:8787)
+# Local: proxies to the cardinal pod
 :8080 {
-	reverse_proxy 127.0.0.1:8787
+    reverse_proxy 127.0.0.1:8080
 }
+
+# ── Podman pod architecture ──────────────────────────────────
+# The cardinal pod contains three containers sharing a network:
+#   cardinal-caddy    (port 80 inside pod → host 8080)
+#   cardinal-frontend (nginx, port 8000, serves SPA + proxies /api and /ws)
+#   cardinal-backend  (Bun, port 8787, API + WebSocket server)
+#
+# Caddy → frontend:8000 → backend:8787
+#
+# The containerized Caddyfile lives at deploy/Caddyfile and gets
+# mounted into the cardinal-caddy container at /etc/caddy/Caddyfile.

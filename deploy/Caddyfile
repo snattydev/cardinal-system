@@ -1,0 +1,12 @@
+# Cardinal System — Caddy configuration (inside the cardinal-caddy container)
+# Proxies all traffic to the cardinal-frontend nginx on port 8000.
+# Caddy listens on port 80 inside the pod; the pod publishes it to the host.
+
+:80 {
+    reverse_proxy localhost:8000
+}
+
+# ── Production (uncomment and configure when deploying with a real domain) ──
+# cardinal.snatdy.dev {
+#     reverse_proxy localhost:8000
+# }
