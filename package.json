@@ -1,6 +1,6 @@
 {
   "name": "cardinal-system",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "scripts": {
     "dev:backend": "bun --watch backend/src/index.ts",
