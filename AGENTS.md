@@ -114,10 +114,16 @@ SOULs y prompts: [`docs/agents/`](./docs/agents/)
 
 - **Cada feature o task se delega a un subagente one-shot** — Shinon orquesta, no implementa
 - Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
-- Cada tipo de tarea usa el skill y modelo adecuado según complejidad
 - El subagente entrega el resultado → Shinon verifica, commitea y documenta
 - Subagentes son **efímeros**: sin estado entre runs, sin memoria persistente
 - Tasks complejas se descomponen en múltiples subagentes secuenciales o paralelos
+
+### Workflow completo por feature
+
+1. **Delegar** — subagente(s) implementan la feature
+2. **Verificar** — build, tests, revisión manual
+3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
+4. **Commit + push** — conventional commit a `dev` incluyendo el doc
 
 ---
 

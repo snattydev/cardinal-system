@@ -49,8 +49,8 @@ Resumen ejecutivo (el detalle completo va en doc de vault):
 - 
 
 ## ✅ Checklist
-- [ ] Versión bump en `package.json`
-- [ ] Documentado en vault (completo: qué, por qué, decisiones, archivos)
+- [ ] Versión bump en `package.json` (solo FASE en PR `dev → main`, PATCH en `dev`)
+- [ ] Documentado en `docs/features/<fecha>-<nombre>.md` (qué, por qué, decisiones, archivos)
 - [ ] Sin leaks (keys, tokens, paths, emails)
 - [ ] Probado localmente
 ```
@@ -90,15 +90,10 @@ chore: bump version to 0.1.0 — model router MVP
 ## 🔢 Versionado
 
 - Source of truth: `version` en `package.json` raíz
-- Formato: Semver — `MAJOR.MINOR.PATCH`
-- MAJOR = 0 hasta que sea estable → `1.0.0`
-- **Bump solo en PR `dev → main`** — en `dev` no se toca
-
-| Cambios acumulados | Bump |
-|---|---|
-| Fixes, security, docs, chores | PATCH |
-| Nuevas features | MINOR |
-| Breaking changes | MAJOR |
+- Formato: `MAJOR.FASE.PATCH` — ej: `0.0.2`
+  - **MAJOR**: `0` hasta estable → `1.0.0`
+  - **FASE**: roadmap actual, se bump ea solo en PR `dev → main`
+  - **PATCH**: incremental por feature/fix/chore en `dev`
 
 ---
 
@@ -125,10 +120,17 @@ chore: bump version to 0.1.0 — model router MVP
 ## 📝 Documentación
 
 - **Cada feature, fix o patch debe tener doc completo en el repo**
-- Ruta: `docs/features/<nombre>.md` dentro del repo
-- Incluir: qué, por qué, decisiones, alternativas, archivos
+- Ruta: `docs/features/<fecha>-<nombre>.md`
+- Incluir: qué, por qué, decisiones, alternativas, archivos creados/modificados
 - La PR template es solo resumen — el detalle vive en el doc de la feature
-- No documentar bumps ni cambios triviales de una línea
+- No documentar bumps de versión ni cambios triviales de una línea
+
+### Workflow por feature
+
+1. **Delegar** — subagente(s) implementan
+2. **Verificar** — build, tests, revisión
+3. **Documentar** — `docs/features/<fecha>-<nombre>.md`
+4. **Commit + push** — conventional commit a `dev` incluyendo el doc
 
 ---
 
