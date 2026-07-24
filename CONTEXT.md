@@ -217,15 +217,17 @@ El Cardinal **no necesita saber qué es un agente**. Solo maneja conexiones, ses
 
 ## 🔢 Versionado
 
-Formato `vMAJOR.FASE.UPDATE`:
-- **MAJOR**: `0` hasta que el sistema supere todas las fases de testing y se declare producto **estable** → `1`
-- **FASE**: fase actual del roadmap (0, 1, 2, ...)
-- **UPDATE**: se incrementa con **cada update** del proyecto dentro de la fase
+Formato [Semver](https://semver.org/) — `MAJOR.MINOR.PATCH` (ej: `0.1.2`).
+
+- **MAJOR**: `0` hasta que el sistema sea estable → `1.0.0`
+- **MINOR**: nuevas features (sin breaking changes)
+- **PATCH**: fixes, security patches, docs, chores
 
 Reglas:
 - Source of truth: campo `version` del `package.json` raíz
+- **Bump version solo en el PR `dev → main`** — en `dev` no se toca
 - El backend la expone en `GET /api/health`; el dashboard la muestra en el footer del sidebar
-- Versión inicial: **v0.0.1**
+- Versión inicial: `0.0.1`
 
 ---
 
