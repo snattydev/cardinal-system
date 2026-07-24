@@ -49,8 +49,15 @@ fix/*    ──→ dev ──→ main
 ## 🔢 Versionado
 
 - **Source of truth:** campo `version` en `package.json` raíz
-- **Formato:** `MAJOR.FASE.UPDATE` (ej: `0.0.2`)
-- **Regla:** **cada PR debe bump version** — si el PR modifica código, la versión sube
+- **Formato:** [Semver](https://semver.org/) — `MAJOR.MINOR.PATCH` (ej: `0.1.2`)
+- **MAJOR = 0** hasta que el sistema sea estable → `1.0.0`
+- **Bump version solo en el PR `dev → main`** — en `dev` no se toca
+
+| Cambios acumulados en el PR | Bump |
+|---|---|
+| Fixes, security patches, docs, chores | PATCH (`0.0.2` → `0.0.3`) |
+| Nuevas features (sin breaking) | MINOR (`0.0.3` → `0.1.0`) |
+| Breaking changes | MAJOR (`0.1.0` → `1.0.0`)
 
 ---
 

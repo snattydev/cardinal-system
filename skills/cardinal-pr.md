@@ -31,15 +31,16 @@ Tipos: `feat/`, `fix/`, `chore/`, `docs/`
 
 ### 3. Version bump
 
+**Solo si el PR es a `main`.** En PRs a `dev` no se toca la versión.
+
 ```bash
-# patch: fix/docs → 0.0.2 → 0.0.3
-# minor: feat → 0.0.2 → 0.1.0
-# major: breaking → 0.1.0 → 1.0.0
+# Evaluar qué bump según lo acumulado:
+# PATCH: fixes, security, docs, chores  → 0.0.2 → 0.0.3
+# MINOR: nuevas features                 → 0.0.3 → 0.1.0
+# MAJOR: breaking changes                → 0.1.0 → 1.0.0
 
 # Editar package.json → "version": "X.Y.Z"
 ```
-
-**Regla:** todo PR que modifica código bump version. Solo docs sin cambios de lógica pueden omitirlo.
 
 ### 4. Commit
 

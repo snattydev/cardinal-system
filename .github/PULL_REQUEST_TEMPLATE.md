@@ -30,7 +30,7 @@
 
 ## ✅ Checklist
 
-- [ ] Versión bump en `package.json`
+- [ ] Versión bump en `package.json` (solo si es PR a `main`)
 - [ ] Documentado en `docs/features/` (completo: qué, por qué, decisiones, archivos)
 - [ ] Sin leaks (keys, tokens, paths, emails)
 - [ ] Probado localmente

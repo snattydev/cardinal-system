@@ -90,8 +90,15 @@ chore: bump version to 0.1.0 — model router MVP
 ## 🔢 Versionado
 
 - Source of truth: `version` en `package.json` raíz
-- Formato: `MAJOR.FASE.UPDATE` (ej: `0.0.2`)
-- **Cada PR debe bump version**
+- Formato: Semver — `MAJOR.MINOR.PATCH`
+- MAJOR = 0 hasta que sea estable → `1.0.0`
+- **Bump solo en PR `dev → main`** — en `dev` no se toca
+
+| Cambios acumulados | Bump |
+|---|---|
+| Fixes, security, docs, chores | PATCH |
+| Nuevas features | MINOR |
+| Breaking changes | MAJOR |
 
 ---
 
