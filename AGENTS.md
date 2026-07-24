@@ -30,9 +30,10 @@ chore/*  ──→ dev ──→ main
 fix/*    ──→ dev ──→ main
 ```
 
-1. Commits/merges van a `dev` sin fricción
+1. Commits y merges van **directo a `dev`** — sin PR, sin review
 2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
 3. `main` jamás recibe commits directos
+4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
 
 ---
 
