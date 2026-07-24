@@ -54,12 +54,44 @@ fix/*    ──→ dev ──→ main
 
 ---
 
+## 📋 Commits
+
+**Formato:** [Conventional Commits](https://www.conventionalcommits.org/)
+
+```
+<type>(<scope>): <descripción breve en inglés>
+
+<opcional: cuerpo con qué, por qué, y decisiones>
+```
+
+**Tipos:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`
+
+**Ejemplos:**
+
+```
+feat(ws): add agent heartbeat with ping/pong protocol
+
+Implementación del keep-alive sobre WebSocket. 30s de intervalo,
+2 pings perdidos = desconexión. Evento emitido al dashboard.
+
+fix(auth): reject expired JWT with 401 instead of 500
+chore: bump version to 0.1.0 — model router MVP
+docs: add agent SOULs and review workflow to AGENTS.md
+```
+
+**Reglas:**
+- Primera línea ≤ 72 chars, inglés
+- Cuerpo opcional en español o inglés — explicar el *qué* y *por qué*, no el *cómo*
+- Si el commit cierra un issue: `Closes #N` al final del cuerpo
+
+---
+
 ## 📤 Pull Requests
 
 - **Shinon abre PRs, Santiくん mergea** — jamás auto-merge
 - PR a `main` requiere revisión de al menos un agente revisor
-- Commits atómicos con mensajes descriptivos ([conventional commits](https://www.conventionalcommits.org/))
 - Branch name: `feat/*`, `fix/*`, `chore/*`, `docs/*`
+- **Template:** [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) — usar siempre
 
 ---
 
