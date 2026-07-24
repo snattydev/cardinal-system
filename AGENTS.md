@@ -35,6 +35,15 @@ fix/*    ──→ dev ──→ main
 3. `main` jamás recibe commits directos
 4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
 
+### Estado actual (2026-07-24)
+
+| Fase | Estado | Spec |
+|------|--------|------|
+| **Fase 0** — Esqueleto Vivo | ✅ Completa | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
+| **Fase 1** — Context Store | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
+| **Fase 2** — One-Shot Pipeline | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) |
+| **Fase 3+** — Graph + Automations | 🔮 Futuro | — |
+
 ---
 
 ## 🔢 Versionado
@@ -63,6 +72,17 @@ fix/*    ──→ dev ──→ main
 | Agil 🪓 | Pentest (recon, vulnerabilidades, PoC) | One-shot via CAI |
 
 SOULs y prompts: [`docs/agents/`](./docs/agents/)
+
+---
+
+## 🤖 Agentes de Desarrollo
+
+- **Cada feature o task se delega a un subagente one-shot** — Shinon orquesta, no implementa
+- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
+- Cada tipo de tarea usa el skill y modelo adecuado según complejidad
+- El subagente entrega el resultado → Shinon verifica, commitea y documenta
+- Subagentes son **efímeros**: sin estado entre runs, sin memoria persistente
+- Tasks complejas se descomponen en múltiples subagentes secuenciales o paralelos
 
 ---
 
