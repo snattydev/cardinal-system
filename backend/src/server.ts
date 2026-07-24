@@ -4,6 +4,7 @@ import type { Config } from "./config";
 import { json } from "./http";
 import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
+import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "./auth/routes";
 import { getSessionUser } from "./auth/session";
 import { Hub, type ConnData } from "./ws/hub";
@@ -44,6 +45,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetAgent(db, decodeURIComponent(agentMatch[1]!));
+      }
+
+      if (pathname === "/api/system" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleSystem(config, db);
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
