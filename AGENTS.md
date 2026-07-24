@@ -80,8 +80,8 @@ docs: add agent SOULs and review workflow to AGENTS.md
 ```
 
 **Reglas:**
-- Primera línea ≤ 72 chars, inglés
-- Cuerpo opcional en español o inglés — explicar el *qué* y *por qué*, no el *cómo*
+- Primera línea ≤ 72 chars, **en inglés** (estándar conventional commits)
+- Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
 - Si el commit cierra un issue: `Closes #N` al final del cuerpo
 
 ---
