@@ -1,0 +1,18 @@
+[Unit]
+Description=Cardinal Caddy reverse proxy — TLS termination + routing
+After=network-online.target
+
+[Container]
+# No AutoUpdate — Caddy uses a fixed tag for stability
+Image=docker.io/library/caddy:alpine
+Pod=cardinal.pod
+# Mount the Caddyfile into the container
+Volume=%h/Data/Projects/agents/cardinal-system/deploy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+
+[Service]
+Restart=always
+MemoryMax=64M
+CPUQuota=25%
+
+[Install]
+WantedBy=cardinal-pod.service

@@ -1,0 +1,68 @@
+# Cardinal System — podman-compose / docker-compose (local development)
+# Usage:
+#   podman-compose up        # start all services
+#   podman-compose down      # stop & remove containers
+#   podman-compose down -v   # also delete the DB volume
+#
+# Before first run, create .env at repo root from deploy/env.example:
+#   cp deploy/env.example .env
+#   # then fill in ADMIN_PASSWORD_HASH and JWT_SECRET
+
+services:
+  backend:
+    image: docker.io/oven/bun:1
+    container_name: cardinal-backend
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - cd /app/backend && bun install && cd /app && bun --watch backend/src/index.ts
+    ports:
+      - "127.0.0.1:8787:8787"
+    volumes:
+      # Mount the backend source for hot-reload via bun --watch
+      - ./backend:/app/backend
+      # Root package.json is needed for monorepo scripts (keygen etc.)
+      - ./package.json:/app/package.json
+      # Persistent SQLite data
+      - cardinal-db:/data
+    environment:
+      PORT: 8787
+      DB_PATH: /data/cardinal.db
+      STATIC_DIR: /app/frontend/dist
+    env_file:
+      - .env
+    networks:
+      - cardinal-net
+    restart: unless-stopped
+
+  frontend:
+    image: docker.io/oven/bun:1
+    container_name: cardinal-frontend
+    working_dir: /app/frontend
+    command:
+      - sh
+      - -c
+      - bun install && bun run dev
+    ports:
+      - "127.0.0.1:5173:5173"
+    volumes:
+      # Mount the frontend source for Vite HMR
+      - ./frontend:/app/frontend
+    environment:
+      # Override proxy targets so Vite proxies /api and /ws → backend container
+      VITE_API_URL: http://backend:8787
+      VITE_WS_URL: ws://backend:8787
+      VITE_HOST: "0.0.0.0"
+    depends_on:
+      - backend
+    networks:
+      - cardinal-net
+    restart: unless-stopped
+
+networks:
+  cardinal-net:
+    driver: bridge
+
+volumes:
+  cardinal-db:

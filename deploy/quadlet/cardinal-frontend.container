@@ -1,0 +1,15 @@
+[Unit]
+Description=Cardinal frontend container — nginx serving React SPA
+After=network-online.target
+
+[Container]
+Image=localhost/cardinal-frontend:latest
+Pod=cardinal.pod
+
+[Service]
+Restart=always
+MemoryMax=128M
+CPUQuota=25%
+
+[Install]
+WantedBy=cardinal-pod.service

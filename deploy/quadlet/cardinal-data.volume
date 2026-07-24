@@ -1,1 +1,3 @@
 [Volume]
+# Persistent volume for Cardinal SQLite database
+# Mounted at /data in the backend container
