@@ -151,6 +151,18 @@ SOULs y prompts: [`docs/agents/`](./docs/agents/)
 
 Ver `CONTEXT.md` para el árbol completo del repositorio.
 
+### Trackers
+
+- Skills planeadas y pendientes → [`docs/skills.md`](docs/skills.md)
+- Cronjobs planeados por fase → [`docs/cronjobs.md`](docs/cronjobs.md)
+
+### Skills activas
+
+- `cardinal-dev` — Workflow completo de desarrollo
+- `cardinal-pr` — Crear Pull Requests
+- `cardinal-commit` — Formato de commits
+- Todas en [`skills/`](skills/)
+
 ---
 
 *Reglas vivas. Si algo cambia, este archivo se actualiza.*

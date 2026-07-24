@@ -10,6 +10,7 @@
 |-------|---------|-----------|
 | `cardinal-dev` | `skills/cardinal-dev.md` | Workflow completo: branching, commits, versionado, doc, seguridad |
 | `cardinal-pr` | `skills/cardinal-pr.md` | Crear PR paso a paso: branch → bump → commit → push → template → revisores |
+| `cardinal-commit` | `skills/cardinal-commit.md` | Formato de commits: conventional commits, tipos, scope, ejemplos |
 
 ---
 
