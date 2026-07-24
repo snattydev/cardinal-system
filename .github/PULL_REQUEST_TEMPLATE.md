@@ -1,62 +1,36 @@
-## 🏷️ Tipo
-
-<!-- feat | fix | chore | docs | refactor | test | style -->
-
-
-
 ## 📋 Resumen
 
-<!-- Qué hace este PR. Una o dos frases, directo al punto. -->
-
-
-
-## 🧠 Motivación
-
-<!-- El problema que resuelve o la necesidad que cubre. Por qué ahora. -->
+<!-- Qué hace y por qué. Una o dos frases. -->
 
 
 
 ## 🔍 Cambios
 
-<!-- Lista de archivos modificados/creados/eliminados y qué cambió en cada uno. -->
+<!-- Archivos modificados y qué cambió. -->
 
-| Archivo | Cambio |
-|---------|--------|
-| | |
-| | |
+- 
+- 
 
-## ⚠️ Breaking Changes
+## ⚠️ Breaking
 
-<!-- ¿Algo deja de funcionar? ¿Requiere migración? Si no, dejar "Ninguno". -->
+<!-- ¿Algo se rompe? Si no, "Ninguno". -->
 
 
 
 ## 🧪 Cómo probar
 
-<!-- Pasos concretos para verificar: comandos, endpoints, escenarios. -->
-
 1. 
 2. 
-3. 
-
-## 📸 Screenshots
-
-<!-- Solo si hay cambios visuales en el dashboard. -->
 
 ## 🗂️ Documentación
 
-<!-- Link al archivo en vault (for-my-agents/docs-agents/). -->
+<!-- Link al doc completo en vault. Acá va TODO el detalle. -->
 
 - 
-
-## 🔗 Issues Relacionados
-
-<!-- Closes #N | Relacionado con #N -->
 
 ## ✅ Checklist
 
 - [ ] Versión bump en `package.json`
-- [ ] Documentado en vault
-- [ ] Commits con formato conventional commits
-- [ ] Sin leaks (keys, tokens, paths absolutos, emails)
-- [ ] Probado localmente con `compose.yaml`
+- [ ] Documentado en vault (completo: qué, por qué, decisiones, archivos)
+- [ ] Sin leaks (keys, tokens, paths, emails)
+- [ ] Probado localmente

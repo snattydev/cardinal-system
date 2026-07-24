@@ -139,10 +139,10 @@ SOULs y prompts: [`docs/agents/`](./docs/agents/)
 
 ## 📝 Documentación
 
-- **Cada feature, commit o push debe ser documentado** en el vault
+- **Cada feature, fix o patch debe tener un doc completo en el vault**
 - Ruta: `/home/snatty/Data/The Archive/for-my-agents/docs-agents/`
-- Formato: un archivo `.md` por feature o decisión arquitectónica significativa
-- El doc debe incluir: qué se hizo, por qué, decisiones tomadas, y archivos creados/modificados
+- El doc debe incluir: **qué se hizo, por qué, decisiones tomadas, alternativas consideradas, y archivos creados/modificados**
+- La PR template es solo un resumen — **el detalle completo vive en el doc de vault**
 - No hace falta documentar bumps de versión ni cambios triviales de una línea
 
 ---
