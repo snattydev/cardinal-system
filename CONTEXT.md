@@ -225,9 +225,11 @@ Reglas:
 
 ---
 
-## 🧠 Conceptos Clave (del onboarding-ia de Agustin Diez)
+## 🧠 Conceptos Clave
 
-Referencia: https://nogal-labs.com.ar/onboarding-ia/ — presentación de **Agustin Diez** (github.com/agusisa) en Nodo Serrano, Tandil.
+### Del onboarding-ia de Agustin Diez
+
+Referencia: https://nogal-labs.com.ar/onboarding-ia/ — presentación en Nodo Serrano, Tandil.
 
 | Concepto | Descripción | Aplica al Cardinal |
 |----------|-------------|-------------------|
@@ -238,6 +240,25 @@ Referencia: https://nogal-labs.com.ar/onboarding-ia/ — presentación de **Agus
 | **Skills = on-demand** | Procedimientos que se cargan cuando hacen falta | Skills unificadas desde el Cardinal |
 | **Rules = permanente** | Comportamiento siempre activo | Reglas base del ecosistema |
 | **Ventana vs Memoria** | Ventana = RAM de la sesión, Memoria = disco del proyecto | Cardinal es el disco; la ventana vive en cada agente |
+
+### De la charla Nogal Hive (Agustin Diez, Julio 2026)
+
+Referencia completa: [`docs/references/nogal-hive-charla.md`](docs/references/nogal-hive-charla.md) — anatomía de una plataforma multi-agente en producción.
+
+**Lecciones directas para el Cardinal:**
+
+| # | Lección | Aplica en |
+|---|---------|-----------|
+| 1 | **Verificar claims contra el mundo real** — los agentes alucinan éxito ("PR listo", "branch pusheado") | Fase 2: todo one-shot agent debe tener verify-step |
+| 2 | **Permisos por capacidad física, no por prompt** — token scoped, fork model, filesystem restringido | Fase 2: API Key Factory + Podman sin mounts del host |
+| 3 | **Efímero por default** — el estado en git/DB, nunca en el proceso | Fase 2: containers one-shot, siempre `finally: rm` |
+| 4 | **Cada token atribuible** — metering por run, costo real en feed | Fase 2: Model Router debe exponer consumo por key |
+| 5 | **Humano cierra cada loop** — merge, confirmación, gates | Principio fundacional (ya en diseño) |
+| 6 | **⚠️ Doble sandbox** — si Hermes dentro de container, sandbox interno OFF | Fase 2: configuración de workers |
+| 7 | **⚠️ Tool-calling en proxies** — OpenAI-compat puede descartar tools | Fase 2: Model Router debe validar passthrough |
+| 8 | **⚠️ Dedup a nivel DB** — tool calls paralelos pueden crear tasks duplicadas | Fase 2: índice único parcial en tabla de tasks |
+| 9 | **💡 Default al modelo caro** — tiempo humano revisando > tokens ahorrados | Fase 2: tier system con opus/sonnet/haiku |
+| 10 | **💡 Review bot one-shot** — un PR = una review, no re-dispara | Fase 4+: automatizaciones con HITL
 
 ---
 
@@ -275,6 +296,7 @@ cardinal-system/
 │   ├── Caddyfile.example
 │   └── quadlet/              # .container + .volume archivos
 ├── docs/
+│   ├── references/            # Referencias externas (charlas, papers, arquitecturas)
 │   └── superpowers/specs/    # Specs de diseño por fase
 ├── package.json              # Monorepo root (workspaces) — version = source of truth
 └── README.md
@@ -297,8 +319,10 @@ cardinal-system/
 
 ## 🔗 Referencias
 
+- [Charla "Nogal Hive: Anatomía de una plataforma multi-agente" — Agustin Diez](https://nogal-labs.com.ar/hive-charla/) · [Notas internas](docs/references/nogal-hive-charla.md)
 - [Presentación "El contexto es el producto" — Agustin Diez](https://nogal-labs.com.ar/onboarding-ia/)
 - [GitHub de Agustin Diez](https://github.com/agusisa)
+- [Nogal Hive (plataforma en producción)](https://nogal-labs.com.ar/hive)
 - FreeLLMAPI: http://127.0.0.1:3001/ (inspiración para API Key Factory)
 - Hermes Agent: https://hermes-agent.nousresearch.com/docs
 
