@@ -2,6 +2,10 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 // Proxy targets: override with VITE_API_URL / VITE_WS_URL env vars when running
 // under podman-compose (where the backend is reachable via service name).
 // Falls back to localhost:8787 for native dev (bun run dev:backend + dev:frontend).
