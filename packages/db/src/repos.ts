@@ -90,3 +90,27 @@ export function revokeKeysForAgent(db: Database, agentName: string): void {
 export function listKeys(db: Database): AgentKeyRow[] {
   return db.query("SELECT * FROM agent_keys ORDER BY id").all() as AgentKeyRow[];
 }
+
+export interface SystemCounts {
+  agentsTotal: number;
+  agentsOnline: number;
+  keysActive: number;
+  keysRevoked: number;
+}
+
+export function getSystemCounts(db: Database): SystemCounts {
+  const count = (sql: string): number => {
+    const row = db.query(sql).get();
+    if (!row || typeof row !== "object" || !("count" in row)) {
+      throw new Error(`expected count row from: ${sql}`);
+    }
+    return Number((row as { count: number }).count);
+  };
+
+  return {
+    agentsTotal: count("SELECT COUNT(*) AS count FROM agents"),
+    agentsOnline: count("SELECT COUNT(*) AS count FROM agents WHERE connected = 1"),
+    keysActive: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL"),
+    keysRevoked: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL"),
+  };
+}

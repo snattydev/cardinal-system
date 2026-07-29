@@ -23,7 +23,6 @@ export type ServerEvent =
 export interface SystemInfo {
   version: string;
   uptime_seconds: number;
-  db_path: string;
   db_size_bytes: number;
   agents_total: number;
   agents_online: number;

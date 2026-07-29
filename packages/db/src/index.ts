@@ -13,5 +13,6 @@ export {
   touchKey,
   revokeKeysForAgent,
   listKeys,
+  getSystemCounts,
 } from "./repos";
-export type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow } from "./repos";
+export type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow, SystemCounts } from "./repos";

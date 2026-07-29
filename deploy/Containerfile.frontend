@@ -8,12 +8,17 @@
 FROM docker.io/oven/bun:1 AS build
 WORKDIR /app
 
-COPY package.json ./
-COPY frontend/package.json frontend/bun.lock ./frontend/
-RUN cd frontend && bun install --frozen-lockfile
+# Install from the monorepo root so workspace resolution stays consistent.
+# Frontend has no @cardinal/* deps, but root workspaces require all members.
+COPY package.json bun.lock ./
+COPY packages ./packages
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+
+RUN bun install --frozen-lockfile
 
 COPY frontend ./frontend
-RUN cd frontend && bun run build
+RUN bun run --cwd frontend build
 
 # ---- Runtime stage ----
 FROM docker.io/nginx:alpine

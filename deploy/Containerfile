@@ -12,14 +12,15 @@ ENV NODE_ENV=production \
     PORT=8787 \
     DB_PATH=/data/cardinal.db
 
-# Root package.json (for /api/health version endpoint)
-COPY package.json ./
+# Workspace manifests (all members required for bun install resolution)
+COPY package.json bun.lock ./
+COPY packages ./packages
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
 
-# Install backend production dependencies
-COPY backend/package.json backend/bun.lock ./backend/
-RUN cd backend && bun install --production --frozen-lockfile
+RUN bun install --production --frozen-lockfile
 
-# Copy backend source code
+# Backend source (packages/ already copied above — Bun runs TS from src/)
 COPY backend ./backend
 
 # Persistent volume for SQLite database

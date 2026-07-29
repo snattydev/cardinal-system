@@ -11,7 +11,6 @@ export default function Settings() {
       <Section title="SYSTEM">
         <Row label="version" value={`v${info.version}`} />
         <Row label="uptime" value={uptimeDisplay} />
-        <Row label="db_path" value={info.db_path} />
         <Row label="db_size" value={fmtBytes(info.db_size_bytes)} />
       </Section>
 
