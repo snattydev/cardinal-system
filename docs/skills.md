@@ -19,7 +19,7 @@
 | Skill | Dependencia | Qué cubrirá |
 |-------|-------------|-------------|
 | `cardinal-container` | Podman + compose funcional | Build, run, debug del pod local (`compose up/down`, logs, rebuild) |
-| `cardinal-review` | Lisbeth/Kirito integrados | Flujo unificado: correr standard review + security review |
+| `cardinal-review` | Standard + Security reviewers | Flujo unificado: correr standard review + security review |
 | `cardinal-api` | Endpoints estables | Referencia rápida de REST + WS para testear y debuggear |
 | `cardinal-vault-doc` | — | Template fijo para docs de vault (qué incluir, formato, ejemplos) |
 
@@ -29,4 +29,4 @@
 |-------|-------------|-------------|
 | `cardinal-keygen` | Key Factory | Crear, revocar, listar API keys vía CLI del Cardinal |
 | `cardinal-deploy` | VPS lista | Deploy a producción: build imágenes, push, quadlet, verificar |
-| `cardinal-pentest` | Agil integrado | Disparar pentest one-shot y leer reporte |
+| `cardinal-pentest` | Pentester integrado | Disparar pentest one-shot y leer reporte |

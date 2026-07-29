@@ -1,13 +1,13 @@
-# Security Review Checklist — Kirito ⚔️
+# Security Review Checklist
 
-Checklist de referencia para el Strong PR Reviewer. Cada item debe evaluarse contra el diff del PR. Si un item no aplica (ej: no hay nuevas dependencias), se omite con "N/A".
+Checklist de referencia para el revisor de seguridad. Cada item debe evaluarse contra el diff del PR. Si un item no aplica (ej: no hay nuevas dependencias), se omite con "N/A".
 
 ---
 
 ## 1. Secrets & Credentials
 
 - [ ] ¿Hay strings que parezcan API keys, tokens, o passwords hardcodeados?
-  - Patrones: `sk-*`, `ghp_*`, `gho_*`, `xoxb-*`, `-----BEGIN`, `Bearer`, `Authorization:`
+  - Patrones: `sk-*`, `ghp_*`, `gho_*`, `xoxb-*`, `-----BEGIN`, `Bearer`, `Authorization:***`
 - [ ] ¿Se modificó `.env.example` sin documentar las nuevas variables?
 - [ ] ¿Archivos `.env`, `.env.local`, `credentials.json` en el diff? (deberían estar en .gitignore)
 - [ ] ¿Config files con secrets en plaintext? (docker-compose env vars, CI configs, etc.)

@@ -99,21 +99,21 @@ chore: bump version to 0.1.0 — model router MVP
 
 ## 🤖 Agentes de Desarrollo
 
-- **Cada feature o task se delega a un subagente one-shot** — Shinon orquesta, no implementa
+- **Cada feature o task se delega a un subagente one-shot** — el orquestador coordina, no implementa
 - Un subagente = una responsabilidad concreta
 - Subagentes son **efímeros**: sin estado entre runs
 - Tasks complejas → múltiples subagentes secuenciales o paralelos
-- Shinon verifica, commitea y documenta el resultado
+- El orquestador verifica, commitea y documenta el resultado
 
 ---
 
-## 👁️ Agentes Revisores
+## 👁️ Roles de Revisión
 
-| Agente | Rol | Trigger |
-|--------|-----|---------|
-| Lisbeth 🔧 | Standard Review (código, claridad, mantenibilidad) | Todo PR a `main` |
-| Kirito ⚔️ | Security Review (secrets, inyección, arquitectura) | `@kirito` en PR |
-| Agil 🪓 | Pentest (recon, vulnerabilidades, PoC) | One-shot via CAI |
+| Rol | Scope | Trigger |
+|-----|-------|---------|
+| Standard Review | Código, claridad, mantenibilidad | Todo PR a `main` |
+| Security Review | Secrets, inyección, arquitectura | Bajo demanda en PR |
+| Pentest | Recon, vulnerabilidades, PoC | One-shot
 
 ---
 
