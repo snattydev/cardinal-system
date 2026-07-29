@@ -167,7 +167,7 @@ bun run --cwd backend keygen -- --list
 - **Settings**: info de cuenta (usuario, versión) + nota de que el cambio de password es por env. Sin edición.
 - **Versión**: visible en el footer del sidebar (fetch a `/api/health`).
 - Estado: React context + hooks (`useAuth`, `useRoster`). Sin librería de estado.
-- Estética según CONTEXT.md: fondo `#0a0e27`/`#08070c`, acento `#00d4ff`, secundario `#8b5cf6`, JetBrains Mono + Inter, paneles con bordes luminosos, avatares circulares con glow.
+- Estética según `context/ecosystem.md`: fondo `#0a0e27`/`#08070c`, acento `#00d4ff`, secundario `#8b5cf6`, JetBrains Mono + Inter, paneles con bordes luminosos, avatares circulares con glow.
 
 ## 8. Ejemplo de cliente (`examples/ws-agent.ts`)
 

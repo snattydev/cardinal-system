@@ -36,7 +36,7 @@ Segunda iteración sobre la UI del dashboard Fase 0. Se refactorizó la navegaci
 
 ### 6. Versionado MAJOR.FASE.PATCH
 
-**Por qué:** El formato `vMAJOR.FASE.UPDATE` original era confuso (UPDATE vs PATCH). Se unificó en `MAJOR.FASE.PATCH` donde FASE refleja el roadmap y PATCH es incremental. Ambos docs (CONTEXT.md, AGENTS.md) alineados.
+**Por qué:** El formato `vMAJOR.FASE.UPDATE` original era confuso (UPDATE vs PATCH). Se unificó en `MAJOR.FASE.PATCH` donde FASE refleja el roadmap y PATCH es incremental. Ambos docs (`context/ecosystem.md`, `AGENTS.md`) alineados.
 
 ## Archivos creados/modificados
 
@@ -56,6 +56,6 @@ Segunda iteración sobre la UI del dashboard Fase 0. Se refactorizó la navegaci
 | `frontend/src/index.css` | Modificado — @font-face rules |
 | `frontend/public/fonts/` | Nuevo — inter.woff2 + jetbrains-mono.woff2 |
 | `frontend/src/pages/AgentDetail.tsx` | Modificado — back link a /agents |
-| `CONTEXT.md` | Modificado — Fase 0 completa, Fase 1/2 links, versionado |
+| `context/ecosystem.md` | Modificado — Fase 0 completa, Fase 1/2 links, versionado |
 | `AGENTS.md` | Modificado — tabla de fases, versionado MAJOR.FASE.PATCH |
 | `docs/superpowers/specs/` | Nuevo — specs de Fase 1 y Fase 2 |

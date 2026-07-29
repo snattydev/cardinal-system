@@ -263,7 +263,7 @@ ANALYST (entrega plan, evento kind:plan) → FEED (plan completo, markdown, con 
 ## Referencias cruzadas
 
 - **Nogal Hive**: https://nogal-labs.com.ar/hive
-- **Onboarding IA (mismo autor)**: https://nogal-labs.com.ar/onboarding-ia/ (referenciado en CONTEXT.md)
+- **Onboarding IA (mismo autor)**: https://nogal-labs.com.ar/onboarding-ia/ (referenciado en `context/ecosystem.md`)
 - **Autor**: Agustín Diez — github.com/agusisa
 
 ---
