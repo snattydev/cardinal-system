@@ -6,6 +6,11 @@
     "test": "bun test"
   },
   "dependencies": {
+    "@cardinal/core": "workspace:*",
+    "@cardinal/db": "workspace:*",
+    "@cardinal/auth": "workspace:*",
+    "@cardinal/keys": "workspace:*",
+    "@cardinal/ws": "workspace:*",
     "jose": "^6.2.4",
     "zod": "^4.4.3"
   },
