@@ -1,5 +1,5 @@
 import type { Database } from "bun:sqlite";
-import { json } from "../http";
+import { json } from "@cardinal/core";
 import { getAgent, listAgents, listEvents } from "@cardinal/db";
 import { agentToPayload } from "@cardinal/ws";
 

@@ -20,5 +20,12 @@
       "@cardinal/ws": ["../packages/ws/src"]
     }
   },
+  "references": [
+    { "path": "../packages/core/tsconfig.json" },
+    { "path": "../packages/db/tsconfig.json" },
+    { "path": "../packages/auth/tsconfig.json" },
+    { "path": "../packages/keys/tsconfig.json" },
+    { "path": "../packages/ws/tsconfig.json" }
+  ],
   "include": ["src"]
 }

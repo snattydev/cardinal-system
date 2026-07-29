@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import type { Config } from "@cardinal/core";
-import { json } from "../http";
+import { json } from "@cardinal/core";
 import rootPkg from "../../../package.json";
 
 export async function handleSystem(config: Config, db: Database): Promise<Response> {

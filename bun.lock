@@ -73,6 +73,8 @@
       "version": "0.1.0",
       "dependencies": {
         "@cardinal/core": "workspace:*",
+        "@cardinal/db": "workspace:*",
+        "@cardinal/keys": "workspace:*",
       },
     },
   },
