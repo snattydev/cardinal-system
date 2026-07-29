@@ -1,6 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createDb } from "../db/index";
-import { insertEvent, registerAgent, upsertAgentOnConnect } from "../db/repos";
+import { createDb, insertEvent, registerAgent, upsertAgentOnConnect } from "@cardinal/db";
 import { handleHealth } from "./health";
 import { handleGetAgent, handleListAgents } from "./agents";
 import rootPkg from "../../../package.json";
@@ -12,7 +11,6 @@ describe("handleHealth", () => {
     expect(res.headers.get("content-type")).toContain("application/json");
     const body = await res.json();
     expect(body).toEqual({ status: "ok", version: rootPkg.version });
-    expect(rootPkg.version).toBe("0.1.0");
   });
 });
 

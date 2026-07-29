@@ -9,10 +9,10 @@ import {
   touchKey,
   updateAgentStatus,
   upsertAgentOnConnect,
-} from "../db/repos";
-import type { AgentRow } from "../db/repos";
-import { hashKey, isKeyFormat } from "../keys/index";
-import { parseClientMessage, resolveKind } from "./protocol";
+} from "@cardinal/db";
+import type { AgentKind, AgentRow } from "@cardinal/core";
+import { parseClientMessage, resolveKind } from "@cardinal/core";
+import { hashKey, isKeyFormat } from "@cardinal/keys";
 
 export interface ConnData {
   dashboardAuthed: boolean;

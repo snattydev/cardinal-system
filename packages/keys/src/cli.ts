@@ -1,6 +1,5 @@
-import { createDb } from "../db/index";
-import { createAgentKey, listKeys, registerAgent, revokeKeysForAgent } from "../db/repos";
-import type { AgentKind } from "../db/repos";
+import { createDb, createAgentKey, listKeys, registerAgent, revokeKeysForAgent } from "@cardinal/db";
+import type { AgentKind } from "@cardinal/core";
 import { generateKey, hashKey } from "./index";
 
 function usage(): never {

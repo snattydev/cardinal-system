@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
-import { json } from "../http";
-import { getAgent, listAgents, listEvents } from "../db/repos";
-import { agentToPayload } from "../ws/hub";
+import { json } from "@cardinal/core";
+import { getAgent, listAgents, listEvents } from "@cardinal/db";
+import { agentToPayload } from "@cardinal/ws";
 
 export function handleListAgents(db: Database): Response {
   return json({ agents: listAgents(db).map(agentToPayload) });

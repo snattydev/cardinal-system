@@ -1,35 +1,7 @@
 import type { Database } from "bun:sqlite";
+import type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow } from "@cardinal/core";
 
-export type AgentKind = "agent" | "subagent";
-
-export interface AgentRow {
-  name: string;
-  device: string;
-  kind: AgentKind;
-  status: string;
-  connected: number;
-  last_seen: string | null;
-  created_at: string;
-}
-
-export interface AgentKeyRow {
-  id: number;
-  key_hash: string;
-  agent_name: string;
-  kind_override: AgentKind | null;
-  created_by: string;
-  created_at: string;
-  last_used_at: string | null;
-  revoked_at: string | null;
-}
-
-export interface AgentEventRow {
-  id: number;
-  agent_name: string;
-  type: "connect" | "disconnect" | "status";
-  meta: string | null;
-  at: string;
-}
+export type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow };
 
 export function registerAgent(db: Database, name: string, kind: AgentKind): void {
   db.run("INSERT INTO agents (name, kind) VALUES (?, ?) ON CONFLICT(name) DO NOTHING", [name, kind]);
@@ -117,4 +89,28 @@ export function revokeKeysForAgent(db: Database, agentName: string): void {
 
 export function listKeys(db: Database): AgentKeyRow[] {
   return db.query("SELECT * FROM agent_keys ORDER BY id").all() as AgentKeyRow[];
+}
+
+export interface SystemCounts {
+  agentsTotal: number;
+  agentsOnline: number;
+  keysActive: number;
+  keysRevoked: number;
+}
+
+export function getSystemCounts(db: Database): SystemCounts {
+  const count = (sql: string): number => {
+    const row = db.query(sql).get();
+    if (!row || typeof row !== "object" || !("count" in row)) {
+      throw new Error(`expected count row from: ${sql}`);
+    }
+    return Number((row as { count: number }).count);
+  };
+
+  return {
+    agentsTotal: count("SELECT COUNT(*) AS count FROM agents"),
+    agentsOnline: count("SELECT COUNT(*) AS count FROM agents WHERE connected = 1"),
+    keysActive: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL"),
+    keysRevoked: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL"),
+  };
 }

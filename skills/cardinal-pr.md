@@ -7,7 +7,7 @@ category: development
 # Cardinal System — Crear un Pull Request
 
 ## ⚠️ Regla fundamental
-**Shinon abre PRs, Santiくん mergea.** Jamás auto-merge.
+El orquestador abre PRs, el humano mergea. Jamás auto-merge.
 
 ---
 
@@ -77,7 +77,7 @@ Llenar con `.github/PULL_REQUEST_TEMPLATE.md` — resumen ejecutivo, el detalle 
 | PR a | Revisores |
 |------|-----------|
 | `dev` | Ninguno — merge directo |
-| `main` | Lisbeth 🔧 (automático), Kirito ⚔️ (`@kirito`) |
+| `main` | Standard Reviewer (automático), Security Reviewer (bajo demanda) |
 
 ---
 

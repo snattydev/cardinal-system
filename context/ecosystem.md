@@ -1,4 +1,4 @@
-# Cardinal System — Contexto del Proyecto
+# Cardinal System — Ecosistema SAO
 
 > *El sistema nervioso central del ecosistema SAO. Un monolito que conecta roster, contexto, memoria, automatizaciones, agentes y más — hosteado en VPS, accesible desde cualquier dispositivo.*
 
@@ -167,39 +167,39 @@ El Cardinal **no necesita saber qué es un agente**. Solo maneja conexiones, ses
 ## 🗺️ Roadmap por Fases
 
 ### ✅ Fase 0 — Esqueleto Vivo (COMPLETA — 2026-07-23)
-|- Login + JWT (admin por variables de entorno)
-|- Dashboard SAO con sidebar
-|- Agent Hub (WebSocket, roster en tiempo real)
-|- **DB mínima (SQLite):** `agents`, `agent_keys`, `agent_events`
-|- **API keys por agente** (`sk-cardinal-*`, CLI `keygen`: create/revoke/list) — precursor de la Key Factory
-|- Clasificación agent/subagent (localhost → subagent salvo override del humano)
-|- Caddy reverse proxy en VPS
-|- Deploy con Podman Quadlet
-|- **Valor:** ver el sistema vivo, agents conectándose
+- Login + JWT (admin por variables de entorno)
+- Dashboard SAO con sidebar
+- Agent Hub (WebSocket, roster en tiempo real)
+- **DB mínima (SQLite):** `agents`, `agent_keys`, `agent_events`
+- **API keys por agente** (`sk-cardinal-*`, CLI `keygen`: create/revoke/list) — precursor de la Key Factory
+- Clasificación agent/subagent (localhost → subagent salvo override del humano)
+- Caddy reverse proxy en VPS
+- Deploy con Podman Quadlet
+- **Valor:** ver el sistema vivo, agents conectándose
 
-> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) ✅
+> Spec: [`../docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](../docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) ✅
 
 ### Fase 1 — Context Store Central (diseñada)
-|- Vault Context Service (agents consultan contexto centralizado)
-|- Vector Store (sqlite-vec o similar)
-|- Session History store
-|- Cada agente one-shot deja su output en memoria
-|- **Valor:** los agents ya no dependen del vault local; el Cardinal es la fuente de contexto
+- Vault Context Service (agents consultan contexto centralizado)
+- Vector Store (sqlite-vec o similar)
+- Session History store
+- Cada agente one-shot deja su output en memoria
+- **Valor:** los agents ya no dependen del vault local; el Cardinal es la fuente de contexto
 
-> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) 📋
+> Spec: [`../docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](../docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) 📋
 
 ### Fase 2 — API Key Factory + Model Router + One-shot Agents (diseñada)
-|- Endpoint **OpenAI-compatible** (`/v1/chat/completions`) autenticado con las mismas `sk-cardinal-*` (la key ya es la identidad desde Fase 0)
-|- Generar API keys con scopes (lectura/escritura por servicio)
-|- Budgets por key (límite de tokens/tiempo/dinero)
-|- Model routing según tarea (pesada → pro, ligera → flash)
-|- Failsafes: si se pasa del budget, denegar automáticamente
-|- Dashboard de consumo por key
-|- **Orquestación de contenedores** (Podman/Docker API compatible) con recursos mínimos para ejecutar **agentes one-shot** con modelo específico según el tipo de tarea
-|- **Keys dinámicas para localhost**: el sistema crea y revoca keys `created_by='system'` para los one-shot; las `created_by='human'` jamás se tocan salvo acción explícita del humano
-|- **Valor:** el Cardinal reemplaza a FreeLLMAPI como router central, con control granular
+- Endpoint **OpenAI-compatible** (`/v1/chat/completions`) autenticado con las mismas `sk-cardinal-*` (la key ya es la identidad desde Fase 0)
+- Generar API keys con scopes (lectura/escritura por servicio)
+- Budgets por key (límite de tokens/tiempo/dinero)
+- Model routing según tarea (pesada → pro, ligera → flash)
+- Failsafes: si se pasa del budget, denegar automáticamente
+- Dashboard de consumo por key
+- **Orquestación de contenedores** (Podman/Docker API compatible) con recursos mínimos para ejecutar **agentes one-shot** con modelo específico según el tipo de tarea
+- **Keys dinámicas para localhost**: el sistema crea y revoca keys `created_by='system'` para los one-shot; las `created_by='human'` jamás se tocan salvo acción explícita del humano
+- **Valor:** el Cardinal reemplaza a FreeLLMAPI como router central, con control granular
 
-> Spec: [`docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) 📋
+> Spec: [`../docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](../docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) 📋
 
 ### Fase 3 — Grafo de Conocimiento
 - Visualización tipo Obsidian Graph pero en web
@@ -227,7 +227,7 @@ Reglas:
 - Source of truth: campo `version` del `package.json` raíz
 - En `dev` solo se bump ea PATCH; la FASE se bump ea una sola vez en el PR a `main`
 - El backend la expone en `GET /api/health`; el dashboard la muestra en el footer del sidebar
-- Versión actual: `0.0.2`
+- Versión actual: `0.1.0`
 
 ---
 
@@ -249,7 +249,7 @@ Referencia: https://nogal-labs.com.ar/onboarding-ia/ — presentación en Nodo S
 
 ### De la charla Nogal Hive (Agustin Diez, Julio 2026)
 
-Referencia completa: [`docs/references/nogal-hive-charla.md`](docs/references/nogal-hive-charla.md) — anatomía de una plataforma multi-agente en producción.
+Referencia completa: [`../docs/references/nogal-hive-charla.md`](../docs/references/nogal-hive-charla.md) — anatomía de una plataforma multi-agente en producción.
 
 **Lecciones directas para el Cardinal:**
 
@@ -268,48 +268,6 @@ Referencia completa: [`docs/references/nogal-hive-charla.md`](docs/references/no
 
 ---
 
-## 📁 Estructura del Repositorio (propuesta)
-
-```
-cardinal-system/
-├── backend/
-│   ├── src/
-│   │   ├── index.ts          # Entry point
-│   │   ├── auth/             # Login, JWT
-│   │   ├── keys/             # API keys de agentes + CLI keygen
-│   │   ├── ws/               # WebSocket handler (agent protocol)
-│   │   ├── api/              # REST endpoints
-│   │   ├── db/               # SQLite schema + migrations
-│   │   ├── rag/              # Vector store, embeddings (Fase 1)
-│   │   ├── router/           # Model routing (Fase 2)
-│   │   └── graph/            # Knowledge graph (Fase 3)
-│   ├── package.json
-│   └── tsconfig.json
-├── frontend/
-│   ├── src/
-│   │   ├── App.tsx
-│   │   ├── pages/            # Login, Home, AgentDetail, Settings...
-│   │   ├── components/       # SAO-themed UI components
-│   │   ├── hooks/            # WS connection, auth state
-│   │   └── lib/              # api client, ws client
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── vite.config.ts
-├── examples/
-│   └── ws-agent.ts           # Cliente WS genérico de referencia (no es SDK)
-├── deploy/
-│   ├── Containerfile         # Podman multi-stage (un contenedor sirve todo)
-│   ├── Caddyfile.example
-│   └── quadlet/              # .container + .volume archivos
-├── docs/
-│   ├── references/            # Referencias externas (charlas, papers, arquitecturas)
-│   └── superpowers/specs/    # Specs de diseño por fase
-├── package.json              # Monorepo root (workspaces) — version = source of truth
-└── README.md
-```
-
----
-
 ## 🎨 Estética SAO — Lineamientos Visuales
 
 - **Fondo:** azul muy oscuro (#0a0e27, #08070c)
@@ -325,7 +283,7 @@ cardinal-system/
 
 ## 🔗 Referencias
 
-- [Charla "Nogal Hive: Anatomía de una plataforma multi-agente" — Agustin Diez](https://nogal-labs.com.ar/hive-charla/) · [Notas internas](docs/references/nogal-hive-charla.md)
+- [Charla "Nogal Hive: Anatomía de una plataforma multi-agente" — Agustin Diez](https://nogal-labs.com.ar/hive-charla/) · [Notas internas](../docs/references/nogal-hive-charla.md)
 - [Presentación "El contexto es el producto" — Agustin Diez](https://nogal-labs.com.ar/onboarding-ia/)
 - [GitHub de Agustin Diez](https://github.com/agusisa)
 - [Nogal Hive (plataforma en producción)](https://nogal-labs.com.ar/hive)

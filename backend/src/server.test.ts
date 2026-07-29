@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
-import type { Config } from "./config";
-import { createDb } from "./db/index";
-import { createAgentKey, getAgent, registerAgent } from "./db/repos";
-import { generateKey, hashKey } from "./keys";
+import type { Config } from "@cardinal/core";
+import { createDb, createAgentKey, getAgent, registerAgent } from "@cardinal/db";
+import { generateKey, hashKey } from "@cardinal/keys";
 import { createServer } from "./server";
+import rootPkg from "../../package.json";
 
 const TEST_KEY = generateKey();
 const LOCAL_KEY = generateKey();
@@ -73,7 +73,7 @@ async function login(): Promise<string> {
 test("GET /api/health returns status ok and version", async () => {
   const res = await fetch(`http://localhost:${port}/api/health`);
   expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ status: "ok", version: "0.1.0" });
+  expect(await res.json()).toEqual({ status: "ok", version: rootPkg.version });
 });
 
 test("auth flow: bad login 401, good login sets cookie, /me with and without cookie", async () => {

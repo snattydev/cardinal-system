@@ -16,14 +16,17 @@ services:
     command:
       - sh
       - -c
-      - cd /app/backend && bun install && cd /app && bun --watch backend/src/index.ts
+      - bun install && bun --watch backend/src/index.ts
     ports:
       - "127.0.0.1:8787:8787"
     volumes:
-      # Mount the backend source for hot-reload via bun --watch
+      # Mount workspace sources for hot-reload via bun --watch
       - ./backend:/app/backend
-      # Root package.json is needed for monorepo scripts (keygen etc.)
+      - ./packages:/app/packages
+      # Root workspace manifests (bun install must run from monorepo root)
       - ./package.json:/app/package.json
+      - ./bun.lock:/app/bun.lock
+      - ./frontend/package.json:/app/frontend/package.json
       # Persistent SQLite data
       - cardinal-db:/data
     environment:

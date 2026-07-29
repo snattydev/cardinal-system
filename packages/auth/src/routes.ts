@@ -1,5 +1,5 @@
-import type { Config } from "../config";
-import { json } from "../http";
+import type { Config } from "@cardinal/core";
+import { json } from "@cardinal/core";
 import { signSession } from "./jwt";
 import { clearSessionCookie, getSessionUser, sessionCookie } from "./session";
 

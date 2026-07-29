@@ -1,9 +1,10 @@
 import { describe, expect, test } from "bun:test";
-import { createDb, migrate } from "./index";
+import { createDb, migrate } from "./schema";
 import {
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
+  getSystemCounts,
   insertEvent,
   listAgents,
   listEvents,
@@ -169,6 +170,37 @@ describe("keys repo", () => {
     expect(keys[0].kind_override).toBe("agent");
     expect(keys[1].key_hash).toBe("hash-2");
     expect(keys[1].created_by).toBe("system");
+    db.close();
+  });
+});
+
+describe("getSystemCounts", () => {
+  test("returns zeros on empty db", () => {
+    const db = createDb(":memory:");
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 0,
+      agentsOnline: 0,
+      keysActive: 0,
+      keysRevoked: 0,
+    });
+    db.close();
+  });
+
+  test("counts agents and keys by status", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    registerAgent(db, "kirito", "agent");
+    upsertAgentOnConnect(db, { name: "shinon", device: "pc", kind: "agent", status: "idle" });
+    createAgentKey(db, { keyHash: "active-1", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "active-2", agentName: "kirito" });
+    revokeKeysForAgent(db, "kirito");
+
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 2,
+      agentsOnline: 1,
+      keysActive: 1,
+      keysRevoked: 1,
+    });
     db.close();
   });
 });

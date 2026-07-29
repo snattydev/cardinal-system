@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AgentKind } from "../db/repos";
+import type { AgentKind } from "./types";
 
 const helloSchema = z.object({
   type: z.literal("hello"),

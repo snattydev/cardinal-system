@@ -1,7 +1,13 @@
 # Cardinal System — Development Rules
 
-> Reglas de desarrollo para agentes que trabajan en este repositorio.
-> Para contexto amplio (visión, arquitectura, roadmap), leer [`CONTEXT.md`](./CONTEXT.md).
+> Reglas de desarrollo. Solo roles, sin nombres.
+
+**Referencias:**
+- [`docs/vision.md`](./docs/vision.md) — objetivo y principios
+- [`docs/stack.md`](./docs/stack.md) — stack técnico
+- [`docs/security.md`](./docs/security.md) — modelo de seguridad
+- [`docs/roadmap.md`](./docs/roadmap.md) — fases y prioridades
+- [`context/ecosystem.md`](./context/ecosystem.md) — knowledge base
 
 ---
 
@@ -10,7 +16,7 @@
 - **Backend:** TypeScript + [Bun](https://bun.sh) (`Bun.serve`, `bun:sqlite`)
 - **Frontend:** React + TypeScript + Vite + Tailwind CSS
 - **DB:** SQLite (un solo archivo, cero infra)
-- **Real-time:** WebSocket nativo (protocolo en CONTEXT.md)
+- **Real-time:** WebSocket nativo (ver [`docs/superpowers/specs/`](./docs/superpowers/specs/))
 - **Runtime:** **siempre containerizado** con Podman — no instalar dependencias nativas
 
 ---
@@ -19,7 +25,7 @@
 
 | Rama | Rol | Protección |
 |------|-----|------------|
-| `main` | Producción | PR + review requerido |
+| `main` | Producción | PR + review requerido, squash merge |
 | `dev` | Integración | Push/merge directo permitido |
 
 **Workflow:**
@@ -34,8 +40,9 @@ fix/*    ──→ dev ──→ main
 2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
 3. `main` jamás recibe commits directos
 4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
+5. **Merge strategy:** squash merge (1 commit por PR, mensaje limpio con feat + resumen)
 
-### Estado actual (2026-07-24)
+### Estado actual (2026-07-28)
 
 | Fase | Estado | Spec |
 |------|--------|------|
@@ -51,9 +58,9 @@ fix/*    ──→ dev ──→ main
 - **Source of truth:** campo `version` en `package.json` raíz
 - **Formato:** `MAJOR.FASE.PATCH` — ej: `0.0.2`
   - **MAJOR**: `0` hasta que el sistema sea estable → `1.0.0`
-  - **FASE**: fase actual del roadmap (0, 1, 2...), se bump ea en el PR `dev → main`
+  - **FASE**: fase actual del roadmap (0, 1, 2...), se bupea en el PR `dev → main`
   - **PATCH**: incrementos incrementales dentro de la fase (features, fixes, docs)
-- **Regla:** en `dev` solo se bump ea PATCH; la FASE se bump ea una sola vez en el PR `dev → main`
+- **Regla:** en `dev` solo se bupea PATCH; la FASE se bupea una sola vez en el PR `dev → main`
 
 ---
 
@@ -76,10 +83,18 @@ feat(ws): add agent heartbeat with ping/pong protocol
 
 Implementación del keep-alive sobre WebSocket. 30s de intervalo,
 2 pings perdidos = desconexión. Evento emitido al dashboard.
+```
 
+```
 fix(auth): reject expired JWT with 401 instead of 500
+```
+
+```
 chore: bump version to 0.1.0 — model router MVP
-docs: add agent SOULs and review workflow to AGENTS.md
+```
+
+```
+docs: add SOULs and review workflow to AGENTS.md
 ```
 
 **Reglas:**
@@ -91,30 +106,90 @@ docs: add agent SOULs and review workflow to AGENTS.md
 
 ## 📤 Pull Requests
 
-- **Shinon abre PRs, Santiくん mergea** — jamás auto-merge
-- PR a `main` requiere revisión de al menos un agente revisor
-- Branch name: `feat/*`, `fix/*`, `chore/*`, `docs/*`
-- **Template:** [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) — usar siempre
+### Flujo `dev → main`
+
+1. `dev` acumula features, fixes, docs
+2. Cuando está estable → se abre PR de `dev` a `main`
+3. El orquestador (fuera del repo) abre el PR
+4. El humano (fuera del repo) revisa y mergea
+5. **Nunca auto-merge**
+
+### Pre-merge checklist (obligatorio)
+
+- [ ] `bun test` pasa completo (todos los packages + backend)
+- [ ] `bun run build` pasa (frontend/)
+- [ ] Audit de leaks: keys, tokens, paths absolutos, emails
+- [ ] Standard Review aprobado (código, claridad, mantenibilidad)
+- [ ] Security Review aprobado si hubo cambios en `auth/`, `keys/`, `ws/` o protocolo
+- [ ] Version bump en `package.json` si corresponde
+- [ ] `docs/features/<fecha>-<nombre>.md` creado o actualizado
+
+### Merge strategy
+
+**Squash merge.** Todos los commits de `dev` se aplastan en un solo commit limpio en `main`. Ejemplo:
+
+```
+feat: Fase 1 — Context Store (v0.2.0)
+
+Profile Registry, SOUL Registry, Skill Catalog, Memory Mirror,
+Session Index, Device Registry. Bun packages split (core, auth, keys, ws, db).
+```
+
+El historial granular queda en `dev`; `main` tiene un commit por feature/fase.
 
 ---
 
-## 👁️ Agentes Revisores
+## 👁️ Roles de Revisión
 
-| Agente | Rol | Trigger |
-|--------|-----|---------|
-| Lisbeth 🔧 | Standard Review (código, claridad, mantenibilidad) | Todo PR a `main` |
-| Kirito ⚔️ | Security Review (secrets, inyección, arquitectura) | `@kirito` en PR |
-| Agil 🪓 | Pentest (recon, vulnerabilidades, PoC) | One-shot via CAI |
+Los agentes revisores son roles, no identidades fijas. Cualquier agente puede asumir
+un rol según el contexto. Los nombres específicos se asignan fuera del repo.
 
-SOULs y prompts: [`docs/agents/`](./docs/agents/)
+| Rol | Disparador | Scope |
+|-----|-----------|-------|
+| **Standard Review** | Todo PR a `main` | Código, claridad, mantenibilidad, tests |
+| **Security Review** | Cambios en `auth/`, `keys/`, `ws/`, protocolo | Secrets, inyección, arquitectura de seguridad |
+| **Pentest** | One-shot, bajo demanda | Recon, vulnerabilidades, PoC |
+
+Templates de review: [`docs/agents/prompts/standard-review.md`](./docs/agents/prompts/standard-review.md)
+
+---
+
+## 🧪 Test-Driven Development (TDD)
+
+### Ámbitos con TDD obligatorio (RED → GREEN → REFACTOR → COMMIT)
+
+| Ámbito | Qué cubre | Riesgo si falla |
+|--------|-----------|-----------------|
+| **Auth** | JWT sign/verify, expiración, login flow, cookie | Acceso no autorizado al sistema |
+| **Keys** | Generación, hashing SHA-256, validación, revocación | Suplantación de identidad de agentes |
+| **Protocolo WS** | Parseo de mensajes, state machine, ping/pong, timeout | Desconexiones silenciosas, estado corrupto |
+| **DB** | Migraciones, integridad de schema, queries críticas | Pérdida de datos, corrupción |
+| **Router** | Fallback chain, rate limiting, budget enforcement | Consumo descontrolado de APIs externas |
+
+### Flujo TDD por feature
+
+```
+1. RED     → bun test --watch              # escribí el test que FALLA
+2. GREEN   → implementación mínima         # corré el test → PASA
+3. REFACTOR → limpiá sin romper tests      # corré el test → sigue PASANDO
+4. COMMIT  → solo después de GREEN        # nunca committear tests rotos
+```
+
+### Ámbitos sin TDD obligatorio (test después, o solo typecheck)
+
+| Ámbito | Verificación |
+|--------|-------------|
+| Frontend components | `bun run build` (typecheck + Vite build) |
+| CSS / estilos | Revisión visual (manual) |
+| Docs, configs, deploy | Revisión humana |
 
 ---
 
 ## 🤖 Agentes de Desarrollo
 
-- **Cada feature o task se delega a un subagente one-shot** — Shinon orquesta, no implementa
+- **El orquestador coordina, los subagentes implementan**
 - Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
-- El subagente entrega el resultado → Shinon verifica, commitea y documenta
+- El subagente entrega el resultado → el orquestador verifica, commitea y documenta
 - Subagentes son **efímeros**: sin estado entre runs, sin memoria persistente
 - Tasks complejas se descomponen en múltiples subagentes secuenciales o paralelos
 
@@ -154,11 +229,56 @@ SOULs y prompts: [`docs/agents/`](./docs/agents/)
 - La PR template es solo un resumen — **el detalle completo vive en el doc de la feature**
 - No hace falta documentar bumps de versión ni cambios triviales de una línea
 
+### Documentación para agentes (BMAD-lite)
+
+Los archivos en `docs/agents/` pueden usar delimitadores para lazy-loading:
+
+```markdown
+<!-- REGION: standard-review-checklist -->
+## Standard Review Checklist
+...
+<!-- ENDREGION: standard-review-checklist -->
+```
+
+Los agentes pueden cargar solo la región que necesitan sin leer el archivo entero.
+Esto aplica a: SOULs, prompts de review, checklists de seguridad.
+
 ---
 
-## 📁 Estructura
+## 📁 Estructura del Repositorio
 
-Ver `CONTEXT.md` para el árbol completo del repositorio.
+```
+cardinal-system/
+├── packages/                  ← Bun workspaces (paquetes internos)
+│   ├── core/                  tipos compartidos, config, zod schemas
+│   ├── auth/                  JWT sign/verify, login, logout
+│   ├── keys/                  generación, hash, revocación
+│   ├── ws/                    protocolo, hub, mensajes
+│   ├── db/                    schema, migraciones, queries
+│   └── router/                model routing (Fase 2)
+├── backend/
+│   └── src/                   composición: server, api handlers, static serve
+├── frontend/
+│   └── src/                   React + Vite + Tailwind v4
+├── examples/
+│   └── ws-agent.ts            cliente WS de referencia (no SDK)
+├── deploy/
+│   ├── Containerfile
+│   ├── Caddyfile.example
+│   └── quadlet/
+├── docs/
+│   ├── features/              documentación de features completadas
+│   ├── agents/                SOULs, prompts, checklists de revisión
+│   │   └── prompts/
+│   ├── superpowers/
+│   │   ├── specs/             specs de diseño por fase
+│   │   └── plans/             planes de implementación
+│   └── references/            charlas, papers, arquitecturas externas
+├── skills/                    skills de Hermes para desarrollo del Cardinal
+├── AGENTS.md                  este archivo
+├── README.md
+└── package.json               workspaces + version source of truth
+```
 
 ### Trackers
 
@@ -170,7 +290,6 @@ Ver `CONTEXT.md` para el árbol completo del repositorio.
 - `cardinal-dev` — Workflow completo de desarrollo
 - `cardinal-pr` — Crear Pull Requests
 - `cardinal-commit` — Formato de commits
-- Todas en [`skills/`](skills/)
 
 ---
 

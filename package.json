@@ -1,14 +1,15 @@
 {
   "name": "cardinal-system",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
+  "workspaces": ["packages/*", "backend", "frontend"],
   "scripts": {
     "dev:backend": "bun --watch backend/src/index.ts",
-    "dev:frontend": "bun --cwd frontend run dev",
-    "build": "bun --cwd frontend run build",
+    "dev:frontend": "bun run --cwd frontend dev",
+    "build": "bun run --cwd frontend build",
     "start": "bun backend/src/index.ts",
-    "test": "bun test backend/src",
+    "test": "bun test --timeout 30000 packages/*/src backend/src",
     "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
-    "keygen": "bun backend/src/keys/cli.ts"
+    "keygen": "bun packages/keys/src/cli.ts"
   }
 }
