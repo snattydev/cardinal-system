@@ -37,7 +37,7 @@ Ver [`roadmap/fase-1.md`](roadmap/fase-1.md) — sección "Pre-Fase 1".
 
 - **Versionado:** `MAJOR.FASE.PATCH` (source: `package.json`)
 - **Commits:** Conventional Commits (inglés ≤72 chars, body español)
-- **Branches:** `feature/* → dev → main` (squash merge)
+- **Branches:** `feature/* → dev → main` (merge commit)
 - **TDD:** Obligatorio para core. No para frontend/docs
 - **Agentes:** Nombres fuera del repo. Solo roles
 - **Contexto:** `context/` → knowledge base. `AGENTS.md` → dev rules

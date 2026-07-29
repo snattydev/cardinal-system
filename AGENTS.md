@@ -25,7 +25,7 @@
 
 | Rama | Rol | Protección |
 |------|-----|------------|
-| `main` | Producción | PR + review requerido, squash merge |
+| `main` | Producción | PR + review requerido, merge commit |
 | `dev` | Integración | Push/merge directo permitido |
 
 **Workflow:**
@@ -40,7 +40,7 @@ fix/*    ──→ dev ──→ main
 2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
 3. `main` jamás recibe commits directos
 4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
-5. **Merge strategy:** squash merge (1 commit por PR, mensaje limpio con feat + resumen)
+5. **Merge strategy:** merge commit (historia completa, sin squash). `dev` y `main` nunca divergen.
 
 ### Estado actual (2026-07-28)
 
@@ -127,32 +127,7 @@ docs: add SOULs and review workflow to AGENTS.md
 
 ### Merge strategy
 
-**Squash merge.** Todos los commits de `dev` se aplastan en un solo commit limpio en `main`. Ejemplo:
-
-```
-feat: Fase 1 — Context Store (v0.2.0)
-
-Profile Registry, SOUL Registry, Skill Catalog, Memory Mirror,
-Session Index, Device Registry. Bun packages split (core, auth, keys, ws, db).
-```
-
-El historial granular queda en `dev`; `main` tiene un commit por feature/fase.
-
-### Post-merge alignment (obligatorio)
-
-Después de cada squash merge `dev → main`:
-
-```bash
-git checkout dev
-git reset --hard origin/main
-# Cherry-pick commits nuevos que no estaban en el PR mergeado
-git cherry-pick <hash> ...
-git push origin dev --force-with-lease
-```
-
-Esto elimina la divergencia cosmética ("N ahead, M behind") que GitHub muestra después de un squash merge. Sin este paso, `dev` queda permanentemente desfasado de `main` y los PRs siguientes se vuelven confusos.
-
-**Regla:** Toda tarea de review de PR debe incluir este realineamiento post-merge como parte del flujo. No cerrar el PR sin alinear `dev` con `main`.
+**Merge commit.** Se usa merge estándar (no squash). Todos los commits de `dev` pasan a `main` con un merge commit explícito. `dev` y `main` nunca divergen — no hay necesidad de realinear después del merge.
 
 ---
 
