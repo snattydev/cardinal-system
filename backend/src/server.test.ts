@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { Config } from "@cardinal/core";
 import { createDb, createAgentKey, getAgent, registerAgent } from "@cardinal/db";
-import { generateKey, hashKey } from "./keys";
+import { generateKey, hashKey } from "@cardinal/keys";
 import { createServer } from "./server";
 
 const TEST_KEY = generateKey();

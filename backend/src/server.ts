@@ -1,13 +1,13 @@
 import type { Server } from "bun";
 import type { Database } from "bun:sqlite";
 import type { Config } from "@cardinal/core";
-import { json } from "./http";
+import { json } from "@cardinal/core";
 import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
 import { handleSystem } from "./api/system";
-import { handleLogin, handleLogout, handleMe } from "./auth/routes";
-import { getSessionUser } from "./auth/session";
-import { Hub, type ConnData } from "./ws/hub";
+import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
+import { getSessionUser } from "@cardinal/auth";
+import { Hub, type ConnData } from "@cardinal/ws";
 import { serveStatic } from "./static";
 
 export function createServer(config: Config, db: Database): Server<ConnData> {

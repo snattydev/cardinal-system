@@ -11,7 +11,14 @@
     "noEmit": true,
     "strict": true,
     "skipLibCheck": true,
-    "types": ["bun-types"]
+    "types": ["bun-types"],
+    "paths": {
+      "@cardinal/core": ["../packages/core/src"],
+      "@cardinal/db": ["../packages/db/src"],
+      "@cardinal/auth": ["../packages/auth/src"],
+      "@cardinal/keys": ["../packages/keys/src"],
+      "@cardinal/ws": ["../packages/ws/src"]
+    }
   },
   "include": ["src"]
 }
