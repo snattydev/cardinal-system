@@ -43,6 +43,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@cardinal/core": "workspace:*",
+        "jose": "^6.2.4",
       },
     },
     "packages/core": {
@@ -64,6 +65,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@cardinal/core": "workspace:*",
+        "@cardinal/db": "workspace:*",
       },
     },
     "packages/ws": {
