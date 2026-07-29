@@ -1,5 +1,5 @@
 import { loadConfig } from "@cardinal/core";
-import { createDb } from "./db/index";
+import { createDb } from "@cardinal/db";
 import { createServer } from "./server";
 
 const config = loadConfig();

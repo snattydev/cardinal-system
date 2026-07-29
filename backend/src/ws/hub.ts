@@ -9,7 +9,7 @@ import {
   touchKey,
   updateAgentStatus,
   upsertAgentOnConnect,
-} from "../db/repos";
+} from "@cardinal/db";
 import type { AgentRow } from "@cardinal/core";
 import { hashKey, isKeyFormat } from "../keys/index";
 import { parseClientMessage, resolveKind } from "./protocol";

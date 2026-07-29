@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { json } from "../http";
-import { getAgent, listAgents, listEvents } from "../db/repos";
+import { getAgent, listAgents, listEvents } from "@cardinal/db";
 import { agentToPayload } from "../ws/hub";
 
 export function handleListAgents(db: Database): Response {

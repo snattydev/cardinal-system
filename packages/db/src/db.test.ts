@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { createDb, migrate } from "./index";
+import { createDb, migrate } from "./schema";
 import {
   createAgentKey,
   findActiveKeyByHash,

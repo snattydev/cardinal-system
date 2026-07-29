@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { ServerWebSocket } from "bun";
-import { createDb } from "../db/index";
-import { createAgentKey, getAgent, listEvents, registerAgent } from "../db/repos";
+import { createDb, createAgentKey, getAgent, listEvents, registerAgent } from "@cardinal/db";
 import { hashKey } from "../keys/index";
 import { Hub } from "./hub";
 import type { ConnData } from "./hub";
