@@ -24,6 +24,20 @@ fix/*    ──→ dev ──→ main
 3. **PRs solo existen para `dev → main`**
 4. `main` jamás recibe commits directos
 
+### Post-merge alignment (obligatorio)
+
+Después de cada squash merge `dev → main`:
+
+```bash
+git checkout dev
+git reset --hard origin/main
+# Cherry-pick commits nuevos que no estaban en el PR mergeado
+git cherry-pick <hash> ...
+git push origin dev --force-with-lease
+```
+
+Esto elimina la divergencia cosmética ("N ahead, M behind") que GitHub muestra después de un squash merge. **Toda tarea de review de PR debe incluir este paso** — no cerrar el PR sin alinear `dev` con `main`.
+
 ---
 
 ## 📋 PR Template

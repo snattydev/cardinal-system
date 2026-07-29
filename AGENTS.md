@@ -138,6 +138,22 @@ Session Index, Device Registry. Bun packages split (core, auth, keys, ws, db).
 
 El historial granular queda en `dev`; `main` tiene un commit por feature/fase.
 
+### Post-merge alignment (obligatorio)
+
+Después de cada squash merge `dev → main`:
+
+```bash
+git checkout dev
+git reset --hard origin/main
+# Cherry-pick commits nuevos que no estaban en el PR mergeado
+git cherry-pick <hash> ...
+git push origin dev --force-with-lease
+```
+
+Esto elimina la divergencia cosmética ("N ahead, M behind") que GitHub muestra después de un squash merge. Sin este paso, `dev` queda permanentemente desfasado de `main` y los PRs siguientes se vuelven confusos.
+
+**Regla:** Toda tarea de review de PR debe incluir este realineamiento post-merge como parte del flujo. No cerrar el PR sin alinear `dev` con `main`.
+
 ---
 
 ## 👁️ Roles de Revisión
