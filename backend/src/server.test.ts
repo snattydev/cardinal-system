@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
-import type { Config } from "./config";
+import type { Config } from "@cardinal/core";
 import { createDb } from "./db/index";
 import { createAgentKey, getAgent, registerAgent } from "./db/repos";
 import { generateKey, hashKey } from "./keys";

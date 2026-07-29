@@ -10,7 +10,7 @@ import {
   updateAgentStatus,
   upsertAgentOnConnect,
 } from "../db/repos";
-import type { AgentRow } from "../db/repos";
+import type { AgentRow } from "@cardinal/core";
 import { hashKey, isKeyFormat } from "../keys/index";
 import { parseClientMessage, resolveKind } from "./protocol";
 

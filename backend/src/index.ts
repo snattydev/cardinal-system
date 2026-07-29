@@ -1,4 +1,4 @@
-import { loadConfig } from "./config";
+import { loadConfig } from "@cardinal/core";
 import { createDb } from "./db/index";
 import { createServer } from "./server";
 

@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { SignJWT } from "jose";
-import type { Config } from "../config";
+import type { Config } from "@cardinal/core";
 import { signSession, verifySession } from "./jwt";
 import { clearSessionCookie, readCookie, sessionCookie } from "./session";
 import { handleLogin, handleLogout, handleMe } from "./routes";

@@ -1,6 +1,6 @@
 import type { Server } from "bun";
 import type { Database } from "bun:sqlite";
-import type { Config } from "./config";
+import type { Config } from "@cardinal/core";
 import { json } from "./http";
 import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
