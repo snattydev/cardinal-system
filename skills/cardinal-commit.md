@@ -44,6 +44,7 @@ docs(agents): add review workflow
 3. Separar subject del cuerpo con línea en blanco
 4. Si cierra un issue: `Closes #N` al final del cuerpo
 5. Un commit = un cambio lógico. No mezclar feat con fix.
+6. **Autoría:** el commit debe usar el nombre y email del usuario de GitHub (`git config user.name` / `user.email`), no el del agente. Todos los agentes heredan la identidad del owner.
 
 ## Ejemplos
 

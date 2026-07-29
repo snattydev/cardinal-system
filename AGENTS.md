@@ -101,6 +101,7 @@ docs: add SOULs and review workflow to AGENTS.md
 - Primera línea ≤ 72 chars, **en inglés** (estándar conventional commits)
 - Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
 - Si el commit cierra un issue: `Closes #N` al final del cuerpo
+- **Autoría:** el commit debe usar el nombre y email del usuario de GitHub que tiene acceso al repo (`git config user.name` / `user.email`), no el nombre de ningún agente. Todos los agentes deben heredar la identidad del owner.
 
 ---
 

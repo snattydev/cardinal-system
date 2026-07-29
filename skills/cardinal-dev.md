@@ -73,6 +73,7 @@ Resumen ejecutivo (el detalle completo va en doc de vault):
 - Primera línea ≤ 72 chars, **en inglés**
 - Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
 - Si cierra un issue: `Closes #N` al final
+- **Autoría:** el commit debe usar el nombre y email del usuario de GitHub (`git config user.name` / `user.email`), no el del agente. Todos los agentes heredan la identidad del owner.
 
 **Ejemplos:**
 ```
