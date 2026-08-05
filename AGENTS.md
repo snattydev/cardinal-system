@@ -279,9 +279,8 @@ cardinal-system/
 
 ### Skills activas
 
-- `cardinal-dev` — Workflow completo de desarrollo
-- `cardinal-pr` — Crear Pull Requests
-- `cardinal-commit` — Formato de commits
+- `cardinal-dev` — Workflow completo de desarrollo (branching, commits, PRs, versionado, TDD, revisión)
+- `cardinal-system` — Dev técnico (keys, WebSocket protocol, API, quirks, pipeline)
 
 ---
 
