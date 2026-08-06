@@ -45,12 +45,12 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.3.1 | Tabla `skills` + `profile_skills` (N:M) | opencode | Sí | ✅ (mismo commit que 1.3.2) |
 | 1.3.2 | API `GET /api/skills`, `GET /api/profiles/:name/skills` | opencode | Sí | ✅ (1.3.1+c) |
 
-### 1.4 Memory Mirror
+### 1.4 Memory Mirror ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.4.1 | Tabla `memories` (key-value por perfil) | Cursor Pro | Sí |
-| 1.4.2 | API `GET/PUT /api/memories/:profile` | Cursor Pro | Sí |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.4.1 | Tabla `memories` (key-value por perfil) | opencode | Sí | ✅ (mismo commit que 1.4.2) |
+| 1.4.2 | API `GET/PUT /api/memories/:profile` | opencode | Sí | ✅ (1.4.1+c) |
 
 ### 1.5 Session Index
 
@@ -87,6 +87,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        7/17 ███████░░░░░░░░░░░░░
-Total F1:           13/23 █████████████░░░░░░░░░
+F1 features:        9/17 █████████░░░░░░░░░░░
+Total F1:           15/23 ███████████████░░░░░░░
 ```
