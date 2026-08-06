@@ -31,12 +31,12 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.1.2 | API `GET/PUT /api/profiles` | opencode | Sí | ✅ (f069191) |
 | 1.1.3 | Sincronizar con perfiles Hermes existentes (PC) | directo | No | ✅ (seed-profiles.py — 4/4) |
 
-### 1.2 SOUL Registry
+### 1.2 SOUL Registry ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.2.1 | Tabla `souls` + endpoint `GET /api/souls/:name` | OpenCode GO | Sí |
-| 1.2.2 | Migrar `docs/agents/*.md` → DB (seed inicial) | Antigravity | No |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.2.1 | Tabla `souls` + endpoint `GET /api/souls/:name` | opencode | Sí | ✅ (0da16d7) |
+| 1.2.2 | Migrar `docs/agents/*.md` → DB (seed inicial) | directo | No | ✅ (seed-souls.py — 3/3) |
 
 ### 1.3 Skill Catalog
 
@@ -87,6 +87,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        3/17 ███░░░░░░░░░░░░░░░░░
-Total F1:           9/23 █████████░░░░░░░░░░░░░
+F1 features:        5/17 █████░░░░░░░░░░░░░░░
+Total F1:           11/23 ███████████░░░░░░░░░░░
 ```
