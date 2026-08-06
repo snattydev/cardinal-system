@@ -74,12 +74,12 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 > rag_cache (TTL 1h, LRU 1000). Vector store propio: Fase 2+ si el vault
 > deja de ser local.
 
-### 1.7 Config Templates
+### 1.7 Config Templates ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.7.1 | Tabla `config_templates` + seed desde perfiles Hermes | OpenCode GO | Sí |
-| 1.7.2 | API `GET /api/config/:profile` (devuelve config.yaml-like) | OpenCode GO | Sí |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.7.1 | Tabla `config_templates` + seed desde perfiles Hermes | opencode | Sí | ✅ (1.7.1+2, seed-config.py 4/4) |
+| 1.7.2 | API `GET /api/config/:profile` (devuelve config.yaml-like) | opencode | Sí | ✅ (1.7.1+c) |
 
 ### 1.8 Device Registry
 
@@ -94,6 +94,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        12/17 ████████████░░░░░░░
-Total F1:           18/23 ██████████████████░░░
+F1 features:        14/17 ██████████████░░░░░
+Total F1:           20/23 ████████████████████░░
 ```
