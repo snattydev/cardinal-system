@@ -25,11 +25,11 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 3 tables and sets user_version to 1", () => {
+  test("migrate creates the 4 tables and sets user_version to 2", () => {
     const db = createDb(":memory:");
-    expect(tableNames(db)).toEqual(["agent_events", "agent_keys", "agents"]);
+    expect(tableNames(db)).toEqual(["agent_events", "agent_keys", "agents", "profiles"]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(1);
+    expect(row.user_version).toBe(2);
     db.close();
   });
 
@@ -38,8 +38,40 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(1);
-    expect(tableNames(db)).toHaveLength(3);
+    expect(row.user_version).toBe(2);
+    expect(tableNames(db)).toHaveLength(4);
+    db.close();
+  });
+
+  test("migration 1 creates the profiles table with columns and CHECK constraints", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("profiles");
+
+    db.query(
+      "INSERT INTO profiles (name, display_name, emoji, model_default, provider_default, device, last_onboarded) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    ).run("hermes", "Hermes", "🧙", "gpt-4o", "openai", "laptop", "2026-08-01");
+
+    const p = db
+      .query("SELECT * FROM profiles WHERE name = ?")
+      .get("hermes") as Record<string, unknown>;
+    expect(p).not.toBeNull();
+    expect(p!.display_name).toBe("Hermes");
+    expect(p!.emoji).toBe("🧙");
+    expect(p!.kind).toBe("permanent");
+    expect(p!.status).toBe("active");
+    expect(p!.model_default).toBe("gpt-4o");
+    expect(p!.provider_default).toBe("openai");
+    expect(p!.device).toBe("laptop");
+    expect(p!.last_onboarded).toBe("2026-08-01");
+    expect(p!.created_at).not.toBeNull();
+    expect(p!.updated_at).toBeNull();
+
+    expect(() =>
+      db.query("INSERT INTO profiles (name, kind) VALUES (?, ?)").run("bad-kind", "ghost"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO profiles (name, status) VALUES (?, ?)").run("bad-status", "zombie"),
+    ).toThrow();
     db.close();
   });
 });

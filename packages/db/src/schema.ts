@@ -29,6 +29,21 @@ CREATE TABLE agent_events (
   at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+CREATE TABLE profiles (
+  name TEXT PRIMARY KEY,
+  display_name TEXT,
+  emoji TEXT,
+  kind TEXT NOT NULL DEFAULT 'permanent' CHECK (kind IN ('permanent','one-shot')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','dormant','liberated')),
+  model_default TEXT,
+  provider_default TEXT,
+  device TEXT,
+  last_onboarded TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
+);
+`,
 ];
 
 export function migrate(db: Database): void {
