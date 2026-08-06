@@ -52,12 +52,12 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.4.1 | Tabla `memories` (key-value por perfil) | opencode | Sí | ✅ (mismo commit que 1.4.2) |
 | 1.4.2 | API `GET/PUT /api/memories/:profile` | opencode | Sí | ✅ (1.4.1+c) |
 
-### 1.5 Session Index
+### 1.5 Session Index ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.5.1 | Tabla `sessions` + endpoint `GET /api/sessions` | OpenCode GO | Sí |
-| 1.5.2 | Indexar sesiones de Hermes (DB local → Cardinal) | Antigravity | No |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.5.1 | Tabla `sessions` + endpoint `GET /api/sessions` | opencode | Sí | ✅ (f0f5f4d) |
+| 1.5.2 | Indexar sesiones de Hermes (DB local → Cardinal) | directo | No | ✅ (seed-sessions.py — 246) |
 
 ### 1.6 Vault RAG Proxy
 
@@ -87,6 +87,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        9/17 █████████░░░░░░░░░░░
-Total F1:           15/23 ███████████████░░░░░░░
+F1 features:        11/17 ███████████░░░░░░░░░
+Total F1:           17/23 █████████████████░░░░░
 ```
