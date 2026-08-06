@@ -5,6 +5,7 @@ import {
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
+  getConfigTemplate,
   getMemoryMirror,
   getProfile,
   getSession,
@@ -25,6 +26,7 @@ import {
   touchKey,
   updateAgentStatus,
   upsertAgentOnConnect,
+  upsertConfigTemplate,
   upsertMemoryMirror,
   upsertProfile,
   upsertSession,
@@ -40,12 +42,13 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 10 tables and sets user_version to 7", () => {
+  test("migrate creates the 11 tables and sets user_version to 8", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
       "agent_keys",
       "agents",
+      "config_templates",
       "memory_mirror",
       "profile_skills",
       "profiles",
@@ -55,7 +58,7 @@ describe("migrations", () => {
       "souls",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(7);
+    expect(row.user_version).toBe(8);
     db.close();
   });
 
@@ -64,8 +67,31 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(7);
-    expect(tableNames(db)).toHaveLength(10);
+    expect(row.user_version).toBe(8);
+    expect(tableNames(db)).toHaveLength(11);
+    db.close();
+  });
+
+  test("migration 7 creates the config_templates table with FK to profiles, version default and no updated_at", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("config_templates");
+
+    db.query("INSERT INTO profiles (name) VALUES (?)").run("hermes");
+
+    db.query(
+      "INSERT INTO config_templates (profile_name, config_yaml) VALUES (?, ?)",
+    ).run("hermes", "model:\n  default: gpt-4o\n");
+
+    const c = db
+      .query("SELECT * FROM config_templates WHERE profile_name = ?")
+      .get("hermes") as Record<string, unknown>;
+    expect(c).not.toBeNull();
+    expect(c!.profile_name).toBe("hermes");
+    expect(c!.config_yaml).toBe("model:\n  default: gpt-4o\n");
+    expect(c!.version).toBe(1);
+    expect(c!.updated_at).toBeNull();
+
+    expect(() => db.query("INSERT INTO config_templates (profile_name) VALUES (?)").run("ghost")).toThrow();
     db.close();
   });
 
@@ -513,6 +539,48 @@ function selectCount(db: ReturnType<typeof createDb>, sql: string): number {
   const row = db.query(sql).get() as { count: number };
   return Number(row.count);
 }
+
+describe("config_templates repo", () => {
+  test("getConfigTemplate returns null for missing templates", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    expect(getConfigTemplate(db, "hermes")).toBeNull();
+    expect(getConfigTemplate(db, "nobody")).toBeNull();
+    db.close();
+  });
+
+  test("upsertConfigTemplate inserts with version=1 and no updated_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o\n" });
+    const c = getConfigTemplate(db, "hermes");
+    expect(c).not.toBeNull();
+    expect(c!.profile_name).toBe("hermes");
+    expect(c!.config_yaml).toBe("model:\n  default: gpt-4o\n");
+    expect(c!.version).toBe(1);
+    expect(c!.updated_at).toBeNull();
+    db.close();
+  });
+
+  test("upsertConfigTemplate updates existing row, increments version and sets updated_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o\n" });
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o-mini\n" });
+    expect(selectCount(db, "SELECT COUNT(*) AS count FROM config_templates")).toBe(1);
+    const c = getConfigTemplate(db, "hermes");
+    expect(c!.config_yaml).toBe("model:\n  default: gpt-4o-mini\n");
+    expect(c!.version).toBe(2);
+    expect(c!.updated_at).not.toBeNull();
+    db.close();
+  });
+
+  test("upsertConfigTemplate throws on unknown profile (FK)", () => {
+    const db = createDb(":memory:");
+    expect(() => upsertConfigTemplate(db, "ghost", { config_yaml: "x" })).toThrow();
+    db.close();
+  });
+});
 
 describe("events repo", () => {
   test("insertEvent + listEvents returns newest first and respects limit", () => {

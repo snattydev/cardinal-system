@@ -7,6 +7,7 @@ import { handleGetAgent, handleListAgents } from "./api/agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/profiles";
 import { handleGetSoul } from "./api/souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
+import { handleGetConfig, handlePutConfig } from "./api/config";
 import { handleGetMemory, handlePutMemory } from "./api/memories";
 import { handleListSessions } from "./api/sessions";
 import { handleRagSearch } from "./api/rag";
@@ -105,6 +106,15 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleListProfileSkills(db, decodeURIComponent(profileSkillsMatch[1]!));
+      }
+
+      const configMatch = pathname.match(/^\/api\/config\/([^/]+)$/);
+      if (configMatch && (method === "GET" || method === "PUT")) {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        const name = decodeURIComponent(configMatch[1]!);
+        if (method === "PUT") return handlePutConfig(db, name, req);
+        return handleGetConfig(db, name);
       }
 
       const memoryMatch = pathname.match(/^\/api\/memories\/([^/]+)\/(memory|user)$/);

@@ -107,6 +107,14 @@ CREATE TABLE rag_cache (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+CREATE TABLE config_templates (
+  profile_name TEXT PRIMARY KEY REFERENCES profiles(name),
+  config_yaml TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT
+);
+`,
 ];
 
 export function migrate(db: Database): void {

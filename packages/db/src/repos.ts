@@ -4,6 +4,7 @@ import type {
   AgentRow,
   AgentKeyRow,
   AgentEventRow,
+  ConfigTemplateRow,
   MemoryMirrorRow,
   MemoryTarget,
   ProfileKind,
@@ -20,6 +21,7 @@ export type {
   AgentRow,
   AgentKeyRow,
   AgentEventRow,
+  ConfigTemplateRow,
   MemoryMirrorRow,
   MemoryTarget,
   ProfileKind,
@@ -165,6 +167,35 @@ export function upsertSoul(db: Database, profileName: string, fields: SoulFields
       fields.canon_ref ?? existing.canon_ref,
       profileName,
     ],
+  );
+}
+
+export function getConfigTemplate(db: Database, profileName: string): ConfigTemplateRow | null {
+  return (
+    (db
+      .query("SELECT * FROM config_templates WHERE profile_name = ?")
+      .get(profileName) as ConfigTemplateRow | null) ?? null
+  );
+}
+
+export interface ConfigFields {
+  config_yaml?: string | null;
+}
+
+export function upsertConfigTemplate(db: Database, profileName: string, fields: ConfigFields): void {
+  const existing = getConfigTemplate(db, profileName);
+  if (existing === null) {
+    db.run("INSERT INTO config_templates (profile_name, config_yaml) VALUES (?, ?)", [
+      profileName,
+      fields.config_yaml ?? null,
+    ]);
+    return;
+  }
+  db.run(
+    `UPDATE config_templates SET
+       config_yaml = ?, version = version + 1, updated_at = datetime('now')
+     WHERE profile_name = ?`,
+    [fields.config_yaml ?? existing.config_yaml, profileName],
   );
 }
 

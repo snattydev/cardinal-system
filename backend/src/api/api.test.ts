@@ -5,6 +5,7 @@ import {
   insertEvent,
   registerAgent,
   upsertAgentOnConnect,
+  upsertConfigTemplate,
   upsertMemoryMirror,
   upsertProfile,
   upsertSession,
@@ -19,6 +20,7 @@ import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./ski
 import { handleGetMemory, handlePutMemory } from "./memories";
 import { handleListSessions } from "./sessions";
 import { handleRagSearch } from "./rag";
+import { handleGetConfig, handlePutConfig } from "./config";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -579,6 +581,110 @@ describe("handleRagSearch", () => {
     const body = (await res.json()) as { error: string; detail: string };
     expect(body.error).toBe("rag_upstream_error");
     expect(typeof body.detail).toBe("string");
+    db.close();
+  });
+});
+
+describe("handleGetConfig", () => {
+  test("perfil inexistente → 404 {error: 'profile_not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleGetConfig(db, "ghost");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "profile_not_found" });
+    db.close();
+  });
+
+  test("perfil sin template → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const res = handleGetConfig(db, "hermes");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("template existente → 200 con {config}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o\n" });
+    const res = handleGetConfig(db, "hermes");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      profile_name: "hermes",
+      config_yaml: "model:\n  default: gpt-4o\n",
+      version: 1,
+      updated_at: null,
+    });
+    db.close();
+  });
+});
+
+describe("handlePutConfig", () => {
+  test("perfil inexistente → 404 {error: 'profile_not_found'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/config/ghost", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ config_yaml: "x" }),
+    });
+    const res = await handlePutConfig(db, "ghost", req);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "profile_not_found" });
+    db.close();
+  });
+
+  test("body no JSON → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const req = new Request("http://localhost/api/config/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "no es json",
+    });
+    const res = await handlePutConfig(db, "hermes", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+
+  test("crea un template con version 1", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const req = new Request("http://localhost/api/config/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ config_yaml: "model:\n  default: gpt-4o\n" }),
+    });
+    const res = await handlePutConfig(db, "hermes", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      profile_name: "hermes",
+      config_yaml: "model:\n  default: gpt-4o\n",
+      version: 1,
+    });
+    db.close();
+  });
+
+  test("actualiza template existente y bupea version", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o\n" });
+    const req = new Request("http://localhost/api/config/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ config_yaml: "model:\n  default: gpt-4o-mini\n" }),
+    });
+    const res = await handlePutConfig(db, "hermes", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { config: Record<string, unknown> };
+    expect(body.config).toMatchObject({
+      profile_name: "hermes",
+      config_yaml: "model:\n  default: gpt-4o-mini\n",
+      version: 2,
+    });
+    expect(body.config.updated_at).not.toBeNull();
     db.close();
   });
 });

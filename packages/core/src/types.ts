@@ -56,6 +56,13 @@ export interface SoulRow {
   updated_at: string | null;
 }
 
+export interface ConfigTemplateRow {
+  profile_name: string;
+  config_yaml: string | null;
+  version: number;
+  updated_at: string | null;
+}
+
 export interface SkillRow {
   name: string;
   description: string | null;
