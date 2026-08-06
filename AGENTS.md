@@ -330,6 +330,7 @@ Los subagentes heredan el modelo del primario. El default del proyecto es `openc
 - Config: `opencode.json` raíz (model default, default_agent, subagent_depth, permissions, MCPs)
 - Agentes: `.opencode/agents/<nombre>.md` (frontmatter + system prompt)
 - Comandos: `.opencode/commands/<nombre>.md`
+- Verificar el setup completo: `bash scripts/verify-dev-setup.sh` (agentes, rules, config)
 - El MCP de GitHub requiere `GITHUB_TOKEN` en el entorno: `set -x GITHUB_TOKEN (gh auth token)` (fish)
 - Extender: agente nuevo → archivo en `.opencode/agents/`; comando nuevo → `.opencode/commands/`; MCP nuevo → entrada en `opencode.json` → `mcp` + quitar su namespace del deny
 - Los MCPs globales (`ZerrantHive_*`, `pencil_*`) están deshabilitados en este proyecto
