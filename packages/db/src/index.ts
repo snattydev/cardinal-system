@@ -26,6 +26,9 @@ export {
   addSkillToProfile,
   getMemoryMirror,
   upsertMemoryMirror,
+  listSessions,
+  getSession,
+  upsertSession,
 } from "./repos";
 export type {
   AgentKind,
@@ -46,4 +49,6 @@ export type {
   MemoryMirrorFields,
   MemoryTarget,
   SyncDirection,
+  SessionRow,
+  SessionFields,
 } from "./repos";

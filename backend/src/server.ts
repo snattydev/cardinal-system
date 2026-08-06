@@ -8,6 +8,7 @@ import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/pr
 import { handleGetSoul } from "./api/souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
 import { handleGetMemory, handlePutMemory } from "./api/memories";
+import { handleListSessions } from "./api/sessions";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -83,6 +84,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleListSkills(db);
+      }
+
+      if (pathname === "/api/sessions" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListSessions(db);
       }
 
       const skillMatch = pathname.match(/^\/api\/skills\/([^/]+)$/);

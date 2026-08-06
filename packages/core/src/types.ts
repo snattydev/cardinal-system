@@ -78,3 +78,15 @@ export interface MemoryMirrorRow {
   last_synced: string | null;
   sync_direction: SyncDirection;
 }
+
+export interface SessionRow {
+  id: string;
+  profile_name: string;
+  title: string | null;
+  model: string | null;
+  started_at: number | null;
+  message_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost: number;
+}

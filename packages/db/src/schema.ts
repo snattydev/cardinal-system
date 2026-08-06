@@ -85,6 +85,19 @@ CREATE TABLE memory_mirror (
   PRIMARY KEY (profile_name, target)
 );
 `,
+  `
+CREATE TABLE sessions_index (
+  id            TEXT PRIMARY KEY,
+  profile_name  TEXT NOT NULL REFERENCES profiles(name),
+  title         TEXT,
+  model         TEXT,
+  started_at    REAL,
+  message_count INTEGER NOT NULL DEFAULT 0,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  estimated_cost REAL NOT NULL DEFAULT 0
+);
+`,
 ];
 
 export function migrate(db: Database): void {

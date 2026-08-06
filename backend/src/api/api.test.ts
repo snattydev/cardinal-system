@@ -7,6 +7,7 @@ import {
   upsertAgentOnConnect,
   upsertMemoryMirror,
   upsertProfile,
+  upsertSession,
   upsertSkill,
   upsertSoul,
 } from "@cardinal/db";
@@ -16,6 +17,7 @@ import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profil
 import { handleGetSoul } from "./souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./skills";
 import { handleGetMemory, handlePutMemory } from "./memories";
+import { handleListSessions } from "./sessions";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -446,6 +448,37 @@ describe("handleListProfileSkills", () => {
     const body = (await res.json()) as { skills: Array<{ name: string; pinned: number }> };
     expect(body.skills.map((s) => s.name)).toEqual(["bash", "git"]);
     expect(body.skills[1]).toMatchObject({ name: "git", pinned: 1 });
+    db.close();
+  });
+});
+
+describe("handleListSessions", () => {
+  test("DB vacía → {sessions: []}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListSessions(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ sessions: [] });
+    db.close();
+  });
+
+  test("con sesiones → lista ordenada por started_at DESC con profile_name", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertProfile(db, "shinon", {});
+    upsertSession(db, { id: "s1", profile_name: "hermes", title: "Hola", started_at: 100 });
+    upsertSession(db, { id: "s2", profile_name: "shinon", title: "Chau", started_at: 200 });
+    upsertSession(db, { id: "s3", profile_name: "hermes", title: "Media", started_at: 150 });
+    const res = handleListSessions(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { sessions: Array<Record<string, unknown>> };
+    expect(body.sessions.map((s) => s.id)).toEqual(["s2", "s3", "s1"]);
+    expect(body.sessions[0]).toMatchObject({
+      id: "s2",
+      profile_name: "shinon",
+      title: "Chau",
+      started_at: 200,
+      message_count: 0,
+    });
     db.close();
   });
 });

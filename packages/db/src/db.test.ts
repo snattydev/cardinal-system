@@ -7,6 +7,7 @@ import {
   getAgent,
   getMemoryMirror,
   getProfile,
+  getSession,
   getSkill,
   getSoul,
   getSystemCounts,
@@ -15,6 +16,7 @@ import {
   listEvents,
   listKeys,
   listProfiles,
+  listSessions,
   listSkills,
   listSkillsForProfile,
   markAgentDisconnected,
@@ -25,6 +27,7 @@ import {
   upsertAgentOnConnect,
   upsertMemoryMirror,
   upsertProfile,
+  upsertSession,
   upsertSkill,
   upsertSoul,
 } from "./repos";
@@ -37,7 +40,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 8 tables and sets user_version to 5", () => {
+  test("migrate creates the 9 tables and sets user_version to 6", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -46,11 +49,12 @@ describe("migrations", () => {
       "memory_mirror",
       "profile_skills",
       "profiles",
+      "sessions_index",
       "skills",
       "souls",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(5);
+    expect(row.user_version).toBe(6);
     db.close();
   });
 
@@ -59,8 +63,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(5);
-    expect(tableNames(db)).toHaveLength(8);
+    expect(row.user_version).toBe(6);
+    expect(tableNames(db)).toHaveLength(9);
     db.close();
   });
 
@@ -183,6 +187,47 @@ describe("migrations", () => {
       db
         .query("INSERT INTO memory_mirror (profile_name, target, sync_direction) VALUES (?, ?, ?)")
         .run("hermes", "memory", "nope"),
+    ).toThrow();
+    db.close();
+  });
+
+  test("migration 5 creates the sessions_index table with FK, defaults and REAL started_at", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("sessions_index");
+
+    db.query("INSERT INTO profiles (name) VALUES (?)").run("hermes");
+
+    db.query(
+      "INSERT INTO sessions_index (id, profile_name, title, model, started_at, message_count, input_tokens, output_tokens, estimated_cost) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ).run("s1", "hermes", "Hola", "gpt-4o", 1700000000.5, 5, 100, 50, 0.02);
+
+    const s = db
+      .query("SELECT * FROM sessions_index WHERE id = ?")
+      .get("s1") as Record<string, unknown>;
+    expect(s).not.toBeNull();
+    expect(s!.profile_name).toBe("hermes");
+    expect(s!.title).toBe("Hola");
+    expect(s!.model).toBe("gpt-4o");
+    expect(s!.started_at).toBe(1700000000.5);
+    expect(s!.message_count).toBe(5);
+    expect(s!.input_tokens).toBe(100);
+    expect(s!.output_tokens).toBe(50);
+    expect(s!.estimated_cost).toBe(0.02);
+
+    db.query("INSERT INTO sessions_index (id, profile_name) VALUES (?, ?)").run("s2", "hermes");
+    const s2 = db
+      .query("SELECT * FROM sessions_index WHERE id = ?")
+      .get("s2") as Record<string, unknown>;
+    expect(s2!.title).toBeNull();
+    expect(s2!.model).toBeNull();
+    expect(s2!.started_at).toBeNull();
+    expect(s2!.message_count).toBe(0);
+    expect(s2!.input_tokens).toBe(0);
+    expect(s2!.output_tokens).toBe(0);
+    expect(s2!.estimated_cost).toBe(0);
+
+    expect(() =>
+      db.query("INSERT INTO sessions_index (id, profile_name) VALUES (?, ?)").run("s3", "ghost"),
     ).toThrow();
     db.close();
   });
@@ -615,6 +660,80 @@ describe("memory_mirror repo", () => {
   test("upsertMemoryMirror throws on unknown profile (FK)", () => {
     const db = createDb(":memory:");
     expect(() => upsertMemoryMirror(db, "ghost", "memory", { content: "x" })).toThrow();
+    db.close();
+  });
+});
+
+describe("sessions repo", () => {
+  test("listSessions returns empty on empty db", () => {
+    const db = createDb(":memory:");
+    expect(listSessions(db)).toEqual([]);
+    db.close();
+  });
+
+  test("listSessions ordered by started_at DESC with profile_name via JOIN", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertProfile(db, "shinon", {});
+    upsertSession(db, { id: "s1", profile_name: "hermes", started_at: 100 });
+    upsertSession(db, { id: "s2", profile_name: "shinon", started_at: 300 });
+    upsertSession(db, { id: "s3", profile_name: "hermes", started_at: 200 });
+    const sessions = listSessions(db);
+    expect(sessions.map((s) => s.id)).toEqual(["s2", "s3", "s1"]);
+    expect(sessions[0].profile_name).toBe("shinon");
+    db.close();
+  });
+
+  test("getSession returns row for existing id and null for missing", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSession(db, { id: "s1", profile_name: "hermes", title: "Hola", started_at: 100 });
+    const s = getSession(db, "s1");
+    expect(s).not.toBeNull();
+    expect(s!.profile_name).toBe("hermes");
+    expect(s!.title).toBe("Hola");
+    expect(getSession(db, "missing")).toBeNull();
+    db.close();
+  });
+
+  test("upsertSession inserts with defaults for counters", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSession(db, { id: "s1", profile_name: "hermes", title: "Hola", started_at: 100 });
+    const s = getSession(db, "s1");
+    expect(s).not.toBeNull();
+    expect(s!.message_count).toBe(0);
+    expect(s!.input_tokens).toBe(0);
+    expect(s!.output_tokens).toBe(0);
+    expect(s!.estimated_cost).toBe(0);
+    db.close();
+  });
+
+  test("upsertSession updates existing row by id and preserves unset fields", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSession(db, {
+      id: "s1",
+      profile_name: "hermes",
+      title: "Hola",
+      started_at: 100,
+      message_count: 5,
+    });
+    upsertSession(db, { id: "s1", profile_name: "hermes", title: "Chau", input_tokens: 50 });
+    expect(selectCount(db, "SELECT COUNT(*) AS count FROM sessions_index")).toBe(1);
+    const s = getSession(db, "s1");
+    expect(s!.title).toBe("Chau");
+    expect(s!.started_at).toBe(100);
+    expect(s!.message_count).toBe(5);
+    expect(s!.input_tokens).toBe(50);
+    expect(s!.output_tokens).toBe(0);
+    expect(s!.estimated_cost).toBe(0);
+    db.close();
+  });
+
+  test("upsertSession throws on unknown profile (FK)", () => {
+    const db = createDb(":memory:");
+    expect(() => upsertSession(db, { id: "s1", profile_name: "ghost" })).toThrow();
     db.close();
   });
 });

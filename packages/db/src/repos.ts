@@ -9,6 +9,7 @@ import type {
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  SessionRow,
   SkillRow,
   SoulRow,
   SyncDirection,
@@ -24,6 +25,7 @@ export type {
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  SessionRow,
   SkillRow,
   SoulRow,
   SyncDirection,
@@ -374,6 +376,69 @@ export function upsertMemoryMirror(
       fields.sync_direction ?? existing.sync_direction,
       profileName,
       target,
+    ],
+  );
+}
+
+export function listSessions(db: Database): SessionRow[] {
+  return db
+    .query(
+      `SELECT s.* FROM sessions_index s
+       JOIN profiles p ON p.name = s.profile_name
+       ORDER BY s.started_at DESC`,
+    )
+    .all() as SessionRow[];
+}
+
+export function getSession(db: Database, id: string): SessionRow | null {
+  return (db.query("SELECT * FROM sessions_index WHERE id = ?").get(id) as SessionRow | null) ?? null;
+}
+
+export interface SessionFields {
+  id: string;
+  profile_name: string;
+  title?: string | null;
+  model?: string | null;
+  started_at?: number | null;
+  message_count?: number;
+  input_tokens?: number;
+  output_tokens?: number;
+  estimated_cost?: number;
+}
+
+export function upsertSession(db: Database, session: SessionFields): void {
+  const existing = getSession(db, session.id);
+  if (existing === null) {
+    db.run(
+      `INSERT INTO sessions_index (id, profile_name, title, model, started_at, message_count, input_tokens, output_tokens, estimated_cost)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        session.id,
+        session.profile_name,
+        session.title ?? null,
+        session.model ?? null,
+        session.started_at ?? null,
+        session.message_count ?? 0,
+        session.input_tokens ?? 0,
+        session.output_tokens ?? 0,
+        session.estimated_cost ?? 0,
+      ],
+    );
+    return;
+  }
+  db.run(
+    `UPDATE sessions_index SET
+       title = ?, model = ?, started_at = ?, message_count = ?, input_tokens = ?, output_tokens = ?, estimated_cost = ?
+     WHERE id = ?`,
+    [
+      session.title !== undefined ? session.title : existing.title,
+      session.model !== undefined ? session.model : existing.model,
+      session.started_at !== undefined ? session.started_at : existing.started_at,
+      session.message_count !== undefined ? session.message_count : existing.message_count,
+      session.input_tokens !== undefined ? session.input_tokens : existing.input_tokens,
+      session.output_tokens !== undefined ? session.output_tokens : existing.output_tokens,
+      session.estimated_cost !== undefined ? session.estimated_cost : existing.estimated_cost,
+      session.id,
     ],
   );
 }
