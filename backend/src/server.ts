@@ -4,6 +4,7 @@ import type { Config } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
+import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/profiles";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -45,6 +46,21 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetAgent(db, decodeURIComponent(agentMatch[1]!));
+      }
+
+      if (pathname === "/api/profiles" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListProfiles(db);
+      }
+
+      const profileMatch = pathname.match(/^\/api\/profiles\/([^/]+)$/);
+      if (profileMatch && (method === "GET" || method === "PUT")) {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        const name = decodeURIComponent(profileMatch[1]!);
+        if (method === "PUT") return handlePutProfile(db, name, req);
+        return handleGetProfile(db, name);
       }
 
       if (pathname === "/api/system" && method === "GET") {

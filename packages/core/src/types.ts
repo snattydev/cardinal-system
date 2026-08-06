@@ -28,3 +28,20 @@ export interface AgentEventRow {
   meta: string | null;
   at: string;
 }
+
+export type ProfileKind = "permanent" | "one-shot";
+export type ProfileStatus = "active" | "dormant" | "liberated";
+
+export interface ProfileRow {
+  name: string;
+  display_name: string | null;
+  emoji: string | null;
+  kind: ProfileKind;
+  status: ProfileStatus;
+  model_default: string | null;
+  provider_default: string | null;
+  device: string | null;
+  last_onboarded: string | null;
+  created_at: string;
+  updated_at: string | null;
+}

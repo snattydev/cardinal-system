@@ -1,8 +1,131 @@
 import { describe, expect, test } from "bun:test";
-import { createDb, insertEvent, registerAgent, upsertAgentOnConnect } from "@cardinal/db";
+import { createDb, insertEvent, registerAgent, upsertAgentOnConnect, upsertProfile } from "@cardinal/db";
 import { handleHealth } from "./health";
 import { handleGetAgent, handleListAgents } from "./agents";
+import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profiles";
 import rootPkg from "../../../package.json";
+
+describe("handleListProfiles", () => {
+  test("DB vacía → {profiles: []}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListProfiles(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ profiles: [] });
+    db.close();
+  });
+
+  test("con perfiles → lista ordenada por name", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "shinon", { display_name: "Shinon" });
+    upsertProfile(db, "kirito", {});
+    const res = handleListProfiles(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { profiles: Array<{ name: string }> };
+    expect(body.profiles.map((p) => p.name)).toEqual(["kirito", "shinon"]);
+    db.close();
+  });
+});
+
+describe("handleGetProfile", () => {
+  test("perfil desconocido → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleGetProfile(db, "nobody");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("perfil conocido → 200 con {profile}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", emoji: "🧙" });
+    const res = handleGetProfile(db, "hermes");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { profile: Record<string, unknown> };
+    expect(body.profile).toMatchObject({
+      name: "hermes",
+      display_name: "Hermes",
+      emoji: "🧙",
+      kind: "permanent",
+      status: "active",
+    });
+    db.close();
+  });
+});
+
+describe("handlePutProfile", () => {
+  test("crea un perfil con defaults", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/profiles/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ display_name: "Hermes", emoji: "🧙" }),
+    });
+    const res = await handlePutProfile(db, "hermes", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { profile: Record<string, unknown> };
+    expect(body.profile).toMatchObject({ name: "hermes", kind: "permanent", status: "active" });
+    db.close();
+  });
+
+  test("actualiza campos existentes y preserva los no enviados", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", device: "laptop" });
+    const req = new Request("http://localhost/api/profiles/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "dormant" }),
+    });
+    const res = await handlePutProfile(db, "hermes", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { profile: Record<string, unknown> };
+    expect(body.profile).toMatchObject({
+      name: "hermes",
+      status: "dormant",
+      display_name: "Hermes",
+      device: "laptop",
+    });
+    db.close();
+  });
+
+  test("kind inválido → 400 {error: 'invalid_kind'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/profiles/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ kind: "ghost" }),
+    });
+    const res = await handlePutProfile(db, "hermes", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_kind" });
+    db.close();
+  });
+
+  test("status inválido → 400 {error: 'invalid_status'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/profiles/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ status: "zombie" }),
+    });
+    const res = await handlePutProfile(db, "hermes", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_status" });
+    db.close();
+  });
+
+  test("body no JSON → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/profiles/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "no es json",
+    });
+    const res = await handlePutProfile(db, "hermes", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+});
 
 describe("handleHealth", () => {
   test("200 con status ok y la versión del package.json raíz", async () => {
