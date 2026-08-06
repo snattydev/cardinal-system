@@ -2,8 +2,10 @@ import { describe, expect, test } from "bun:test";
 import {
   addSkillToProfile,
   createDb,
+  getAgent,
   insertEvent,
   registerAgent,
+  updateAgentDeviceInfo,
   upsertAgentOnConnect,
   upsertConfigTemplate,
   upsertMemoryMirror,
@@ -14,6 +16,7 @@ import {
 } from "@cardinal/db";
 import { handleHealth } from "./health";
 import { handleGetAgent, handleListAgents } from "./agents";
+import { handleDeviceHeartbeat, handleListDevices } from "./devices";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profiles";
 import { handleGetSoul } from "./souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./skills";
@@ -716,6 +719,94 @@ describe("handleListSessions", () => {
       started_at: 200,
       message_count: 0,
     });
+    db.close();
+  });
+});
+
+describe("handleListDevices", () => {
+  test("DB vacía → {devices: []}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListDevices(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ devices: [] });
+    db.close();
+  });
+
+  test("agentes con device_info → devices deduplicados por hostname con count", async () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    upsertAgentOnConnect(db, { name: "asuna", device: "pc", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "kirito", { hostname: "home-pc", platform: "linux", arch: "x86_64" });
+    updateAgentDeviceInfo(db, "asuna", { hostname: "home-pc" });
+    const res = handleListDevices(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { devices: Array<Record<string, unknown>> };
+    expect(body.devices).toHaveLength(1);
+    expect(body.devices[0]).toMatchObject({ id: "home-pc", hostname: "home-pc", agents: 2 });
+    db.close();
+  });
+});
+
+describe("handleDeviceHeartbeat", () => {
+  const heartbeatReq = (body: unknown): Request =>
+    new Request("http://localhost/api/devices/heartbeat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  test("body no JSON → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/devices/heartbeat", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "no es json",
+    });
+    const res = await handleDeviceHeartbeat(db, "shinon", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+
+  test("agente desconocido → 404 {error: 'agent_not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = await handleDeviceHeartbeat(db, "ghost", heartbeatReq({ info: { hostname: "pc" } }));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "agent_not_found" });
+    db.close();
+  });
+
+  test("heartbeat válido → 200 con {device} y persiste device_info", async () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    const res = await handleDeviceHeartbeat(
+      db,
+      "kirito",
+      heartbeatReq({
+        info: { hostname: "home-pc", platform: "linux", arch: "x86_64", gpu: "RTX 4090", ram_gb: 64, ip: "10.0.0.2" },
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { device: Record<string, unknown> };
+    expect(body.device).toMatchObject({
+      id: "home-pc",
+      hostname: "home-pc",
+      platform: "linux",
+      arch: "x86_64",
+      gpu: "RTX 4090",
+      ram_gb: 64,
+      ip: "10.0.0.2",
+    });
+    expect(getAgent(db, "kirito")!.device).toBe("home-pc");
+    db.close();
+  });
+
+  test("info que no es objeto → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    const res = await handleDeviceHeartbeat(db, "kirito", heartbeatReq({ info: "pc" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
     db.close();
   });
 });

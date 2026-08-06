@@ -158,9 +158,33 @@ describe("Hub", () => {
     expect(getAgent(db, "shinon")?.connected).toBe(0);
     expect(listEvents(db, "shinon").some((e) => e.type === "disconnect")).toBe(true);
     expect(agent.closed[0]).toEqual({ code: 1000, reason: "bye" });
-    const last = dash.sent[dash.sent.length - 1] as { type: string; agent: { connected: boolean } };
-    expect(last.type).toBe("agent_update");
-    expect(last.agent.connected).toBe(false);
+    const msgs = dash.sent as Array<{ type: string; agent?: { connected: boolean }; devices?: unknown[] }>;
+    const updates = msgs.filter((m) => m.type === "agent_update");
+    expect(updates[updates.length - 1].agent?.connected).toBe(false);
+    const deviceUpdates = msgs.filter((m) => m.type === "devices_update");
+    expect(deviceUpdates).toHaveLength(2);
+    const lastDevices = deviceUpdates[deviceUpdates.length - 1].devices as Array<{ id: string }>;
+    expect(lastDevices[0]).toMatchObject({ id: "pc" });
+  });
+
+  test("hello emite devices_update a dashboards después de agent_update", () => {
+    const { hub } = makeHub();
+    const dash = mockWs({ dashboardAuthed: true });
+    hub.websocket.message(dash.ws, JSON.stringify({ type: "subscribe" }));
+
+    const agent = mockWs();
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc", status: "idle" }));
+
+    const updates = dash.sent.filter((m) => (m as { type: string }).type === "agent_update");
+    expect(updates).toHaveLength(1);
+    const devicesMsg = dash.sent.find((m) => (m as { type: string }).type === "devices_update") as {
+      type: string;
+      devices: Array<Record<string, unknown>>;
+    };
+    expect(devicesMsg.type).toBe("devices_update");
+    expect(Array.isArray(devicesMsg.devices)).toBe(true);
+    expect(devicesMsg.devices).toHaveLength(1);
+    expect(devicesMsg.devices[0]).toMatchObject({ id: "pc", agents: 1 });
   });
 
   test("dos pings sin pong → desconecta y cierra con ping_timeout", async () => {

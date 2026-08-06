@@ -5,6 +5,7 @@ import type {
   AgentKeyRow,
   AgentEventRow,
   ConfigTemplateRow,
+  DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
   ProfileKind,
@@ -22,6 +23,7 @@ export type {
   AgentKeyRow,
   AgentEventRow,
   ConfigTemplateRow,
+  DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
   ProfileKind,
@@ -68,6 +70,88 @@ export function listAgents(db: Database): AgentRow[] {
 
 export function getAgent(db: Database, name: string): AgentRow | null {
   return (db.query("SELECT * FROM agents WHERE name = ?").get(name) as AgentRow | null) ?? null;
+}
+
+export function updateAgentDeviceInfo(db: Database, name: string, info: Record<string, unknown>): void {
+  const device = typeof info.hostname === "string" && info.hostname.length > 0 ? info.hostname : undefined;
+  const serialized = JSON.stringify(info);
+  if (device !== undefined) {
+    db.run(
+      "UPDATE agents SET device = ?, device_info = ?, last_seen = datetime('now') WHERE name = ?",
+      [device, serialized, name],
+    );
+  } else {
+    db.run("UPDATE agents SET device_info = ?, last_seen = datetime('now') WHERE name = ?", [
+      serialized,
+      name,
+    ]);
+  }
+}
+
+export function listDevices(db: Database): DeviceRow[] {
+  const rows = db
+    .query(
+      "SELECT name, device, device_info, last_seen FROM agents ORDER BY name",
+    )
+    .all() as Array<{
+    name: string;
+    device: string;
+    device_info: string | null;
+    last_seen: string | null;
+  }>;
+
+  const grouped = new Map<
+    string,
+    { info: Record<string, unknown>; profiles: string[]; lastSeen: string | null; count: number }
+  >();
+
+  for (const row of rows) {
+    let info: Record<string, unknown> = {};
+    let hasInfo = false;
+    if (row.device_info !== null && row.device_info.length > 0) {
+      try {
+        info = JSON.parse(row.device_info) as Record<string, unknown>;
+        hasInfo = true;
+      } catch {
+        info = {};
+      }
+    }
+    const hostname = typeof info.hostname === "string" && info.hostname.length > 0 ? info.hostname : null;
+    const id = hostname ?? row.device;
+
+    const entry = grouped.get(id);
+    if (entry === undefined) {
+      grouped.set(id, { info, profiles: [row.name], lastSeen: row.last_seen, count: 1 });
+    } else {
+      if (hasInfo) entry.info = { ...entry.info, ...info };
+      entry.profiles.push(row.name);
+      entry.count += 1;
+      if (
+        row.last_seen !== null &&
+        (entry.lastSeen === null || row.last_seen > entry.lastSeen)
+      ) {
+        entry.lastSeen = row.last_seen;
+      }
+    }
+  }
+
+  return [...grouped.entries()]
+    .map(([id, entry]): DeviceRow => {
+      const info = entry.info;
+      return {
+        id,
+        hostname: typeof info.hostname === "string" ? info.hostname : null,
+        platform: typeof info.platform === "string" ? info.platform : null,
+        arch: typeof info.arch === "string" ? info.arch : null,
+        gpu: typeof info.gpu === "string" ? info.gpu : null,
+        ram_gb: typeof info.ram_gb === "number" ? info.ram_gb : null,
+        ip: typeof info.ip === "string" ? info.ip : null,
+        last_seen: entry.lastSeen,
+        profiles: entry.profiles.sort(),
+        agents: entry.count,
+      };
+    })
+    .sort((a, b) => a.id.localeCompare(b.id));
 }
 
 export function listProfiles(db: Database): ProfileRow[] {

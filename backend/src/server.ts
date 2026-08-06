@@ -4,6 +4,7 @@ import type { Config } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
+import { handleDeviceHeartbeat, handleListDevices } from "./api/devices";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/profiles";
 import { handleGetSoul } from "./api/souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
@@ -52,6 +53,24 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetAgent(db, decodeURIComponent(agentMatch[1]!));
+      }
+
+      if (pathname === "/api/devices" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListDevices(db);
+      }
+
+      if (pathname === "/api/devices/heartbeat" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        const body = (await req.clone().json().catch(() => null)) as
+          | { agent?: unknown }
+          | null
+          | undefined;
+        const name = typeof body?.agent === "string" ? body.agent : null;
+        if (!name) return json({ error: "bad_request" }, 400);
+        return handleDeviceHeartbeat(db, name, req);
       }
 
       if (pathname === "/api/profiles" && method === "GET") {

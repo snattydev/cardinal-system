@@ -1,6 +1,7 @@
 export type { Config } from "./config";
 export { loadConfig } from "./config";
 export type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow } from "./types";
+export type { DeviceInfo, DeviceRow } from "./types";
 export type { ProfileKind, ProfileStatus, ProfileRow } from "./types";
 export type { SoulRow, SkillRow } from "./types";
 export type { ConfigTemplateRow } from "./types";

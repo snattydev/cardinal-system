@@ -8,6 +8,29 @@ export interface AgentRow {
   connected: number;
   last_seen: string | null;
   created_at: string;
+  device_info: string | null;
+}
+
+export interface DeviceInfo {
+  hostname?: string;
+  platform?: string;
+  arch?: string;
+  gpu?: string;
+  ram_gb?: number;
+  ip?: string;
+}
+
+export interface DeviceRow {
+  id: string;
+  hostname: string | null;
+  platform: string | null;
+  arch: string | null;
+  gpu: string | null;
+  ram_gb: number | null;
+  ip: string | null;
+  last_seen: string | null;
+  profiles: string[];
+  agents: number;
 }
 
 export interface AgentKeyRow {

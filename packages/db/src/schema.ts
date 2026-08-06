@@ -115,6 +115,9 @@ CREATE TABLE config_templates (
   updated_at TEXT
 );
 `,
+  `
+ALTER TABLE agents ADD COLUMN device_info TEXT;
+`,
 ];
 
 export function migrate(db: Database): void {

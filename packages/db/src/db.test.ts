@@ -14,6 +14,7 @@ import {
   getSystemCounts,
   insertEvent,
   listAgents,
+  listDevices,
   listEvents,
   listKeys,
   listProfiles,
@@ -24,6 +25,7 @@ import {
   registerAgent,
   revokeKeysForAgent,
   touchKey,
+  updateAgentDeviceInfo,
   updateAgentStatus,
   upsertAgentOnConnect,
   upsertConfigTemplate,
@@ -42,7 +44,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 11 tables and sets user_version to 8", () => {
+  test("migrate creates the 11 tables and sets user_version to 9", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -58,7 +60,7 @@ describe("migrations", () => {
       "souls",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(8);
+    expect(row.user_version).toBe(9);
     db.close();
   });
 
@@ -67,8 +69,18 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(8);
+    expect(row.user_version).toBe(9);
     expect(tableNames(db)).toHaveLength(11);
+    db.close();
+  });
+
+  test("migration 8 adds the device_info TEXT column to agents", () => {
+    const db = createDb(":memory:");
+    const cols = db.query("PRAGMA table_info(agents)").all() as Array<{ name: string }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("device_info");
+    const row = db.query("PRAGMA user_version").get() as { user_version: number };
+    expect(row.user_version).toBe(9);
     db.close();
   });
 
@@ -347,6 +359,98 @@ describe("agents repo", () => {
     registerAgent(db, "kirito", "subagent");
     expect(listAgents(db).map((a) => a.name)).toEqual(["asuna", "kirito", "shinon"]);
     expect(getAgent(db, "nobody")).toBeNull();
+    db.close();
+  });
+});
+
+describe("device registry repo", () => {
+  test("updateAgentDeviceInfo stores JSON in device_info and bumps last_seen", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "shinon", device: "pc", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "shinon", {
+      hostname: "home-pc",
+      platform: "linux",
+      arch: "x86_64",
+      gpu: "RTX 4090",
+      ram_gb: 64,
+      ip: "192.168.1.5",
+    });
+    const agent = getAgent(db, "shinon");
+    expect(agent!.device_info).not.toBeNull();
+    const info = JSON.parse(agent!.device_info!) as Record<string, unknown>;
+    expect(info).toMatchObject({
+      hostname: "home-pc",
+      platform: "linux",
+      arch: "x86_64",
+      gpu: "RTX 4090",
+      ram_gb: 64,
+      ip: "192.168.1.5",
+    });
+    expect(agent!.last_seen).not.toBeNull();
+    db.close();
+  });
+
+  test("updateAgentDeviceInfo sets agents.device from info.hostname", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "shinon", device: "pc", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "shinon", { hostname: "laptop-sao" });
+    expect(getAgent(db, "shinon")!.device).toBe("laptop-sao");
+    db.close();
+  });
+
+  test("listDevices returns empty on empty db", () => {
+    const db = createDb(":memory:");
+    expect(listDevices(db)).toEqual([]);
+    db.close();
+  });
+
+  test("listDevices groups agents by hostname with count, last_seen and profiles", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    upsertAgentOnConnect(db, { name: "asuna", device: "pc", kind: "agent", status: "idle" });
+    upsertAgentOnConnect(db, { name: "lisbeth", device: "laptop", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "kirito", {
+      hostname: "home-pc",
+      platform: "linux",
+      arch: "x86_64",
+      gpu: "RTX",
+      ram_gb: 32,
+      ip: "10.0.0.2",
+    });
+    updateAgentDeviceInfo(db, "asuna", { hostname: "home-pc" });
+    updateAgentDeviceInfo(db, "lisbeth", { hostname: "macbook", platform: "macos", arch: "arm64", ram_gb: 16 });
+
+    const devices = listDevices(db);
+    expect(devices).toHaveLength(2);
+    const homePc = devices.find((d) => d.id === "home-pc")!;
+    expect(homePc).toMatchObject({
+      id: "home-pc",
+      hostname: "home-pc",
+      platform: "linux",
+      arch: "x86_64",
+      gpu: "RTX",
+      ram_gb: 32,
+      ip: "10.0.0.2",
+    });
+    expect(homePc.agents).toBe(2);
+    expect(homePc.profiles.sort()).toEqual(["asuna", "kirito"]);
+    const macbook = devices.find((d) => d.id === "macbook")!;
+    expect(macbook).toMatchObject({ platform: "macos", arch: "arm64", ram_gb: 16 });
+    expect(macbook.agents).toBe(1);
+    expect(macbook.profiles).toEqual(["lisbeth"]);
+    db.close();
+  });
+
+  test("listDevices falls back to agents.device when device_info has no hostname", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "workstation", kind: "agent", status: "idle" });
+    upsertAgentOnConnect(db, { name: "asuna", device: "workstation", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "kirito", { platform: "linux" });
+    const devices = listDevices(db);
+    expect(devices).toHaveLength(1);
+    expect(devices[0]).toMatchObject({ id: "workstation", platform: "linux" });
+    expect(devices[0].agents).toBe(2);
+    expect(devices[0].profiles.sort()).toEqual(["asuna", "kirito"]);
     db.close();
   });
 });
