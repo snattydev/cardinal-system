@@ -16,10 +16,8 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 4 | Crear `packages/keys/` — keygen, hash SHA-256, validate, revoke | OpenCode GO | Sí | ✅ (PR #5) |
 | 5 | Crear `packages/ws/` — protocolo zod, hub, agent lifecycle | OpenCode GO | Sí | ✅ (PR #5) |
 | 6 | Adelgazar `backend/src/index.ts` — solo composición de packages | Antigravity | No | ✅ (PR #5) |
-| 7 | Crear `tools/agy-acp-bridge.py` — wrapper ACP para ZED | Antigravity | No | ⬜ (¿ZED en uso?) |
-| 8 | Registrar bridge en `~/.config/zed/settings.json` | Manual | — | ⬜ (¿ZED en uso?) |
 
-> Actualizado 2026-08-06: tareas 1–6 completadas en PR #5 (v0.1.1). 7–8 dependen de si ZED sigue en uso.
+> Actualizado 2026-08-06: tareas 1–6 completadas en PR #5 (v0.1.1). Las tareas de bridge ACP para ZED del checklist original se eliminaron — ZED no está en uso.
 
 ---
 
@@ -88,7 +86,7 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 ## 📊 Progreso
 
 ```
-Pre-F1 refactors:  6/8  ████████████████░░░░
+Pre-F1 refactors:  6/6  ████████████████████
 F1 features:        0/17 ░░░░░░░░░░░░░░░░░░░░
-Total F1:           6/25 █████░░░░░░░░░░░░░░░░░
+Total F1:           6/23 █████░░░░░░░░░░░░░░░░░
 ```
