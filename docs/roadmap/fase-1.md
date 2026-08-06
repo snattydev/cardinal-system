@@ -23,13 +23,13 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ## 1. Fase 1: Features del Context Store
 
-### 1.1 Profile Registry
+### 1.1 Profile Registry ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.1.1 | Tabla `profiles` en DB (name, device, skin, config_ref) | Cursor Pro | Sí |
-| 1.1.2 | API `GET/PUT /api/profiles` | Cursor Pro | Sí |
-| 1.1.3 | Sincronizar con perfiles Hermes existentes (PC) | Antigravity | No |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.1.1 | Tabla `profiles` en DB (name, device, skin, config_ref) | opencode | Sí | ✅ (534d8bb) |
+| 1.1.2 | API `GET/PUT /api/profiles` | opencode | Sí | ✅ (f069191) |
+| 1.1.3 | Sincronizar con perfiles Hermes existentes (PC) | directo | No | ✅ (seed-profiles.py — 4/4) |
 
 ### 1.2 SOUL Registry
 
@@ -87,6 +87,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        0/17 ░░░░░░░░░░░░░░░░░░░░
-Total F1:           6/23 █████░░░░░░░░░░░░░░░░░
+F1 features:        3/17 ███░░░░░░░░░░░░░░░░░
+Total F1:           9/23 █████████░░░░░░░░░░░░░
 ```
