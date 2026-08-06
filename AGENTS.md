@@ -285,3 +285,51 @@ cardinal-system/
 ---
 
 *Reglas vivas. Si algo cambia, este archivo se actualiza.*
+
+---
+
+## 🕸️ Swarm Workflow (OpenCode)
+
+El repo tiene setup multi-agente de OpenCode (ver `.opencode/`).
+
+- **Features de 1-2 archivos sin lógica crítica** → implementación directa, sin workflow completo
+- **Features con dependencias o lógica crítica** → `/feature "descripción"` desde OpenCode
+- **`/review`** → code review del working tree contra `dev`
+- **`/test [path]`** → TDD workflow (tester escribe RED, builder hace GREEN)
+- **`/deploy`** → build + tests + containers + healthcheck
+- El orquestador (primary agent) descompone, delega y verifica. Los subagentes son efímeros.
+
+## 🤖 Agent Roles (OpenCode)
+
+| Agente | Modo | Modelo | Rol |
+|--------|------|--------|-----|
+| `orchestrator` | primary | `opencode-go/deepseek-v4-pro` | Descompone, delega, verifica, sugiere commits. No escribe código |
+| `builder` | subagent | hereda | Implementa features (packages, backend, frontend) |
+| `tester` | subagent | hereda | TDD estricto (RED → GREEN) en `*.test.ts` |
+| `reviewer` | subagent | hereda | Code review read-only, output CRITICAL/HIGH/LOW |
+| `docs` | subagent | hereda | Documentación en `docs/features/` |
+
+Los subagentes heredan el modelo del primario. El default del proyecto es `opencode-go/deepseek-v4-flash`.
+
+## 📤 Delegation Rules
+
+- El orchestrator **no escribe código** — solo coordina, verifica y sugiere commits
+- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
+- El orchestrator verifica resultados (tests, build, diff) antes de marcar completo
+- Los commits los hace el humano (o el orquestador con identidad del owner) después de revisar el diff
+
+## 🖥️ Cursor Section
+
+- Cursor lee `AGENTS.md` automáticamente como Cursor Rules + `.cursor/rules/cardinal.mdc`
+- **Grok 4.5 en Composer** para: planning de features complejas, code review visual, refactors multi-archivo
+- **OpenCode CLI** para: implementación concreta (`/feature`), TDD (`/test`), review rápido (`/review`)
+- Ambos comparten reglas vía `AGENTS.md` y `.cursor/rules/`
+
+## ⚙️ OpenCode Config Reference
+
+- Config: `opencode.json` raíz (model default, default_agent, subagent_depth, permissions, MCPs)
+- Agentes: `.opencode/agents/<nombre>.md` (frontmatter + system prompt)
+- Comandos: `.opencode/commands/<nombre>.md`
+- El MCP de GitHub requiere `GITHUB_TOKEN` en el entorno: `set -x GITHUB_TOKEN (gh auth token)` (fish)
+- Extender: agente nuevo → archivo en `.opencode/agents/`; comando nuevo → `.opencode/commands/`; MCP nuevo → entrada en `opencode.json` → `mcp` + quitar su namespace del deny
+- Los MCPs globales (`ZerrantHive_*`, `pencil_*`) están deshabilitados en este proyecto

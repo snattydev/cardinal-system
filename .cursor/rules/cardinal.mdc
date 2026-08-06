@@ -1,0 +1,25 @@
+---
+description: Cardinal System development rules — leídas por Cursor (Grok 4.5 en Composer) y por OpenCode como instrucciones adicionales
+globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
+---
+
+# Cardinal System — Development Rules
+
+- Lee `AGENTS.md` para las reglas completas del repo (branching, commits, TDD, versionado)
+- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), React + Vite + Tailwind v4, WebSocket nativo
+- Runtime siempre containerizado con Podman — no instalar dependencias nativas en el host
+- TDD obligatorio en: auth, keys, ws, db, router (RED → GREEN → REFACTOR)
+- Branching: `feature/* → dev → main`. Commits directos a `dev`; PR con review solo para `dev → main` (merge commit)
+- Commits: Conventional Commits, primera línea en inglés ≤72 chars, body en español
+- Versionado: `MAJOR.FASE.PATCH` (source: `package.json` raíz). En `dev` solo PATCH
+- Audit de leaks antes de commit: keys `sk-cardinal-*`, tokens, paths absolutos, emails
+- Frontend types DEBEN matchear 1:1 el JSON real del backend (flat fields, no nested) — mismatch = pantalla negra
+- El WS del frontend va directo a `ws://127.0.0.1:8787/ws`, NO por el proxy de Vite (roto en Bun)
+- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (usar 127.0.0.1, no localhost — cookies)
+- Ecosistema y knowledge base: `context/ecosystem.md`
+
+## Cuándo usar Cursor vs OpenCode
+
+- **Cursor (Grok 4.5 Composer)**: planning de features complejas, code review visual, refactors multi-archivo
+- **OpenCode CLI**: implementación concreta con `/feature`, TDD con `/test`, review rápido con `/review`
+- Ambos comparten estas reglas via `AGENTS.md` y este archivo
