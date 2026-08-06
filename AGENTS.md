@@ -42,12 +42,12 @@ fix/*    ──→ dev ──→ main
 4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
 5. **Merge strategy:** merge commit (historia completa, sin squash). `dev` y `main` nunca divergen.
 
-### Estado actual (2026-07-28)
+### Estado actual (2026-08-06)
 
 | Fase | Estado | Spec |
 |------|--------|------|
 | **Fase 0** — Esqueleto Vivo | ✅ Completa | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
-| **Fase 1** — Context Store | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
+| **Fase 1** — Context Store | 🏗️ En progreso (pre-refactors completos, features pendientes) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
 | **Fase 2** — One-Shot Pipeline | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) |
 | **Fase 3+** — Graph + Automations | 🔮 Futuro | — |
 
