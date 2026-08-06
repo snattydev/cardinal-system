@@ -81,12 +81,14 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.7.1 | Tabla `config_templates` + seed desde perfiles Hermes | opencode | Sí | ✅ (1.7.1+2, seed-config.py 4/4) |
 | 1.7.2 | API `GET /api/config/:profile` (devuelve config.yaml-like) | opencode | Sí | ✅ (1.7.1+c) |
 
-### 1.8 Device Registry
+### 1.8 Device Registry ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.8.1 | Extender tabla `agents` con `device_info` JSON | Cursor Pro | Sí |
-| 1.8.2 | API `GET /api/devices` + WS broadcast | Cursor Pro | Sí |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.8.1 | Extender tabla `agents` con `device_info` JSON | opencode | Sí | ✅ (719bbd2) |
+| 1.8.2 | API `GET /api/devices` + WS broadcast | opencode | Sí | ✅ (719bbd2) |
+
+> ⚠️ Security Review requerida antes del merge dev→main (se tocó packages/ws/hub.ts).
 
 ---
 
@@ -94,6 +96,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        14/17 ██████████████░░░░░
-Total F1:           20/23 ████████████████████░░
+F1 features:        16/17 ████████████████░░░
+Total F1:           22/23 ██████████████████████
 ```
