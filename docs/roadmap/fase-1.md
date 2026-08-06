@@ -59,13 +59,20 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.5.1 | Tabla `sessions` + endpoint `GET /api/sessions` | opencode | Sí | ✅ (f0f5f4d) |
 | 1.5.2 | Indexar sesiones de Hermes (DB local → Cardinal) | directo | No | ✅ (seed-sessions.py — 246) |
 
-### 1.6 Vault RAG Proxy
+### 1.6 Vault RAG Proxy ✅ (enfoque spec — proxy, no vector store propio)
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.6.1 | Integrar sqlite-vec en `packages/rag/` | Cursor Pro | Sí |
-| 1.6.2 | Indexar `context/*.md` en vector store | Antigravity | No |
-| 1.6.3 | API `POST /api/rag/search` (búsqueda semántica) | Cursor Pro | Sí |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.6.1 | Integrar sqlite-vec en `packages/rag/` | — | — | ⏭️ Postergado a Fase 2+ (spec 3.6) |
+| 1.6.2 | Indexar `context/*.md` en vector store | — | — | ⏭️ El índice vive en vault-query del host (351 files/2340 chunks) |
+| 1.6.3 | API `POST /api/rag/search` (búsqueda semántica) | opencode | Sí | ✅ (f137873) |
+
+> Decisión 2026-08-06: se implementó el enfoque de la spec (proxy con caché),
+> NO sqlite-vec nativo. vault-query ya existe en el host (sqlite-vec + FTS5 +
+> fastembed) — el Cardinal llama scripts/vault-query-proxy.py por HTTP
+> (host.containers.internal:8788, token VAULT_PROXY_TOKEN) y cachea en
+> rag_cache (TTL 1h, LRU 1000). Vector store propio: Fase 2+ si el vault
+> deja de ser local.
 
 ### 1.7 Config Templates
 
@@ -87,6 +94,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        11/17 ███████████░░░░░░░░░
-Total F1:           17/23 █████████████████░░░░░
+F1 features:        12/17 ████████████░░░░░░░
+Total F1:           18/23 ██████████████████░░░
 ```
