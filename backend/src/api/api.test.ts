@@ -18,6 +18,7 @@ import { handleGetSoul } from "./souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./skills";
 import { handleGetMemory, handlePutMemory } from "./memories";
 import { handleListSessions } from "./sessions";
+import { handleRagSearch } from "./rag";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -448,6 +449,136 @@ describe("handleListProfileSkills", () => {
     const body = (await res.json()) as { skills: Array<{ name: string; pinned: number }> };
     expect(body.skills.map((s) => s.name)).toEqual(["bash", "git"]);
     expect(body.skills[1]).toMatchObject({ name: "git", pinned: 1 });
+    db.close();
+  });
+});
+
+function mockRagFetch(
+  results: unknown[],
+  calls: Array<{ url: string; body: Record<string, unknown> }>,
+) {
+  return async (url: string, init?: RequestInit) => {
+    calls.push({ url, body: JSON.parse(String(init?.body)) as Record<string, unknown> });
+    return new Response(JSON.stringify({ results }), { status: 200 });
+  };
+}
+
+describe("handleRagSearch", () => {
+  const ragReq = (body: unknown): Request =>
+    new Request("http://localhost/api/rag/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+  test("body no JSON → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/rag/search", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "no es json",
+    });
+    const res = await handleRagSearch(db, req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+
+  test("query vacía → 400 {error: 'missing_query'}", async () => {
+    const db = createDb(":memory:");
+    const res = await handleRagSearch(db, ragReq({ query: "" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing_query" });
+    db.close();
+  });
+
+  test("mode inválido → 400 {error: 'invalid_mode'}", async () => {
+    const db = createDb(":memory:");
+    const res = await handleRagSearch(db, ragReq({ query: "kirito", mode: "rrf" }));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_mode" });
+    db.close();
+  });
+
+  test("éxito → 200 con resultados normalizados y cached: false", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(
+      [
+        {
+          id: 1,
+          file_path: "notes/sao.md",
+          chunk_index: 0,
+          heading: "Kirito",
+          content: "dual wielding",
+          tokens: 10,
+          sources: ["vector"],
+          rrf_score: 0.042,
+        },
+      ],
+      calls,
+    );
+    const res = await handleRagSearch(db, ragReq({ query: "kirito", top_k: 3, mode: "hybrid" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toEqual({
+      results: [{ path: "notes/sao.md", score: 0.042, content: "Kirito\n\ndual wielding", source: "vault" }],
+      cached: false,
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].url).toBe("http://vault:8788/search");
+    expect(calls[0].body).toEqual({ query: "kirito", top_k: 3, mode: "hybrid" });
+    db.close();
+  });
+
+  test("top_k se clampea a [1,10] antes de llamar al upstream", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch([], calls);
+    await handleRagSearch(db, ragReq({ query: "kirito", top_k: 999 }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    expect((calls[0].body as { top_k: number }).top_k).toBe(10);
+    db.close();
+  });
+
+  test("segunda llamada igual → cached: true con cached_at sin repetir upstream", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(
+      [{ file_path: "a.md", content: "x", heading: "H", rrf_score: 0.5 }],
+      calls,
+    );
+    const first = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    expect(((await first.json()) as { cached: boolean }).cached).toBe(false);
+    const second = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    const body2 = (await second.json()) as { cached: boolean; cached_at?: string };
+    expect(body2.cached).toBe(true);
+    expect(typeof body2.cached_at).toBe("string");
+    expect(calls).toHaveLength(1);
+    db.close();
+  });
+
+  test("upstream falla → 502 {error: 'rag_upstream_error', detail}", async () => {
+    const db = createDb(":memory:");
+    const fetchImpl = async () => {
+      throw new Error("connection refused");
+    };
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), { fetchImpl });
+    expect(res.status).toBe(502);
+    const body = (await res.json()) as { error: string; detail: string };
+    expect(body.error).toBe("rag_upstream_error");
+    expect(typeof body.detail).toBe("string");
     db.close();
   });
 });

@@ -98,6 +98,15 @@ CREATE TABLE sessions_index (
   estimated_cost REAL NOT NULL DEFAULT 0
 );
 `,
+  `
+CREATE TABLE rag_cache (
+  cache_key  TEXT PRIMARY KEY,
+  query      TEXT NOT NULL,
+  top_k      INTEGER NOT NULL DEFAULT 5,
+  results    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
 ];
 
 export function migrate(db: Database): void {

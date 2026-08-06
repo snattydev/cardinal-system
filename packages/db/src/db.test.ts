@@ -40,7 +40,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 9 tables and sets user_version to 6", () => {
+  test("migrate creates the 10 tables and sets user_version to 7", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -49,12 +49,13 @@ describe("migrations", () => {
       "memory_mirror",
       "profile_skills",
       "profiles",
+      "rag_cache",
       "sessions_index",
       "skills",
       "souls",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(6);
+    expect(row.user_version).toBe(7);
     db.close();
   });
 
@@ -63,8 +64,31 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(6);
-    expect(tableNames(db)).toHaveLength(9);
+    expect(row.user_version).toBe(7);
+    expect(tableNames(db)).toHaveLength(10);
+    db.close();
+  });
+
+  test("migration 6 creates the rag_cache table with defaults and PK on cache_key", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("rag_cache");
+
+    db.query(
+      "INSERT INTO rag_cache (cache_key, query, top_k, results) VALUES (?, ?, ?, ?)",
+    ).run("key-1", "kirito", 5, "[]");
+
+    const r = db
+      .query("SELECT * FROM rag_cache WHERE cache_key = ?")
+      .get("key-1") as Record<string, unknown>;
+    expect(r).not.toBeNull();
+    expect(r!.query).toBe("kirito");
+    expect(r!.top_k).toBe(5);
+    expect(r!.results).toBe("[]");
+    expect(r!.created_at).not.toBeNull();
+
+    expect(() =>
+      db.query("INSERT INTO rag_cache (cache_key, query) VALUES (?, ?)").run("key-1", "dup"),
+    ).toThrow();
     db.close();
   });
 

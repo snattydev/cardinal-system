@@ -9,6 +9,7 @@ import { handleGetSoul } from "./api/souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
 import { handleGetMemory, handlePutMemory } from "./api/memories";
 import { handleListSessions } from "./api/sessions";
+import { handleRagSearch } from "./api/rag";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -114,6 +115,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const target = memoryMatch[2] as "memory" | "user";
         if (method === "PUT") return handlePutMemory(db, profileName, target, req);
         return handleGetMemory(db, profileName, target);
+      }
+
+      if (pathname === "/api/rag/search" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleRagSearch(db, req);
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
