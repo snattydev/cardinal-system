@@ -4,17 +4,22 @@ import {
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
+  getProfile,
+  getSoul,
   getSystemCounts,
   insertEvent,
   listAgents,
   listEvents,
   listKeys,
+  listProfiles,
   markAgentDisconnected,
   registerAgent,
   revokeKeysForAgent,
   touchKey,
   updateAgentStatus,
   upsertAgentOnConnect,
+  upsertProfile,
+  upsertSoul,
 } from "./repos";
 
 function tableNames(db: ReturnType<typeof createDb>): string[] {
@@ -25,11 +30,11 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 4 tables and sets user_version to 2", () => {
+  test("migrate creates the 5 tables and sets user_version to 3", () => {
     const db = createDb(":memory:");
-    expect(tableNames(db)).toEqual(["agent_events", "agent_keys", "agents", "profiles"]);
+    expect(tableNames(db)).toEqual(["agent_events", "agent_keys", "agents", "profiles", "souls"]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(2);
+    expect(row.user_version).toBe(3);
     db.close();
   });
 
@@ -38,8 +43,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(2);
-    expect(tableNames(db)).toHaveLength(4);
+    expect(row.user_version).toBe(3);
+    expect(tableNames(db)).toHaveLength(5);
     db.close();
   });
 
@@ -72,6 +77,31 @@ describe("migrations", () => {
     expect(() =>
       db.query("INSERT INTO profiles (name, status) VALUES (?, ?)").run("bad-status", "zombie"),
     ).toThrow();
+    db.close();
+  });
+
+  test("migration 2 creates the souls table with FK to profiles and version default", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("souls");
+
+    db.query("INSERT INTO profiles (name) VALUES (?)").run("hermes");
+
+    db.query("INSERT INTO souls (profile_name, soul_md, personality_tags) VALUES (?, ?, ?)").run(
+      "hermes",
+      "# alma",
+      "curioso, leal",
+    );
+
+    const s = db.query("SELECT * FROM souls WHERE profile_name = ?").get("hermes") as Record<string, unknown>;
+    expect(s).not.toBeNull();
+    expect(s!.soul_md).toBe("# alma");
+    expect(s!.personality_tags).toBe("curioso, leal");
+    expect(s!.tool_restrictions).toBeNull();
+    expect(s!.canon_ref).toBeNull();
+    expect(s!.version).toBe(1);
+    expect(s!.updated_at).toBeNull();
+
+    expect(() => db.query("INSERT INTO souls (profile_name) VALUES (?)").run("ghost")).toThrow();
     db.close();
   });
 });
@@ -143,6 +173,98 @@ describe("agents repo", () => {
     db.close();
   });
 });
+
+describe("profiles repo", () => {
+  test("listProfiles returns empty on empty db and all profiles ordered by name", () => {
+    const db = createDb(":memory:");
+    expect(listProfiles(db)).toEqual([]);
+    upsertProfile(db, "shinon", { display_name: "Shinon" });
+    upsertProfile(db, "kirito", {});
+    expect(listProfiles(db).map((p) => p.name)).toEqual(["kirito", "shinon"]);
+    db.close();
+  });
+
+  test("upsertProfile inserts with defaults kind=permanent, status=active and created_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", emoji: "🧙", device: "laptop" });
+    const p = getProfile(db, "hermes");
+    expect(p).not.toBeNull();
+    expect(p!.kind).toBe("permanent");
+    expect(p!.status).toBe("active");
+    expect(p!.display_name).toBe("Hermes");
+    expect(p!.emoji).toBe("🧙");
+    expect(p!.device).toBe("laptop");
+    expect(p!.created_at).not.toBeNull();
+    expect(p!.updated_at).toBeNull();
+    db.close();
+  });
+
+  test("upsertProfile updates existing fields, sets updated_at and preserves unset ones", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", device: "laptop" });
+    upsertProfile(db, "hermes", { status: "dormant" });
+    const p = getProfile(db, "hermes");
+    expect(listProfiles(db)).toHaveLength(1);
+    expect(p!.status).toBe("dormant");
+    expect(p!.display_name).toBe("Hermes");
+    expect(p!.device).toBe("laptop");
+    expect(p!.updated_at).not.toBeNull();
+    db.close();
+  });
+
+  test("getProfile returns null for unknown names", () => {
+    const db = createDb(":memory:");
+    expect(getProfile(db, "nobody")).toBeNull();
+    db.close();
+  });
+});
+
+describe("souls repo", () => {
+  test("getSoul returns null for missing souls", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    expect(getSoul(db, "hermes")).toBeNull();
+    expect(getSoul(db, "nobody")).toBeNull();
+    db.close();
+  });
+
+  test("upsertSoul inserts with version=1 and no updated_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSoul(db, "hermes", { soul_md: "# alma", personality_tags: "curioso, leal" });
+    const s = getSoul(db, "hermes");
+    expect(s).not.toBeNull();
+    expect(s!.profile_name).toBe("hermes");
+    expect(s!.soul_md).toBe("# alma");
+    expect(s!.personality_tags).toBe("curioso, leal");
+    expect(s!.tool_restrictions).toBeNull();
+    expect(s!.canon_ref).toBeNull();
+    expect(s!.version).toBe(1);
+    expect(s!.updated_at).toBeNull();
+    db.close();
+  });
+
+  test("upsertSoul updates existing row, increments version and sets updated_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSoul(db, "hermes", { soul_md: "# alma", personality_tags: "curioso" });
+    upsertSoul(db, "hermes", { canon_ref: "sao" });
+    expect(getSoul(db, "hermes")!.version).toBe(2);
+    const s = getSoul(db, "hermes");
+    expect(s!.soul_md).toBe("# alma");
+    expect(s!.personality_tags).toBe("curioso");
+    expect(s!.canon_ref).toBe("sao");
+    expect(s!.version).toBe(2);
+    expect(s!.updated_at).not.toBeNull();
+    expect(selectCount(db, "SELECT COUNT(*) AS count FROM souls")).toBe(1);
+    db.close();
+  });
+});
+
+function selectCount(db: ReturnType<typeof createDb>, sql: string): number {
+  const row = db.query(sql).get() as { count: number };
+  return Number(row.count);
+}
 
 describe("events repo", () => {
   test("insertEvent + listEvents returns newest first and respects limit", () => {

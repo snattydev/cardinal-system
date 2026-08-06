@@ -44,6 +44,17 @@ CREATE TABLE profiles (
   updated_at TEXT
 );
 `,
+  `
+CREATE TABLE souls (
+  profile_name TEXT PRIMARY KEY REFERENCES profiles(name),
+  soul_md TEXT,
+  personality_tags TEXT,
+  tool_restrictions TEXT,
+  canon_ref TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT
+);
+`,
 ];
 
 export function migrate(db: Database): void {

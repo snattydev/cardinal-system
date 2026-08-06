@@ -45,3 +45,13 @@ export interface ProfileRow {
   created_at: string;
   updated_at: string | null;
 }
+
+export interface SoulRow {
+  profile_name: string;
+  soul_md: string | null;
+  personality_tags: string | null;
+  tool_restrictions: string | null;
+  canon_ref: string | null;
+  version: number;
+  updated_at: string | null;
+}

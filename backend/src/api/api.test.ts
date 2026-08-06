@@ -1,8 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { createDb, insertEvent, registerAgent, upsertAgentOnConnect, upsertProfile } from "@cardinal/db";
+import {
+  createDb,
+  insertEvent,
+  registerAgent,
+  upsertAgentOnConnect,
+  upsertProfile,
+  upsertSoul,
+} from "@cardinal/db";
 import { handleHealth } from "./health";
 import { handleGetAgent, handleListAgents } from "./agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profiles";
+import { handleGetSoul } from "./souls";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -190,6 +198,36 @@ describe("handleGetAgent", () => {
     expect(body.events).toHaveLength(20);
     expect(body.events[0].meta).toBe("s25");
     expect(body.events[19].meta).toBe("s6");
+    db.close();
+  });
+});
+
+describe("handleGetSoul", () => {
+  test("soul desconocido → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const res = handleGetSoul(db, "hermes");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("soul conocido → 200 con {soul}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSoul(db, "hermes", { soul_md: "# alma", personality_tags: "curioso" });
+    const res = handleGetSoul(db, "hermes");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { soul: Record<string, unknown> };
+    expect(body.soul).toMatchObject({
+      profile_name: "hermes",
+      soul_md: "# alma",
+      personality_tags: "curioso",
+      tool_restrictions: null,
+      canon_ref: null,
+      version: 1,
+      updated_at: null,
+    });
     db.close();
   });
 });

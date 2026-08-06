@@ -14,5 +14,22 @@ export {
   revokeKeysForAgent,
   listKeys,
   getSystemCounts,
+  listProfiles,
+  getProfile,
+  upsertProfile,
+  getSoul,
+  upsertSoul,
 } from "./repos";
-export type { AgentKind, AgentRow, AgentKeyRow, AgentEventRow, SystemCounts } from "./repos";
+export type {
+  AgentKind,
+  AgentRow,
+  AgentKeyRow,
+  AgentEventRow,
+  SystemCounts,
+  ProfileKind,
+  ProfileRow,
+  ProfileStatus,
+  ProfileFields,
+  SoulRow,
+  SoulFields,
+} from "./repos";
