@@ -38,12 +38,12 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 | 1.2.1 | Tabla `souls` + endpoint `GET /api/souls/:name` | opencode | Sí | ✅ (0da16d7) |
 | 1.2.2 | Migrar `docs/agents/*.md` → DB (seed inicial) | directo | No | ✅ (seed-souls.py — 3/3) |
 
-### 1.3 Skill Catalog
+### 1.3 Skill Catalog ✅
 
-| # | Tarea | Tool | TDD |
-|---|-------|------|-----|
-| 1.3.1 | Tabla `skills` + `profile_skills` (N:M) | OpenCode GO | Sí |
-| 1.3.2 | API `GET /api/skills`, `GET /api/profiles/:name/skills` | OpenCode GO | Sí |
+| # | Tarea | Tool | TDD | Estado |
+|---|-------|------|-----|--------|
+| 1.3.1 | Tabla `skills` + `profile_skills` (N:M) | opencode | Sí | ✅ (mismo commit que 1.3.2) |
+| 1.3.2 | API `GET /api/skills`, `GET /api/profiles/:name/skills` | opencode | Sí | ✅ (1.3.1+c) |
 
 ### 1.4 Memory Mirror
 
@@ -87,6 +87,6 @@ Antes de tocar features de F1, partir el monolito en Bun workspaces.
 
 ```
 Pre-F1 refactors:  6/6  ████████████████████
-F1 features:        5/17 █████░░░░░░░░░░░░░░░
-Total F1:           11/23 ███████████░░░░░░░░░░░
+F1 features:        7/17 ███████░░░░░░░░░░░░░
+Total F1:           13/23 █████████████░░░░░░░░░
 ```
