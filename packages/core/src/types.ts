@@ -55,3 +55,13 @@ export interface SoulRow {
   version: number;
   updated_at: string | null;
 }
+
+export interface SkillRow {
+  name: string;
+  description: string | null;
+  category: string | null;
+  content_hash: string | null;
+  path: string | null;
+  required_toolsets: string | null;
+  updated_at: string | null;
+}

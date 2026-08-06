@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import { createDb, migrate } from "./schema";
 import {
+  addSkillToProfile,
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
   getProfile,
+  getSkill,
   getSoul,
   getSystemCounts,
   insertEvent,
@@ -12,6 +14,8 @@ import {
   listEvents,
   listKeys,
   listProfiles,
+  listSkills,
+  listSkillsForProfile,
   markAgentDisconnected,
   registerAgent,
   revokeKeysForAgent,
@@ -19,6 +23,7 @@ import {
   updateAgentStatus,
   upsertAgentOnConnect,
   upsertProfile,
+  upsertSkill,
   upsertSoul,
 } from "./repos";
 
@@ -30,11 +35,19 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 5 tables and sets user_version to 3", () => {
+  test("migrate creates the 7 tables and sets user_version to 4", () => {
     const db = createDb(":memory:");
-    expect(tableNames(db)).toEqual(["agent_events", "agent_keys", "agents", "profiles", "souls"]);
+    expect(tableNames(db)).toEqual([
+      "agent_events",
+      "agent_keys",
+      "agents",
+      "profile_skills",
+      "profiles",
+      "skills",
+      "souls",
+    ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(3);
+    expect(row.user_version).toBe(4);
     db.close();
   });
 
@@ -43,8 +56,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(3);
-    expect(tableNames(db)).toHaveLength(5);
+    expect(row.user_version).toBe(4);
+    expect(tableNames(db)).toHaveLength(7);
     db.close();
   });
 
@@ -102,6 +115,38 @@ describe("migrations", () => {
     expect(s!.updated_at).toBeNull();
 
     expect(() => db.query("INSERT INTO souls (profile_name) VALUES (?)").run("ghost")).toThrow();
+    db.close();
+  });
+
+  test("migration 3 creates skills + profile_skills with FKs and pinned default", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("skills");
+    expect(tableNames(db)).toContain("profile_skills");
+
+    db.query(
+      "INSERT INTO skills (name, description, category, content_hash, path, required_toolsets) VALUES (?, ?, ?, ?, ?, ?)",
+    ).run("git", "git workflows", "dev", "abc123", "skills/git.md", "shell");
+
+    const s = db.query("SELECT * FROM skills WHERE name = ?").get("git") as Record<string, unknown>;
+    expect(s).not.toBeNull();
+    expect(s!.description).toBe("git workflows");
+    expect(s!.category).toBe("dev");
+    expect(s!.content_hash).toBe("abc123");
+    expect(s!.path).toBe("skills/git.md");
+    expect(s!.required_toolsets).toBe("shell");
+    expect(s!.updated_at).toBeNull();
+
+    db.query("INSERT INTO profiles (name) VALUES (?)").run("hermes");
+    db.query("INSERT INTO profile_skills (profile_name, skill_name) VALUES (?, ?)").run("hermes", "git");
+    const ps = db
+      .query("SELECT * FROM profile_skills WHERE profile_name = ? AND skill_name = ?")
+      .get("hermes", "git") as Record<string, unknown>;
+    expect(ps).not.toBeNull();
+    expect(ps!.pinned).toBe(0);
+    expect(ps!.added_at).toBeNull();
+
+    expect(() => db.query("INSERT INTO profile_skills (profile_name, skill_name) VALUES (?, ?)").run("ghost", "git")).toThrow();
+    expect(() => db.query("INSERT INTO profile_skills (profile_name, skill_name) VALUES (?, ?)").run("hermes", "ghost")).toThrow();
     db.close();
   });
 });
@@ -215,6 +260,103 @@ describe("profiles repo", () => {
   test("getProfile returns null for unknown names", () => {
     const db = createDb(":memory:");
     expect(getProfile(db, "nobody")).toBeNull();
+    db.close();
+  });
+});
+
+describe("skills repo", () => {
+  test("listSkills returns empty on empty db and all skills ordered by name", () => {
+    const db = createDb(":memory:");
+    expect(listSkills(db)).toEqual([]);
+    upsertSkill(db, "bash", { description: "shell scripting" });
+    upsertSkill(db, "git", { description: "git workflows" });
+    expect(listSkills(db).map((s) => s.name)).toEqual(["bash", "git"]);
+    db.close();
+  });
+
+  test("upsertSkill inserts with all fields and no updated_at", () => {
+    const db = createDb(":memory:");
+    upsertSkill(db, "git", {
+      description: "git workflows",
+      category: "dev",
+      content_hash: "abc123",
+      path: "skills/git.md",
+      required_toolsets: "shell",
+    });
+    const s = getSkill(db, "git");
+    expect(s).not.toBeNull();
+    expect(s!.name).toBe("git");
+    expect(s!.description).toBe("git workflows");
+    expect(s!.category).toBe("dev");
+    expect(s!.content_hash).toBe("abc123");
+    expect(s!.path).toBe("skills/git.md");
+    expect(s!.required_toolsets).toBe("shell");
+    expect(s!.updated_at).toBeNull();
+    db.close();
+  });
+
+  test("upsertSkill updates existing fields, sets updated_at and preserves unset ones", () => {
+    const db = createDb(":memory:");
+    upsertSkill(db, "git", { description: "git workflows", path: "skills/git.md" });
+    upsertSkill(db, "git", { content_hash: "def456" });
+    expect(listSkills(db)).toHaveLength(1);
+    const s = getSkill(db, "git");
+    expect(s!.description).toBe("git workflows");
+    expect(s!.path).toBe("skills/git.md");
+    expect(s!.content_hash).toBe("def456");
+    expect(s!.updated_at).not.toBeNull();
+    db.close();
+  });
+
+  test("getSkill returns null for unknown names", () => {
+    const db = createDb(":memory:");
+    expect(getSkill(db, "nobody")).toBeNull();
+    db.close();
+  });
+
+  test("addSkillToProfile inserts with pinned default 0 and added_at", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    addSkillToProfile(db, "hermes", "git", {});
+    const rows = listSkillsForProfile(db, "hermes");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ name: "git", pinned: 0 });
+    db.close();
+  });
+
+  test("addSkillToProfile is idempotent and updates pinned", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    addSkillToProfile(db, "hermes", "git", {});
+    addSkillToProfile(db, "hermes", "git", { pinned: 1 });
+    expect(selectCount(db, "SELECT COUNT(*) AS count FROM profile_skills")).toBe(1);
+    const rows = listSkillsForProfile(db, "hermes");
+    expect(rows[0].pinned).toBe(1);
+    db.close();
+  });
+
+  test("addSkillToProfile throws on unknown profile or skill", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    expect(() => addSkillToProfile(db, "ghost", "git", {})).toThrow();
+    expect(() => addSkillToProfile(db, "hermes", "ghost", {})).toThrow();
+    db.close();
+  });
+
+  test("listSkillsForProfile returns empty for profiles without skills and orders by name", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertProfile(db, "shinon", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    upsertSkill(db, "bash", { description: "shell scripting" });
+    expect(listSkillsForProfile(db, "hermes")).toEqual([]);
+    addSkillToProfile(db, "hermes", "git", {});
+    addSkillToProfile(db, "hermes", "bash", {});
+    expect(listSkillsForProfile(db, "hermes").map((s) => s.name)).toEqual(["bash", "git"]);
+    expect(listSkillsForProfile(db, "shinon")).toEqual([]);
     db.close();
   });
 });

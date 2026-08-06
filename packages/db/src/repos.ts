@@ -7,6 +7,7 @@ import type {
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  SkillRow,
   SoulRow,
 } from "@cardinal/core";
 
@@ -18,6 +19,7 @@ export type {
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  SkillRow,
   SoulRow,
 };
 
@@ -231,4 +233,81 @@ export function getSystemCounts(db: Database): SystemCounts {
     keysActive: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL"),
     keysRevoked: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL"),
   };
+}
+
+export function listSkills(db: Database): SkillRow[] {
+  return db.query("SELECT * FROM skills ORDER BY name").all() as SkillRow[];
+}
+
+export function getSkill(db: Database, name: string): SkillRow | null {
+  return (db.query("SELECT * FROM skills WHERE name = ?").get(name) as SkillRow | null) ?? null;
+}
+
+export interface SkillFields {
+  description?: string | null;
+  category?: string | null;
+  content_hash?: string | null;
+  path?: string | null;
+  required_toolsets?: string | null;
+}
+
+export function upsertSkill(db: Database, name: string, fields: SkillFields): void {
+  const existing = getSkill(db, name);
+  if (existing === null) {
+    db.run(
+      `INSERT INTO skills (name, description, category, content_hash, path, required_toolsets)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        name,
+        fields.description ?? null,
+        fields.category ?? null,
+        fields.content_hash ?? null,
+        fields.path ?? null,
+        fields.required_toolsets ?? null,
+      ],
+    );
+    return;
+  }
+  db.run(
+    `UPDATE skills SET
+       description = ?, category = ?, content_hash = ?, path = ?, required_toolsets = ?, updated_at = datetime('now')
+     WHERE name = ?`,
+    [
+      fields.description ?? existing.description,
+      fields.category ?? existing.category,
+      fields.content_hash ?? existing.content_hash,
+      fields.path ?? existing.path,
+      fields.required_toolsets ?? existing.required_toolsets,
+      name,
+    ],
+  );
+}
+
+export interface ProfileSkill extends SkillRow {
+  pinned: number;
+}
+
+export function listSkillsForProfile(db: Database, profileName: string): ProfileSkill[] {
+  return db
+    .query(
+      `SELECT s.*, ps.pinned FROM skills s
+       JOIN profile_skills ps ON ps.skill_name = s.name
+       WHERE ps.profile_name = ?
+       ORDER BY s.name`,
+    )
+    .all(profileName) as ProfileSkill[];
+}
+
+export function addSkillToProfile(
+  db: Database,
+  profileName: string,
+  skillName: string,
+  options: { pinned?: number } = {},
+): void {
+  db.run(
+    `INSERT INTO profile_skills (profile_name, skill_name, pinned)
+     VALUES (?, ?, ?)
+     ON CONFLICT(profile_name, skill_name) DO UPDATE SET pinned = excluded.pinned`,
+    [profileName, skillName, options.pinned ?? 0],
+  );
 }

@@ -55,6 +55,24 @@ CREATE TABLE souls (
   updated_at TEXT
 );
 `,
+  `
+CREATE TABLE skills (
+  name TEXT PRIMARY KEY,
+  description TEXT,
+  category TEXT,
+  content_hash TEXT,
+  path TEXT,
+  required_toolsets TEXT,
+  updated_at TEXT
+);
+CREATE TABLE profile_skills (
+  profile_name TEXT NOT NULL REFERENCES profiles(name),
+  skill_name TEXT NOT NULL REFERENCES skills(name),
+  pinned INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT,
+  PRIMARY KEY (profile_name, skill_name)
+);
+`,
 ];
 
 export function migrate(db: Database): void {

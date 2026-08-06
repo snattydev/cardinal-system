@@ -19,6 +19,11 @@ export {
   upsertProfile,
   getSoul,
   upsertSoul,
+  listSkills,
+  getSkill,
+  upsertSkill,
+  listSkillsForProfile,
+  addSkillToProfile,
 } from "./repos";
 export type {
   AgentKind,
@@ -32,4 +37,7 @@ export type {
   ProfileFields,
   SoulRow,
   SoulFields,
+  SkillRow,
+  SkillFields,
+  ProfileSkill,
 } from "./repos";

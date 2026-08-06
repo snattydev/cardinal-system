@@ -6,6 +6,7 @@ import { handleHealth } from "./api/health";
 import { handleGetAgent, handleListAgents } from "./api/agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/profiles";
 import { handleGetSoul } from "./api/souls";
+import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -75,6 +76,26 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetSoul(db, decodeURIComponent(soulMatch[1]!));
+      }
+
+      if (pathname === "/api/skills" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListSkills(db);
+      }
+
+      const skillMatch = pathname.match(/^\/api\/skills\/([^/]+)$/);
+      if (skillMatch && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleGetSkill(db, decodeURIComponent(skillMatch[1]!));
+      }
+
+      const profileSkillsMatch = pathname.match(/^\/api\/profiles\/([^/]+)\/skills$/);
+      if (profileSkillsMatch && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListProfileSkills(db, decodeURIComponent(profileSkillsMatch[1]!));
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);

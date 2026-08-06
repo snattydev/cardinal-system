@@ -1,16 +1,19 @@
 import { describe, expect, test } from "bun:test";
 import {
+  addSkillToProfile,
   createDb,
   insertEvent,
   registerAgent,
   upsertAgentOnConnect,
   upsertProfile,
+  upsertSkill,
   upsertSoul,
 } from "@cardinal/db";
 import { handleHealth } from "./health";
 import { handleGetAgent, handleListAgents } from "./agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profiles";
 import { handleGetSoul } from "./souls";
+import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./skills";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -228,6 +231,96 @@ describe("handleGetSoul", () => {
       version: 1,
       updated_at: null,
     });
+    db.close();
+  });
+});
+
+describe("handleListSkills", () => {
+  test("DB vacía → {skills: []}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListSkills(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skills: [] });
+    db.close();
+  });
+
+  test("con skills → lista ordenada por name", async () => {
+    const db = createDb(":memory:");
+    upsertSkill(db, "git", { description: "git workflows" });
+    upsertSkill(db, "bash", { description: "shell scripting" });
+    const res = handleListSkills(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { skills: Array<{ name: string }> };
+    expect(body.skills.map((s) => s.name)).toEqual(["bash", "git"]);
+    db.close();
+  });
+});
+
+describe("handleGetSkill", () => {
+  test("skill desconocido → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleGetSkill(db, "nobody");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("skill conocido → 200 con {skill}", async () => {
+    const db = createDb(":memory:");
+    upsertSkill(db, "git", {
+      description: "git workflows",
+      category: "dev",
+      content_hash: "abc123",
+      path: "skills/git.md",
+      required_toolsets: "shell",
+    });
+    const res = handleGetSkill(db, "git");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { skill: Record<string, unknown> };
+    expect(body.skill).toMatchObject({
+      name: "git",
+      description: "git workflows",
+      category: "dev",
+      content_hash: "abc123",
+      path: "skills/git.md",
+      required_toolsets: "shell",
+      updated_at: null,
+    });
+    db.close();
+  });
+});
+
+describe("handleListProfileSkills", () => {
+  test("perfil inexistente → 404 {error: 'profile_not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListProfileSkills(db, "ghost");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "profile_not_found" });
+    db.close();
+  });
+
+  test("perfil sin skills → 200 con {skills: []}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    const res = handleListProfileSkills(db, "hermes");
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ skills: [] });
+    db.close();
+  });
+
+  test("perfil con skills → 200 con skills y pinned", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertSkill(db, "git", { description: "git workflows" });
+    upsertSkill(db, "bash", { description: "shell scripting" });
+    addSkillToProfile(db, "hermes", "git", { pinned: 1 });
+    addSkillToProfile(db, "hermes", "bash", {});
+    const res = handleListProfileSkills(db, "hermes");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { skills: Array<{ name: string; pinned: number }> };
+    expect(body.skills.map((s) => s.name)).toEqual(["bash", "git"]);
+    expect(body.skills[1]).toMatchObject({ name: "git", pinned: 1 });
     db.close();
   });
 });
