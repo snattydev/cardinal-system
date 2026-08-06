@@ -7,6 +7,7 @@ import { handleGetAgent, handleListAgents } from "./api/agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./api/profiles";
 import { handleGetSoul } from "./api/souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./api/skills";
+import { handleGetMemory, handlePutMemory } from "./api/memories";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -96,6 +97,16 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleListProfileSkills(db, decodeURIComponent(profileSkillsMatch[1]!));
+      }
+
+      const memoryMatch = pathname.match(/^\/api\/memories\/([^/]+)\/(memory|user)$/);
+      if (memoryMatch && (method === "GET" || method === "PUT")) {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        const profileName = decodeURIComponent(memoryMatch[1]!);
+        const target = memoryMatch[2] as "memory" | "user";
+        if (method === "PUT") return handlePutMemory(db, profileName, target, req);
+        return handleGetMemory(db, profileName, target);
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);

@@ -24,6 +24,8 @@ export {
   upsertSkill,
   listSkillsForProfile,
   addSkillToProfile,
+  getMemoryMirror,
+  upsertMemoryMirror,
 } from "./repos";
 export type {
   AgentKind,
@@ -40,4 +42,8 @@ export type {
   SkillRow,
   SkillFields,
   ProfileSkill,
+  MemoryMirrorRow,
+  MemoryMirrorFields,
+  MemoryTarget,
+  SyncDirection,
 } from "./repos";

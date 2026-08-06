@@ -65,3 +65,16 @@ export interface SkillRow {
   required_toolsets: string | null;
   updated_at: string | null;
 }
+
+export type MemoryTarget = "memory" | "user";
+export type SyncDirection = "local_primary" | "cardinal_primary" | "bidirectional";
+
+export interface MemoryMirrorRow {
+  profile_name: string;
+  target: MemoryTarget;
+  content: string | null;
+  char_count: number;
+  content_hash: string | null;
+  last_synced: string | null;
+  sync_direction: SyncDirection;
+}

@@ -5,6 +5,7 @@ import {
   insertEvent,
   registerAgent,
   upsertAgentOnConnect,
+  upsertMemoryMirror,
   upsertProfile,
   upsertSkill,
   upsertSoul,
@@ -14,6 +15,7 @@ import { handleGetAgent, handleListAgents } from "./agents";
 import { handleGetProfile, handleListProfiles, handlePutProfile } from "./profiles";
 import { handleGetSoul } from "./souls";
 import { handleGetSkill, handleListProfileSkills, handleListSkills } from "./skills";
+import { handleGetMemory, handlePutMemory } from "./memories";
 import rootPkg from "../../../package.json";
 
 describe("handleListProfiles", () => {
@@ -286,6 +288,129 @@ describe("handleGetSkill", () => {
       required_toolsets: "shell",
       updated_at: null,
     });
+    db.close();
+  });
+});
+
+describe("handleGetMemory", () => {
+  test("perfil inexistente → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleGetMemory(db, "ghost", "memory");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("mirror inexistente → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const res = handleGetMemory(db, "hermes", "memory");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("mirror existente → 200 con {memory}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola mundo", content_hash: "abc" });
+    const res = handleGetMemory(db, "hermes", "memory");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { memory: Record<string, unknown> };
+    expect(body.memory).toMatchObject({
+      profile_name: "hermes",
+      target: "memory",
+      content: "hola mundo",
+      char_count: 10,
+      content_hash: "abc",
+      sync_direction: "local_primary",
+      last_synced: null,
+    });
+    db.close();
+  });
+});
+
+describe("handlePutMemory", () => {
+  test("perfil inexistente → 404 {error: 'not_found'}", async () => {
+    const db = createDb(":memory:");
+    const req = new Request("http://localhost/api/memories/ghost/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "x" }),
+    });
+    const res = await handlePutMemory(db, "ghost", "memory", req);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("crea un mirror con defaults", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const req = new Request("http://localhost/api/memories/hermes/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "hola mundo" }),
+    });
+    const res = await handlePutMemory(db, "hermes", "memory", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { memory: Record<string, unknown> };
+    expect(body.memory).toMatchObject({
+      profile_name: "hermes",
+      target: "memory",
+      content: "hola mundo",
+      char_count: 10,
+      sync_direction: "local_primary",
+    });
+    db.close();
+  });
+
+  test("actualiza mirror existente y bupea last_synced", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola" });
+    const req = new Request("http://localhost/api/memories/hermes/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: "hola mundo", sync_direction: "bidirectional" }),
+    });
+    const res = await handlePutMemory(db, "hermes", "memory", req);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { memory: Record<string, unknown> };
+    expect(body.memory).toMatchObject({
+      content: "hola mundo",
+      char_count: 10,
+      sync_direction: "bidirectional",
+    });
+    expect(body.memory.last_synced).not.toBeNull();
+    db.close();
+  });
+
+  test("sync_direction inválido → 400 {error: 'invalid_sync_direction'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const req = new Request("http://localhost/api/memories/hermes/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ sync_direction: "nope" }),
+    });
+    const res = await handlePutMemory(db, "hermes", "memory", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_sync_direction" });
+    db.close();
+  });
+
+  test("body no JSON → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    const req = new Request("http://localhost/api/memories/hermes/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: "no es json",
+    });
+    const res = await handlePutMemory(db, "hermes", "memory", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
     db.close();
   });
 });

@@ -4,11 +4,14 @@ import type {
   AgentRow,
   AgentKeyRow,
   AgentEventRow,
+  MemoryMirrorRow,
+  MemoryTarget,
   ProfileKind,
   ProfileRow,
   ProfileStatus,
   SkillRow,
   SoulRow,
+  SyncDirection,
 } from "@cardinal/core";
 
 export type {
@@ -16,11 +19,14 @@ export type {
   AgentRow,
   AgentKeyRow,
   AgentEventRow,
+  MemoryMirrorRow,
+  MemoryTarget,
   ProfileKind,
   ProfileRow,
   ProfileStatus,
   SkillRow,
   SoulRow,
+  SyncDirection,
 };
 
 export function registerAgent(db: Database, name: string, kind: AgentKind): void {
@@ -309,5 +315,65 @@ export function addSkillToProfile(
      VALUES (?, ?, ?)
      ON CONFLICT(profile_name, skill_name) DO UPDATE SET pinned = excluded.pinned`,
     [profileName, skillName, options.pinned ?? 0],
+  );
+}
+
+export function getMemoryMirror(
+  db: Database,
+  profileName: string,
+  target: MemoryTarget,
+): MemoryMirrorRow | null {
+  return (
+    (db
+      .query("SELECT * FROM memory_mirror WHERE profile_name = ? AND target = ?")
+      .get(profileName, target) as MemoryMirrorRow | null) ?? null
+  );
+}
+
+export interface MemoryMirrorFields {
+  content?: string | null;
+  content_hash?: string | null;
+  sync_direction?: SyncDirection;
+}
+
+export function upsertMemoryMirror(
+  db: Database,
+  profileName: string,
+  target: MemoryTarget,
+  fields: MemoryMirrorFields,
+): void {
+  const existing = getMemoryMirror(db, profileName, target);
+  if (existing === null) {
+    const content = fields.content ?? null;
+    db.run(
+      `INSERT INTO memory_mirror (profile_name, target, content, char_count, content_hash, sync_direction)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        profileName,
+        target,
+        content,
+        content === null ? 0 : content.length,
+        fields.content_hash ?? null,
+        fields.sync_direction ?? "local_primary",
+      ],
+    );
+    return;
+  }
+  db.run(
+    `UPDATE memory_mirror SET
+       content = ?, char_count = ?, content_hash = ?, sync_direction = ?, last_synced = datetime('now')
+     WHERE profile_name = ? AND target = ?`,
+    [
+      fields.content ?? existing.content,
+      fields.content !== undefined
+        ? fields.content === null
+          ? 0
+          : fields.content.length
+        : existing.char_count,
+      fields.content_hash ?? existing.content_hash,
+      fields.sync_direction ?? existing.sync_direction,
+      profileName,
+      target,
+    ],
   );
 }

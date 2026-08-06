@@ -5,6 +5,7 @@ import {
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
+  getMemoryMirror,
   getProfile,
   getSkill,
   getSoul,
@@ -22,6 +23,7 @@ import {
   touchKey,
   updateAgentStatus,
   upsertAgentOnConnect,
+  upsertMemoryMirror,
   upsertProfile,
   upsertSkill,
   upsertSoul,
@@ -35,19 +37,20 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 7 tables and sets user_version to 4", () => {
+  test("migrate creates the 8 tables and sets user_version to 5", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
       "agent_keys",
       "agents",
+      "memory_mirror",
       "profile_skills",
       "profiles",
       "skills",
       "souls",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(4);
+    expect(row.user_version).toBe(5);
     db.close();
   });
 
@@ -56,8 +59,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(4);
-    expect(tableNames(db)).toHaveLength(7);
+    expect(row.user_version).toBe(5);
+    expect(tableNames(db)).toHaveLength(8);
     db.close();
   });
 
@@ -147,6 +150,40 @@ describe("migrations", () => {
 
     expect(() => db.query("INSERT INTO profile_skills (profile_name, skill_name) VALUES (?, ?)").run("ghost", "git")).toThrow();
     expect(() => db.query("INSERT INTO profile_skills (profile_name, skill_name) VALUES (?, ?)").run("hermes", "ghost")).toThrow();
+    db.close();
+  });
+
+  test("migration 4 creates the memory_mirror table with FKs, CHECKs and defaults", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("memory_mirror");
+
+    db.query("INSERT INTO profiles (name) VALUES (?)").run("hermes");
+
+    db.query(
+      "INSERT INTO memory_mirror (profile_name, target, content, content_hash) VALUES (?, ?, ?, ?)",
+    ).run("hermes", "memory", "hola mundo", "hash-1");
+
+    const m = db
+      .query("SELECT * FROM memory_mirror WHERE profile_name = ? AND target = ?")
+      .get("hermes", "memory") as Record<string, unknown>;
+    expect(m).not.toBeNull();
+    expect(m!.content).toBe("hola mundo");
+    expect(m!.char_count).toBe(0);
+    expect(m!.content_hash).toBe("hash-1");
+    expect(m!.last_synced).toBeNull();
+    expect(m!.sync_direction).toBe("local_primary");
+
+    expect(() =>
+      db.query("INSERT INTO memory_mirror (profile_name, target) VALUES (?, ?)").run("ghost", "memory"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO memory_mirror (profile_name, target) VALUES (?, ?)").run("hermes", "ghost"),
+    ).toThrow();
+    expect(() =>
+      db
+        .query("INSERT INTO memory_mirror (profile_name, target, sync_direction) VALUES (?, ?, ?)")
+        .run("hermes", "memory", "nope"),
+    ).toThrow();
     db.close();
   });
 });
@@ -497,6 +534,87 @@ describe("getSystemCounts", () => {
       keysActive: 1,
       keysRevoked: 1,
     });
+    db.close();
+  });
+});
+
+describe("memory_mirror repo", () => {
+  test("getMemoryMirror returns null for missing rows", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    expect(getMemoryMirror(db, "hermes", "memory")).toBeNull();
+    expect(getMemoryMirror(db, "hermes", "user")).toBeNull();
+    expect(getMemoryMirror(db, "nobody", "memory")).toBeNull();
+    db.close();
+  });
+
+  test("upsertMemoryMirror inserts with char_count from content and default sync_direction", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola mundo" });
+    const m = getMemoryMirror(db, "hermes", "memory");
+    expect(m).not.toBeNull();
+    expect(m!.profile_name).toBe("hermes");
+    expect(m!.target).toBe("memory");
+    expect(m!.content).toBe("hola mundo");
+    expect(m!.char_count).toBe(10);
+    expect(m!.content_hash).toBeNull();
+    expect(m!.last_synced).toBeNull();
+    expect(m!.sync_direction).toBe("local_primary");
+    db.close();
+  });
+
+  test("upsertMemoryMirror with explicit sync_direction and content_hash", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "user", {
+      content: "USER.md",
+      content_hash: "abc123",
+      sync_direction: "bidirectional",
+    });
+    const m = getMemoryMirror(db, "hermes", "user");
+    expect(m!.content_hash).toBe("abc123");
+    expect(m!.sync_direction).toBe("bidirectional");
+    expect(m!.char_count).toBe(7);
+    db.close();
+  });
+
+  test("upsertMemoryMirror updates existing row, recomputes char_count and bumps last_synced", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola" });
+    expect(getMemoryMirror(db, "hermes", "memory")!.char_count).toBe(4);
+    expect(getMemoryMirror(db, "hermes", "memory")!.last_synced).toBeNull();
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola mundo" });
+    expect(selectCount(db, "SELECT COUNT(*) AS count FROM memory_mirror")).toBe(1);
+    const m = getMemoryMirror(db, "hermes", "memory");
+    expect(m!.content).toBe("hola mundo");
+    expect(m!.char_count).toBe(10);
+    expect(m!.last_synced).not.toBeNull();
+    db.close();
+  });
+
+  test("upsertMemoryMirror update preserves fields not sent", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", {
+      content: "hola",
+      content_hash: "abc",
+      sync_direction: "cardinal_primary",
+    });
+    upsertMemoryMirror(db, "hermes", "memory", { content_hash: "def" });
+    const m = getMemoryMirror(db, "hermes", "memory");
+    expect(m!.content).toBe("hola");
+    expect(m!.char_count).toBe(4);
+    expect(m!.content_hash).toBe("def");
+    expect(m!.sync_direction).toBe("cardinal_primary");
+    expect(m!.last_synced).not.toBeNull();
+    db.close();
+  });
+
+  test("upsertMemoryMirror throws on unknown profile (FK)", () => {
+    const db = createDb(":memory:");
+    expect(() => upsertMemoryMirror(db, "ghost", "memory", { content: "x" })).toThrow();
     db.close();
   });
 });

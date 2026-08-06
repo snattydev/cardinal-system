@@ -73,6 +73,18 @@ CREATE TABLE profile_skills (
   PRIMARY KEY (profile_name, skill_name)
 );
 `,
+  `
+CREATE TABLE memory_mirror (
+  profile_name   TEXT NOT NULL REFERENCES profiles(name),
+  target         TEXT NOT NULL CHECK (target IN ('memory','user')),
+  content        TEXT,
+  char_count     INTEGER NOT NULL DEFAULT 0,
+  content_hash   TEXT,
+  last_synced    TEXT,
+  sync_direction TEXT NOT NULL DEFAULT 'local_primary' CHECK (sync_direction IN ('local_primary','cardinal_primary','bidirectional')),
+  PRIMARY KEY (profile_name, target)
+);
+`,
 ];
 
 export function migrate(db: Database): void {
