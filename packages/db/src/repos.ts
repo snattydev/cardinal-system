@@ -181,14 +181,14 @@ export function upsertProfile(db: Database, name: string, fields: ProfileFields)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name,
-        fields.display_name ?? null,
-        fields.emoji ?? null,
-        fields.kind ?? "permanent",
-        fields.status ?? "active",
-        fields.model_default ?? null,
-        fields.provider_default ?? null,
-        fields.device ?? null,
-        fields.last_onboarded ?? null,
+        fields.display_name !== undefined ? fields.display_name : null,
+        fields.emoji !== undefined ? fields.emoji : null,
+        fields.kind !== undefined ? fields.kind : "permanent",
+        fields.status !== undefined ? fields.status : "active",
+        fields.model_default !== undefined ? fields.model_default : null,
+        fields.provider_default !== undefined ? fields.provider_default : null,
+        fields.device !== undefined ? fields.device : null,
+        fields.last_onboarded !== undefined ? fields.last_onboarded : null,
       ],
     );
     return;
@@ -198,14 +198,14 @@ export function upsertProfile(db: Database, name: string, fields: ProfileFields)
        display_name = ?, emoji = ?, kind = ?, status = ?, model_default = ?, provider_default = ?, device = ?, last_onboarded = ?, updated_at = datetime('now')
      WHERE name = ?`,
     [
-      fields.display_name ?? existing.display_name,
-      fields.emoji ?? existing.emoji,
-      fields.kind ?? existing.kind,
-      fields.status ?? existing.status,
-      fields.model_default ?? existing.model_default,
-      fields.provider_default ?? existing.provider_default,
-      fields.device ?? existing.device,
-      fields.last_onboarded ?? existing.last_onboarded,
+      fields.display_name !== undefined ? fields.display_name : existing.display_name,
+      fields.emoji !== undefined ? fields.emoji : existing.emoji,
+      fields.kind !== undefined ? fields.kind : existing.kind,
+      fields.status !== undefined ? fields.status : existing.status,
+      fields.model_default !== undefined ? fields.model_default : existing.model_default,
+      fields.provider_default !== undefined ? fields.provider_default : existing.provider_default,
+      fields.device !== undefined ? fields.device : existing.device,
+      fields.last_onboarded !== undefined ? fields.last_onboarded : existing.last_onboarded,
       name,
     ],
   );
@@ -232,10 +232,10 @@ export function upsertSoul(db: Database, profileName: string, fields: SoulFields
        VALUES (?, ?, ?, ?, ?)`,
       [
         profileName,
-        fields.soul_md ?? null,
-        fields.personality_tags ?? null,
-        fields.tool_restrictions ?? null,
-        fields.canon_ref ?? null,
+        fields.soul_md !== undefined ? fields.soul_md : null,
+        fields.personality_tags !== undefined ? fields.personality_tags : null,
+        fields.tool_restrictions !== undefined ? fields.tool_restrictions : null,
+        fields.canon_ref !== undefined ? fields.canon_ref : null,
       ],
     );
     return;
@@ -245,10 +245,10 @@ export function upsertSoul(db: Database, profileName: string, fields: SoulFields
        soul_md = ?, personality_tags = ?, tool_restrictions = ?, canon_ref = ?, version = version + 1, updated_at = datetime('now')
      WHERE profile_name = ?`,
     [
-      fields.soul_md ?? existing.soul_md,
-      fields.personality_tags ?? existing.personality_tags,
-      fields.tool_restrictions ?? existing.tool_restrictions,
-      fields.canon_ref ?? existing.canon_ref,
+      fields.soul_md !== undefined ? fields.soul_md : existing.soul_md,
+      fields.personality_tags !== undefined ? fields.personality_tags : existing.personality_tags,
+      fields.tool_restrictions !== undefined ? fields.tool_restrictions : existing.tool_restrictions,
+      fields.canon_ref !== undefined ? fields.canon_ref : existing.canon_ref,
       profileName,
     ],
   );
@@ -271,7 +271,7 @@ export function upsertConfigTemplate(db: Database, profileName: string, fields: 
   if (existing === null) {
     db.run("INSERT INTO config_templates (profile_name, config_yaml) VALUES (?, ?)", [
       profileName,
-      fields.config_yaml ?? null,
+      fields.config_yaml !== undefined ? fields.config_yaml : null,
     ]);
     return;
   }
@@ -279,7 +279,7 @@ export function upsertConfigTemplate(db: Database, profileName: string, fields: 
     `UPDATE config_templates SET
        config_yaml = ?, version = version + 1, updated_at = datetime('now')
      WHERE profile_name = ?`,
-    [fields.config_yaml ?? existing.config_yaml, profileName],
+    [fields.config_yaml !== undefined ? fields.config_yaml : existing.config_yaml, profileName],
   );
 }
 
@@ -382,11 +382,11 @@ export function upsertSkill(db: Database, name: string, fields: SkillFields): vo
        VALUES (?, ?, ?, ?, ?, ?)`,
       [
         name,
-        fields.description ?? null,
-        fields.category ?? null,
-        fields.content_hash ?? null,
-        fields.path ?? null,
-        fields.required_toolsets ?? null,
+        fields.description !== undefined ? fields.description : null,
+        fields.category !== undefined ? fields.category : null,
+        fields.content_hash !== undefined ? fields.content_hash : null,
+        fields.path !== undefined ? fields.path : null,
+        fields.required_toolsets !== undefined ? fields.required_toolsets : null,
       ],
     );
     return;
@@ -396,11 +396,11 @@ export function upsertSkill(db: Database, name: string, fields: SkillFields): vo
        description = ?, category = ?, content_hash = ?, path = ?, required_toolsets = ?, updated_at = datetime('now')
      WHERE name = ?`,
     [
-      fields.description ?? existing.description,
-      fields.category ?? existing.category,
-      fields.content_hash ?? existing.content_hash,
-      fields.path ?? existing.path,
-      fields.required_toolsets ?? existing.required_toolsets,
+      fields.description !== undefined ? fields.description : existing.description,
+      fields.category !== undefined ? fields.category : existing.category,
+      fields.content_hash !== undefined ? fields.content_hash : existing.content_hash,
+      fields.path !== undefined ? fields.path : existing.path,
+      fields.required_toolsets !== undefined ? fields.required_toolsets : existing.required_toolsets,
       name,
     ],
   );
@@ -461,7 +461,7 @@ export function upsertMemoryMirror(
 ): void {
   const existing = getMemoryMirror(db, profileName, target);
   if (existing === null) {
-    const content = fields.content ?? null;
+    const content = fields.content !== undefined ? fields.content : null;
     db.run(
       `INSERT INTO memory_mirror (profile_name, target, content, char_count, content_hash, sync_direction)
        VALUES (?, ?, ?, ?, ?, ?)`,
@@ -470,8 +470,8 @@ export function upsertMemoryMirror(
         target,
         content,
         content === null ? 0 : content.length,
-        fields.content_hash ?? null,
-        fields.sync_direction ?? "local_primary",
+        fields.content_hash !== undefined ? fields.content_hash : null,
+        fields.sync_direction !== undefined ? fields.sync_direction : "local_primary",
       ],
     );
     return;
@@ -481,14 +481,14 @@ export function upsertMemoryMirror(
        content = ?, char_count = ?, content_hash = ?, sync_direction = ?, last_synced = datetime('now')
      WHERE profile_name = ? AND target = ?`,
     [
-      fields.content ?? existing.content,
+      fields.content !== undefined ? fields.content : existing.content,
       fields.content !== undefined
         ? fields.content === null
           ? 0
           : fields.content.length
         : existing.char_count,
-      fields.content_hash ?? existing.content_hash,
-      fields.sync_direction ?? existing.sync_direction,
+      fields.content_hash !== undefined ? fields.content_hash : existing.content_hash,
+      fields.sync_direction !== undefined ? fields.sync_direction : existing.sync_direction,
       profileName,
       target,
     ],

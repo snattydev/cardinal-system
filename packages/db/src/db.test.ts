@@ -493,6 +493,17 @@ describe("profiles repo", () => {
     db.close();
   });
 
+  test("upsertProfile clears a field when explicitly set to null", () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", emoji: "🧙", device: "laptop" });
+    upsertProfile(db, "hermes", { emoji: null });
+    const p = getProfile(db, "hermes");
+    expect(p!.emoji).toBeNull();
+    expect(p!.display_name).toBe("Hermes"); // campo no enviado se preserva
+    expect(p!.device).toBe("laptop");
+    db.close();
+  });
+
   test("getProfile returns null for unknown names", () => {
     const db = createDb(":memory:");
     expect(getProfile(db, "nobody")).toBeNull();
