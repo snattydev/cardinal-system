@@ -23,6 +23,7 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
   return Bun.serve<ConnData>({
     port: config.port,
+    maxPayloadLength: 4096, // protocolo usa mensajes ~200 bytes; default Bun es 16 MiB
 
     async fetch(req, server) {
       const { pathname } = new URL(req.url);

@@ -18,7 +18,8 @@ export async function handleLogin(req: Request, config: Config): Promise<Respons
     return json({ error: "invalid_credentials" }, 401);
   }
   const token = await signSession(config.jwtSecret, config.adminUser);
-  return json({ user: config.adminUser }, 200, { "set-cookie": sessionCookie(token) });
+  const secure = process.env.NODE_ENV === "production";
+  return json({ user: config.adminUser }, 200, { "set-cookie": sessionCookie(token, secure) });
 }
 
 export function handleLogout(): Response {
