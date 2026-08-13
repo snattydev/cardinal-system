@@ -15,6 +15,8 @@ import type {
   SkillRow,
   SoulRow,
   SyncDirection,
+  TaskRow,
+  TaskStatus,
 } from "@cardinal/core";
 
 export type {
@@ -33,6 +35,8 @@ export type {
   SkillRow,
   SoulRow,
   SyncDirection,
+  TaskRow,
+  TaskStatus,
 };
 
 export function registerAgent(db: Database, name: string, kind: AgentKind): void {
@@ -556,4 +560,52 @@ export function upsertSession(db: Database, session: SessionFields): void {
       session.id,
     ],
   );
+}
+
+export function getTask(db: Database, id: string): TaskRow | null {
+  return (db.query("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | null) ?? null;
+}
+
+export function createTask(
+  db: Database,
+  args: { goal: string; createdBy: string; parentId?: string | null },
+): TaskRow {
+  const id = crypto.randomUUID();
+  db.run("INSERT INTO tasks (id, goal, created_by, parent_id) VALUES (?, ?, ?, ?)", [
+    id,
+    args.goal,
+    args.createdBy,
+    args.parentId ?? null,
+  ]);
+  return getTask(db, id)!;
+}
+
+export function listTasks(db: Database, status?: TaskStatus): TaskRow[] {
+  if (status !== undefined) {
+    return db.query("SELECT * FROM tasks WHERE status = ? ORDER BY created_at").all(status) as TaskRow[];
+  }
+  return db.query("SELECT * FROM tasks ORDER BY created_at").all() as TaskRow[];
+}
+
+export function claimTask(db: Database, id: string, by: string): TaskRow | null {
+  const existing = getTask(db, id);
+  if (existing === null || existing.status !== "open") return null;
+  db.run("UPDATE tasks SET status = 'claimed', assigned_to = ?, updated_at = datetime('now') WHERE id = ?", [
+    by,
+    id,
+  ]);
+  return getTask(db, id);
+}
+
+export function completeTask(
+  db: Database,
+  id: string,
+  args: { summary?: string | null; artifactRef?: string | null },
+): TaskRow | null {
+  if (getTask(db, id) === null) return null;
+  db.run(
+    "UPDATE tasks SET status = 'done', summary = ?, artifact_ref = ?, updated_at = datetime('now') WHERE id = ?",
+    [args.summary ?? null, args.artifactRef ?? null, id],
+  );
+  return getTask(db, id);
 }

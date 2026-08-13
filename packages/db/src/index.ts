@@ -33,6 +33,11 @@ export {
   listSessions,
   getSession,
   upsertSession,
+  getTask,
+  createTask,
+  listTasks,
+  claimTask,
+  completeTask,
 } from "./repos";
 export type {
   AgentKind,
@@ -58,4 +63,6 @@ export type {
   SyncDirection,
   SessionRow,
   SessionFields,
+  TaskRow,
+  TaskStatus,
 } from "./repos";

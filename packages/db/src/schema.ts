@@ -118,6 +118,20 @@ CREATE TABLE config_templates (
   `
 ALTER TABLE agents ADD COLUMN device_info TEXT;
 `,
+  `
+CREATE TABLE tasks (
+  id          TEXT PRIMARY KEY,
+  goal        TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','claimed','done','blocked')),
+  assigned_to TEXT,
+  created_by  TEXT NOT NULL,
+  parent_id   TEXT REFERENCES tasks(id),
+  summary     TEXT,
+  artifact_ref TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT
+);
+`,
 ];
 
 export function migrate(db: Database): void {

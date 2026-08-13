@@ -12,6 +12,13 @@ import { handleGetConfig, handlePutConfig } from "./api/config";
 import { handleGetMemory, handlePutMemory } from "./api/memories";
 import { handleListSessions } from "./api/sessions";
 import { handleRagSearch } from "./api/rag";
+import {
+  handleClaimTask,
+  handleCompleteTask,
+  handleCreateTask,
+  handleGetTask,
+  handleListTasks,
+} from "./api/tasks";
 import { handleSystem } from "./api/system";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -151,6 +158,39 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleRagSearch(db, req);
+      }
+
+      if (pathname === "/api/tasks" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListTasks(db);
+      }
+
+      if (pathname === "/api/tasks" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleCreateTask(db, req);
+      }
+
+      const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
+      if (taskClaimMatch && method === "PUT") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req);
+      }
+
+      const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
+      if (taskCompleteMatch && method === "PUT") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req);
+      }
+
+      const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
+      if (taskMatch && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);

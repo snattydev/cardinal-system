@@ -120,3 +120,18 @@ export interface SessionRow {
   output_tokens: number;
   estimated_cost: number;
 }
+
+export type TaskStatus = "open" | "claimed" | "done" | "blocked";
+
+export interface TaskRow {
+  id: string;
+  goal: string;
+  status: TaskStatus;
+  assigned_to: string | null;
+  created_by: string;
+  parent_id: string | null;
+  summary: string | null;
+  artifact_ref: string | null;
+  created_at: string;
+  updated_at: string | null;
+}

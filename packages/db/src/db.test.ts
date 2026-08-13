@@ -44,7 +44,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 11 tables and sets user_version to 9", () => {
+  test("migrate creates the 12 tables and sets user_version to 10", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -58,9 +58,10 @@ describe("migrations", () => {
       "sessions_index",
       "skills",
       "souls",
+      "tasks",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(9);
+    expect(row.user_version).toBe(10);
     db.close();
   });
 
@@ -69,8 +70,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(9);
-    expect(tableNames(db)).toHaveLength(11);
+    expect(row.user_version).toBe(10);
+    expect(tableNames(db)).toHaveLength(12);
     db.close();
   });
 
@@ -80,7 +81,7 @@ describe("migrations", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("device_info");
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(9);
+    expect(row.user_version).toBe(10);
     db.close();
   });
 
