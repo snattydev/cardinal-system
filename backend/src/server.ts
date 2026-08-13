@@ -163,7 +163,7 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (pathname === "/api/tasks" && method === "GET") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleListTasks(db);
+        return handleListTasks(db, req);
       }
 
       if (pathname === "/api/tasks" && method === "POST") {

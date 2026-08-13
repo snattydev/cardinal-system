@@ -28,7 +28,7 @@ async function createOpenTask(
 describe("handleListTasks", () => {
   test("DB vacía → {tasks: []}", async () => {
     const db = createDb(":memory:");
-    const res = handleListTasks(db);
+    const res = handleListTasks(db, new Request("http://localhost/api/tasks"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ tasks: [] });
     db.close();
@@ -40,10 +40,34 @@ describe("handleListTasks", () => {
     const second = await createOpenTask(db, "second");
     db.run("UPDATE tasks SET created_at = ? WHERE id = ?", ["2026-01-01 00:00:00", first.id]);
     db.run("UPDATE tasks SET created_at = ? WHERE id = ?", ["2026-01-02 00:00:00", second.id]);
-    const res = handleListTasks(db);
+    const res = handleListTasks(db, new Request("http://localhost/api/tasks"));
     expect(res.status).toBe(200);
     const body = (await res.json()) as { tasks: Array<{ id: string; goal: string }> };
     expect(body.tasks.map((t) => t.goal)).toEqual(["first", "second"]);
+    db.close();
+  });
+
+  test("?status=open filtra por status", async () => {
+    const db = createDb(":memory:");
+    await createOpenTask(db, "open one");
+    const done = await createOpenTask(db, "done one");
+    await handleCompleteTask(
+      db,
+      done.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", {}),
+    );
+    const res = handleListTasks(db, new Request("http://localhost/api/tasks?status=open"));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { tasks: Array<{ goal: string }> };
+    expect(body.tasks.map((t) => t.goal)).toEqual(["open one"]);
+    db.close();
+  });
+
+  test("?status inválido → 400 {error: 'invalid_status'}", async () => {
+    const db = createDb(":memory:");
+    const res = handleListTasks(db, new Request("http://localhost/api/tasks?status=foo"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_status" });
     db.close();
   });
 });
@@ -87,6 +111,28 @@ describe("handleCreateTask", () => {
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "missing_goal" });
+    db.close();
+  });
+
+  test("goal solo espacios → 400 {error: 'missing_goal'}", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "   " }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "missing_goal" });
+    db.close();
+  });
+
+  test("parent_id inexistente → 400 {error: 'parent_not_found'}", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "orphan", parent_id: "missing" }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "parent_not_found" });
     db.close();
   });
 
@@ -196,6 +242,19 @@ describe("handleClaimTask", () => {
       db,
       created.id,
       jsonReq("http://localhost/api/tasks/x/claim", "PUT", {}),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+
+  test("by solo espacios → 400 {error: 'bad_request'}", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "needs by");
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "   " }),
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "bad_request" });

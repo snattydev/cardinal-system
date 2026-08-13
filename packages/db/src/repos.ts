@@ -588,12 +588,12 @@ export function listTasks(db: Database, status?: TaskStatus): TaskRow[] {
 }
 
 export function claimTask(db: Database, id: string, by: string): TaskRow | null {
-  const existing = getTask(db, id);
-  if (existing === null || existing.status !== "open") return null;
-  db.run("UPDATE tasks SET status = 'claimed', assigned_to = ?, updated_at = datetime('now') WHERE id = ?", [
-    by,
-    id,
-  ]);
+  const result = db
+    .query(
+      "UPDATE tasks SET status = 'claimed', assigned_to = ?, updated_at = datetime('now') WHERE id = ? AND status = 'open'",
+    )
+    .run(by, id);
+  if (result.changes === 0) return null;
   return getTask(db, id);
 }
 
