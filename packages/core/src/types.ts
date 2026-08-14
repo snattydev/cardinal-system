@@ -8,6 +8,29 @@ export interface AgentRow {
   connected: number;
   last_seen: string | null;
   created_at: string;
+  device_info: string | null;
+}
+
+export interface DeviceInfo {
+  hostname?: string;
+  platform?: string;
+  arch?: string;
+  gpu?: string;
+  ram_gb?: number;
+  ip?: string;
+}
+
+export interface DeviceRow {
+  id: string;
+  hostname: string | null;
+  platform: string | null;
+  arch: string | null;
+  gpu: string | null;
+  ram_gb: number | null;
+  ip: string | null;
+  last_seen: string | null;
+  profiles: string[];
+  agents: number;
 }
 
 export interface AgentKeyRow {
@@ -27,4 +50,88 @@ export interface AgentEventRow {
   type: "connect" | "disconnect" | "status";
   meta: string | null;
   at: string;
+}
+
+export type ProfileKind = "permanent" | "one-shot";
+export type ProfileStatus = "active" | "dormant" | "liberated";
+
+export interface ProfileRow {
+  name: string;
+  display_name: string | null;
+  emoji: string | null;
+  kind: ProfileKind;
+  status: ProfileStatus;
+  model_default: string | null;
+  provider_default: string | null;
+  device: string | null;
+  last_onboarded: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface SoulRow {
+  profile_name: string;
+  soul_md: string | null;
+  personality_tags: string | null;
+  tool_restrictions: string | null;
+  canon_ref: string | null;
+  version: number;
+  updated_at: string | null;
+}
+
+export interface ConfigTemplateRow {
+  profile_name: string;
+  config_yaml: string | null;
+  version: number;
+  updated_at: string | null;
+}
+
+export interface SkillRow {
+  name: string;
+  description: string | null;
+  category: string | null;
+  content_hash: string | null;
+  path: string | null;
+  required_toolsets: string | null;
+  updated_at: string | null;
+}
+
+export type MemoryTarget = "memory" | "user";
+export type SyncDirection = "local_primary" | "cardinal_primary" | "bidirectional";
+
+export interface MemoryMirrorRow {
+  profile_name: string;
+  target: MemoryTarget;
+  content: string | null;
+  char_count: number;
+  content_hash: string | null;
+  last_synced: string | null;
+  sync_direction: SyncDirection;
+}
+
+export interface SessionRow {
+  id: string;
+  profile_name: string;
+  title: string | null;
+  model: string | null;
+  started_at: number | null;
+  message_count: number;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost: number;
+}
+
+export type TaskStatus = "open" | "claimed" | "done" | "blocked";
+
+export interface TaskRow {
+  id: string;
+  goal: string;
+  status: TaskStatus;
+  assigned_to: string | null;
+  created_by: string;
+  parent_id: string | null;
+  summary: string | null;
+  artifact_ref: string | null;
+  created_at: string;
+  updated_at: string | null;
 }

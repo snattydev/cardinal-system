@@ -25,7 +25,7 @@
 
 | Rama | Rol | Protección |
 |------|-----|------------|
-| `main` | Producción | PR + review requerido, squash merge |
+| `main` | Producción | PR + review requerido, merge commit |
 | `dev` | Integración | Push/merge directo permitido |
 
 **Workflow:**
@@ -40,14 +40,14 @@ fix/*    ──→ dev ──→ main
 2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
 3. `main` jamás recibe commits directos
 4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
-5. **Merge strategy:** squash merge (1 commit por PR, mensaje limpio con feat + resumen)
+5. **Merge strategy:** merge commit (historia completa, sin squash). `dev` y `main` nunca divergen.
 
-### Estado actual (2026-07-28)
+### Estado actual (2026-08-06)
 
 | Fase | Estado | Spec |
 |------|--------|------|
 | **Fase 0** — Esqueleto Vivo | ✅ Completa | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
-| **Fase 1** — Context Store | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
+| **Fase 1** — Context Store | 🏗️ En progreso (pre-refactors completos, features pendientes) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
 | **Fase 2** — One-Shot Pipeline | 📋 Diseñada | [`docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-2-one-shot-pipeline.md) |
 | **Fase 3+** — Graph + Automations | 🔮 Futuro | — |
 
@@ -101,6 +101,7 @@ docs: add SOULs and review workflow to AGENTS.md
 - Primera línea ≤ 72 chars, **en inglés** (estándar conventional commits)
 - Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
 - Si el commit cierra un issue: `Closes #N` al final del cuerpo
+- **Autoría:** el commit debe usar el nombre y email del usuario de GitHub que tiene acceso al repo (`git config user.name` / `user.email`), no el nombre de ningún agente. Todos los agentes deben heredar la identidad del owner.
 
 ---
 
@@ -126,16 +127,7 @@ docs: add SOULs and review workflow to AGENTS.md
 
 ### Merge strategy
 
-**Squash merge.** Todos los commits de `dev` se aplastan en un solo commit limpio en `main`. Ejemplo:
-
-```
-feat: Fase 1 — Context Store (v0.2.0)
-
-Profile Registry, SOUL Registry, Skill Catalog, Memory Mirror,
-Session Index, Device Registry. Bun packages split (core, auth, keys, ws, db).
-```
-
-El historial granular queda en `dev`; `main` tiene un commit por feature/fase.
+**Merge commit.** Se usa merge estándar (no squash). Todos los commits de `dev` pasan a `main` con un merge commit explícito. `dev` y `main` nunca divergen — no hay necesidad de realinear después del merge.
 
 ---
 
@@ -287,10 +279,58 @@ cardinal-system/
 
 ### Skills activas
 
-- `cardinal-dev` — Workflow completo de desarrollo
-- `cardinal-pr` — Crear Pull Requests
-- `cardinal-commit` — Formato de commits
+- `cardinal-dev` — Workflow completo de desarrollo (branching, commits, PRs, versionado, TDD, revisión)
+- `cardinal-system` — Dev técnico (keys, WebSocket protocol, API, quirks, pipeline)
 
 ---
 
 *Reglas vivas. Si algo cambia, este archivo se actualiza.*
+
+---
+
+## 🕸️ Swarm Workflow (OpenCode)
+
+El repo tiene setup multi-agente de OpenCode (ver `.opencode/`).
+
+- **Features de 1-2 archivos sin lógica crítica** → implementación directa, sin workflow completo
+- **Features con dependencias o lógica crítica** → `/feature "descripción"` desde OpenCode
+- **`/review`** → code review del working tree contra `dev`
+- **`/test [path]`** → TDD workflow (tester escribe RED, builder hace GREEN)
+- **`/deploy`** → build + tests + containers + healthcheck
+- El orquestador (primary agent) descompone, delega y verifica. Los subagentes son efímeros.
+
+## 🤖 Agent Roles (OpenCode)
+
+| Agente | Modo | Modelo | Rol |
+|--------|------|--------|-----|
+| `orchestrator` | primary | `opencode-go/deepseek-v4-pro` | Descompone, delega, verifica, sugiere commits. No escribe código |
+| `builder` | subagent | hereda | Implementa features (packages, backend, frontend) |
+| `tester` | subagent | hereda | TDD estricto (RED → GREEN) en `*.test.ts` |
+| `reviewer` | subagent | hereda | Code review read-only, output CRITICAL/HIGH/LOW |
+| `docs` | subagent | hereda | Documentación en `docs/features/` |
+
+Los subagentes heredan el modelo del primario. El default del proyecto es `opencode-go/deepseek-v4-flash`.
+
+## 📤 Delegation Rules
+
+- El orchestrator **no escribe código** — solo coordina, verifica y sugiere commits
+- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
+- El orchestrator verifica resultados (tests, build, diff) antes de marcar completo
+- Los commits los hace el humano (o el orquestador con identidad del owner) después de revisar el diff
+
+## 🖥️ Cursor Section
+
+- Cursor lee `AGENTS.md` automáticamente como Cursor Rules + `.cursor/rules/cardinal.mdc`
+- **Grok 4.5 en Composer** para: planning de features complejas, code review visual, refactors multi-archivo
+- **OpenCode CLI** para: implementación concreta (`/feature`), TDD (`/test`), review rápido (`/review`)
+- Ambos comparten reglas vía `AGENTS.md` y `.cursor/rules/`
+
+## ⚙️ OpenCode Config Reference
+
+- Config: `opencode.json` raíz (model default, default_agent, subagent_depth, permissions, MCPs)
+- Agentes: `.opencode/agents/<nombre>.md` (frontmatter + system prompt)
+- Comandos: `.opencode/commands/<nombre>.md`
+- Verificar el setup completo: `bash scripts/verify-dev-setup.sh` (agentes, rules, config)
+- El MCP de GitHub requiere `GITHUB_TOKEN` en el entorno: `set -x GITHUB_TOKEN (gh auth token)` (fish)
+- Extender: agente nuevo → archivo en `.opencode/agents/`; comando nuevo → `.opencode/commands/`; MCP nuevo → entrada en `opencode.json` → `mcp` + quitar su namespace del deny
+- Los MCPs globales (`ZerrantHive_*`, `pencil_*`) están deshabilitados en este proyecto

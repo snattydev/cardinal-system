@@ -5,6 +5,7 @@ import {
   getAgent,
   insertEvent,
   listAgents,
+  listDevices,
   markAgentDisconnected,
   touchKey,
   updateAgentStatus,
@@ -125,6 +126,7 @@ export class Hub {
 
     this.send(ws, { type: "welcome", agent: name, kind });
     this.broadcastAgent(name);
+    this.broadcastDevices();
     this.startPing(name);
   }
 
@@ -174,6 +176,7 @@ export class Hub {
     markAgentDisconnected(this.db, name);
     insertEvent(this.db, { agentName: name, type: "disconnect" });
     this.broadcastAgent(name);
+    this.broadcastDevices();
   }
 
   private teardownAgent(name: string): void {
@@ -204,6 +207,11 @@ export class Hub {
     const row = getAgent(this.db, name);
     if (!row) return;
     const payload = JSON.stringify({ type: "agent_update", agent: agentToPayload(row) });
+    for (const dash of this.dashboards) dash.send(payload);
+  }
+
+  private broadcastDevices(): void {
+    const payload = JSON.stringify({ type: "devices_update", devices: listDevices(this.db) });
     for (const dash of this.dashboards) dash.send(payload);
   }
 

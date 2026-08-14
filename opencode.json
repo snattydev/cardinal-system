@@ -1,0 +1,28 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/deepseek-v4-flash",
+  "default_agent": "orchestrator",
+  "subagent_depth": 2,
+  "instructions": ["AGENTS.md", ".cursor/rules/cardinal.mdc"],
+  "permission": {
+    "bash": {
+      "sudo *": "deny",
+      "rm -rf /*": "deny"
+    },
+    "*": "allow",
+    "mcp__*": "deny"
+  },
+  "mcp": {
+    "github": {
+      "type": "local",
+      "command": ["npx", "-y", "@anthropic/mcp-server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "{env:GITHUB_TOKEN}"
+      }
+    }
+  },
+  "tools": {
+    "ZerrantHive_*": false,
+    "pencil_*": false
+  }
+}

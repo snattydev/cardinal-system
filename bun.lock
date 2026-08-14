@@ -12,6 +12,7 @@
         "@cardinal/core": "workspace:*",
         "@cardinal/db": "workspace:*",
         "@cardinal/keys": "workspace:*",
+        "@cardinal/rag": "workspace:*",
         "@cardinal/ws": "workspace:*",
         "jose": "^6.2.4",
         "zod": "^4.4.3",
@@ -60,6 +61,13 @@
         "@cardinal/core": "workspace:*",
       },
     },
+    "packages/rag": {
+      "name": "@cardinal/rag",
+      "version": "0.1.0",
+      "dependencies": {
+        "@cardinal/db": "workspace:*",
+      },
+    },
     "packages/keys": {
       "name": "@cardinal/keys",
       "version": "0.1.0",
@@ -86,6 +94,8 @@
     "@cardinal/db": ["@cardinal/db@workspace:packages/db"],
 
     "@cardinal/keys": ["@cardinal/keys@workspace:packages/keys"],
+
+    "@cardinal/rag": ["@cardinal/rag@workspace:packages/rag"],
 
     "@cardinal/ws": ["@cardinal/ws@workspace:packages/ws"],
 

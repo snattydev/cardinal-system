@@ -29,6 +29,109 @@ CREATE TABLE agent_events (
   at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+CREATE TABLE profiles (
+  name TEXT PRIMARY KEY,
+  display_name TEXT,
+  emoji TEXT,
+  kind TEXT NOT NULL DEFAULT 'permanent' CHECK (kind IN ('permanent','one-shot')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','dormant','liberated')),
+  model_default TEXT,
+  provider_default TEXT,
+  device TEXT,
+  last_onboarded TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT
+);
+`,
+  `
+CREATE TABLE souls (
+  profile_name TEXT PRIMARY KEY REFERENCES profiles(name),
+  soul_md TEXT,
+  personality_tags TEXT,
+  tool_restrictions TEXT,
+  canon_ref TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT
+);
+`,
+  `
+CREATE TABLE skills (
+  name TEXT PRIMARY KEY,
+  description TEXT,
+  category TEXT,
+  content_hash TEXT,
+  path TEXT,
+  required_toolsets TEXT,
+  updated_at TEXT
+);
+CREATE TABLE profile_skills (
+  profile_name TEXT NOT NULL REFERENCES profiles(name),
+  skill_name TEXT NOT NULL REFERENCES skills(name),
+  pinned INTEGER NOT NULL DEFAULT 0,
+  added_at TEXT,
+  PRIMARY KEY (profile_name, skill_name)
+);
+`,
+  `
+CREATE TABLE memory_mirror (
+  profile_name   TEXT NOT NULL REFERENCES profiles(name),
+  target         TEXT NOT NULL CHECK (target IN ('memory','user')),
+  content        TEXT,
+  char_count     INTEGER NOT NULL DEFAULT 0,
+  content_hash   TEXT,
+  last_synced    TEXT,
+  sync_direction TEXT NOT NULL DEFAULT 'local_primary' CHECK (sync_direction IN ('local_primary','cardinal_primary','bidirectional')),
+  PRIMARY KEY (profile_name, target)
+);
+`,
+  `
+CREATE TABLE sessions_index (
+  id            TEXT PRIMARY KEY,
+  profile_name  TEXT NOT NULL REFERENCES profiles(name),
+  title         TEXT,
+  model         TEXT,
+  started_at    REAL,
+  message_count INTEGER NOT NULL DEFAULT 0,
+  input_tokens  INTEGER NOT NULL DEFAULT 0,
+  output_tokens INTEGER NOT NULL DEFAULT 0,
+  estimated_cost REAL NOT NULL DEFAULT 0
+);
+`,
+  `
+CREATE TABLE rag_cache (
+  cache_key  TEXT PRIMARY KEY,
+  query      TEXT NOT NULL,
+  top_k      INTEGER NOT NULL DEFAULT 5,
+  results    TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
+  `
+CREATE TABLE config_templates (
+  profile_name TEXT PRIMARY KEY REFERENCES profiles(name),
+  config_yaml TEXT,
+  version INTEGER NOT NULL DEFAULT 1,
+  updated_at TEXT
+);
+`,
+  `
+ALTER TABLE agents ADD COLUMN device_info TEXT;
+`,
+  `
+CREATE TABLE tasks (
+  id          TEXT PRIMARY KEY,
+  goal        TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','claimed','done','blocked')),
+  assigned_to TEXT,
+  created_by  TEXT NOT NULL,
+  parent_id   TEXT REFERENCES tasks(id),
+  summary     TEXT,
+  artifact_ref TEXT,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at  TEXT
+);
+`,
 ];
 
 export function migrate(db: Database): void {

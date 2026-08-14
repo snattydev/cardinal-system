@@ -112,6 +112,49 @@ test("GET /api/agents requires a session cookie", async () => {
   expect(Array.isArray(body.agents)).toBe(true);
 });
 
+test("GET /api/devices requires a session cookie and returns devices", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/devices`);
+  expect(anon.status).toBe(401);
+
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/devices`, { headers: { cookie } });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { devices: unknown[] };
+  expect(Array.isArray(body.devices)).toBe(true);
+});
+
+test("POST /api/devices/heartbeat persists device info", async () => {
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/devices/heartbeat`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      agent: "shinon",
+      info: { hostname: "home-pc", platform: "linux", arch: "x86_64", ram_gb: 64, ip: "10.0.0.2" },
+    }),
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { device: Record<string, unknown> };
+  expect(body.device).toMatchObject({ id: "home-pc", hostname: "home-pc", platform: "linux", ram_gb: 64 });
+});
+
+test("POST /api/devices/heartbeat with unknown agent → 404 and without cookie → 401", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/devices/heartbeat`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agent: "shinon", info: { hostname: "x" } }),
+  });
+  expect(anon.status).toBe(401);
+
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/devices/heartbeat`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ agent: "ghost", info: { hostname: "x" } }),
+  });
+  expect(res.status).toBe(404);
+});
+
 test("agent flow: hello → welcome → roster → pong status → bye disconnect", async () => {
   const cookie = await login();
   const ws = await connectWs();

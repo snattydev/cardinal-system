@@ -3,12 +3,12 @@ import { verifySession } from "./jwt";
 export const SESSION_COOKIE = "cardinal_session";
 export const SESSION_MAX_AGE = 43200;
 
-export function sessionCookie(token: string): string {
-  return `${SESSION_COOKIE}=${token}; HttpOnly; Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}`;
+export function sessionCookie(token: string, secure = false): string {
+  return `${SESSION_COOKIE}=${token}; HttpOnly; ${secure ? "Secure; " : ""}Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}`;
 }
 
-export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; HttpOnly; Path=/; SameSite=Strict; Max-Age=0`;
+export function clearSessionCookie(secure = false): string {
+  return `${SESSION_COOKIE}=; HttpOnly; ${secure ? "Secure; " : ""}Path=/; SameSite=Strict; Max-Age=0`;
 }
 
 export function readCookie(header: string | null, name: string): string | null {
