@@ -19,14 +19,22 @@ Ver [`roadmap/fase-1.md`](roadmap/fase-1.md) para el detalle de features.
 |------|--------|--------|---------|
 | 0 | Esqueleto Vivo | ✅ Completa | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
 | 1 | Context Store | ✅ Completa (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
-| 2 | One-Shot Pipeline | 📋 Diseñada | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
+| 2 | Cardinal v2 (Blackboard + MCP + Pool) | 🚧 En curso | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
 | 3 | Grafo de Conocimiento | 🔮 Futuro | — |
 | 4 | Automations | 🔮 Futuro | — |
 
-### Fase 2 — estado del bloqueo
+### Fase 2 — estado
 
-Diseño original requería VPS con IP pública para webhooks de GitHub (bloqueado Jul 2026).
-**Decisión 2026-08-10:** destrabe sin VPS vía **polling local de la API de GitHub desde un cron** (opción B — más simple, nada expuesto, alineado con security-first). Webhooks/Tailscale Funnel quedan como alternativa si el polling no alcanza. **No priorizado por ahora** — se implementa cuando haya features que lo justifiquen.
+Re-scopeada por Cardinal v2 (2026-08-12): la orquestación es commodity, el
+Cardinal es cerebro (identidad + contexto + blackboard). El cuello de botella
+ya no es el VPS (webhooks); ahora es **validar los pilares con spikes** (001
+blackboard ✅, 002 MCP multi-vault, 003 pool opencode-go). Ver
+[`roadmap/fase-2.md`](roadmap/fase-2.md) y el
+[plan de backlog](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
+
+El desbloqueo por polling local de la API de GitHub (decisión 2026-08-10) sigue
+válido como alternativa para triggers externos, pero dejó de ser el cuello de
+botella de Fase 2.
 
 ---
 
