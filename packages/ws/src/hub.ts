@@ -11,7 +11,7 @@ import {
   updateAgentStatus,
   upsertAgentOnConnect,
 } from "@cardinal/db";
-import type { AgentKind, AgentRow } from "@cardinal/core";
+import type { AgentKind, AgentRow, TaskRow } from "@cardinal/core";
 import { parseClientMessage, resolveKind } from "@cardinal/core";
 import { hashKey, isKeyFormat } from "@cardinal/keys";
 
@@ -38,6 +38,34 @@ export function agentToPayload(row: AgentRow): AgentPayload {
     status: row.status,
     connected: row.connected === 1,
     lastSeen: row.last_seen,
+  };
+}
+
+export interface TaskPayload {
+  id: string;
+  goal: string;
+  status: TaskRow["status"];
+  assignedTo: string | null;
+  createdBy: string;
+  parentId: string | null;
+  summary: string | null;
+  artifactRef: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+export function taskToPayload(row: TaskRow): TaskPayload {
+  return {
+    id: row.id,
+    goal: row.goal,
+    status: row.status,
+    assignedTo: row.assigned_to,
+    createdBy: row.created_by,
+    parentId: row.parent_id,
+    summary: row.summary,
+    artifactRef: row.artifact_ref,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -212,6 +240,11 @@ export class Hub {
 
   private broadcastDevices(): void {
     const payload = JSON.stringify({ type: "devices_update", devices: listDevices(this.db) });
+    for (const dash of this.dashboards) dash.send(payload);
+  }
+
+  broadcastTask(task: TaskRow): void {
+    const payload = JSON.stringify({ type: "task_update", task: taskToPayload(task) });
     for (const dash of this.dashboards) dash.send(payload);
   }
 

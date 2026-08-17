@@ -169,21 +169,21 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (pathname === "/api/tasks" && method === "POST") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleCreateTask(db, req);
+        return handleCreateTask(db, req, (t) => hub.broadcastTask(t));
       }
 
       const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
       if (taskClaimMatch && method === "PUT") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req);
+        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
       if (taskCompleteMatch && method === "PUT") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req);
+        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);

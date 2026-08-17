@@ -1,2 +1,2 @@
-export { Hub, agentToPayload } from "./hub";
-export type { ConnData, AgentPayload } from "./hub";
+export { Hub, agentToPayload, taskToPayload } from "./hub";
+export type { ConnData, AgentPayload, TaskPayload } from "./hub";
