@@ -241,6 +241,9 @@ Esto aplica a: SOULs, prompts de review, checklists de seguridad.
 
 ```
 cardinal-system/
+├── .cursor/
+│   ├── agents/              subagentes Cursor (adapters)
+│   └── rules/
 ├── packages/                  ← Bun workspaces (paquetes internos)
 │   ├── core/                  tipos compartidos, config, zod schemas
 │   ├── auth/                  JWT sign/verify, login, logout
@@ -261,7 +264,8 @@ cardinal-system/
 ├── docs/
 │   ├── features/              documentación de features completadas
 │   ├── agents/                SOULs, prompts, checklists de revisión
-│   │   └── prompts/
+│   │   ├── prompts/
+│   │   └── roles/           roles canónicos (agnósticos)
 │   ├── superpowers/
 │   │   ├── specs/             specs de diseño por fase
 │   │   └── plans/             planes de implementación

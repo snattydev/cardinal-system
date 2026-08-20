@@ -83,6 +83,13 @@ Copy all `.pod`, `.container`, and `.volume` files to `~/.config/containers/syst
 
 ## Environment & Secrets
 
+> **Cloud blocker (2026-08-20):** do **not** create or rotate the admin
+> password via an AI agent. Local testing may use any throwaway password.
+> Production (even single-user) must use a TTY-only bootstrap: human types the
+> password (`read -s`), the host hashes it, only `ADMIN_PASSWORD_HASH` is
+> stored. See `docs/security.md`. This script is backlog item 11 — required
+> before the first cloud deploy.
+
 The backend expects these environment variables (via `~/.config/cardinal/env`):
 
 | Variable | Description |

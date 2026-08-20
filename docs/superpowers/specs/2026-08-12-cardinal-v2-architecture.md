@@ -140,6 +140,12 @@ agent_keys (extendido)         — identidad del cliente
 └── created_by=system → auto-revocable (one-shot); created_by=human → jamás se toca
 ```
 
+Dashboard `/keys` (spec `2026-08-20-keys-dashboard-design.md`): lista grande =
+human activas; historial (icono log) = human revocadas. **Futuro (no ahora):**
+one-shot vivas en un bloque compacto **abajo a la izquierda**; al terminar el
+one-shot la fila se **borra** (no va al historial; el rastro queda en el log
+de ese agente).
+
 ### Resolución (autorouter + alias)
 
 - `model="deepseek-v4-flash"` (nombre real) → AUTOROUTER: el router arma el pool de

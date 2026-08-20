@@ -27,6 +27,9 @@
 | 8 | Fix typecheck roto (`maxPayloadLength` vs `bun-types`) | fix | — | — |
 | 9 | Docs stale — `roadmap/fase-2.md`, `roadmap.md`, `AGENTS.md` | docs | — | — |
 | 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router | release | — | todos |
+| 11 | Bootstrap admin password **sin el modelo** (TTY `read -s` → solo hash en env/secret) | security / deploy | — | **blocker cloud** |
+| 12 | Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí (keys API) | — |
+| 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar (rastro en log del one-shot, no en historial) | feature | Sí | pipeline one-shot |
 
 ## Decisiones
 
@@ -105,7 +108,26 @@
   Review si se tocó auth/keys/ws, Standard Review, version bump, docs).
   Nunca auto-merge.
 
+### 11 — Bootstrap admin password sin el modelo (blocker cloud)
+- En local/testing cualquier password sirve. En nube, no.
+- Script TTY: el humano tipea la password (`read -s`); se hashea en esa
+  máquina; solo el hash llega a `~/.config/cardinal/env` o Podman secret.
+- El modelo **nunca** genera, recibe, imprime ni rota el plaintext. Aplica
+  aunque Santi sea el único usuario.
+- Ver `docs/security.md` § "Bootstrap de password admin".
+
+### 12 — Keys dashboard (listar + revocar persistentes)
+- Spec: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md).
+- Página `/keys`, JWT, sin plaintext. Historial human-revoked detrás de icono log.
+- Crear sigue en CLI. TDD en API keys.
+
+### 13 — One-shot keys (diferido)
+- Bloque compacto abajo a la izquierda en `/keys` para `created_by=system` vivas.
+- Al terminar el one-shot: hard-delete de `agent_keys`; rastro en el log de ese
+  agente, no en el historial de `/keys`.
+- Depende del pipeline one-shot. Detalle en spec §6.
+
 ## Próximo paso
 
-Arrancar por **6 (router)** y **7 (key factory)** con cursor-agent — el deploy local
-del pool + router es la prioridad de Santi.
+Router + key factory ya están en `dev`. Siguiente slice de UI cuando se retome:
+**12 (Keys dashboard)** según la spec del 2026-08-20. No implementar 13 todavía.
