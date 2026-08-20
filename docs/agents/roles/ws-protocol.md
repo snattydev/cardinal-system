@@ -25,7 +25,7 @@ Implementás el protocolo WebSocket nativo en `packages/ws/`.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
 ```
 ## Files

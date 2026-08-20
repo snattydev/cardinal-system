@@ -31,7 +31,7 @@ Despachás trabajo a un pane hermano del multiplexer local. No implementás prod
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
 ```
 ## Dispatch

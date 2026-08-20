@@ -12,6 +12,7 @@
 
 - Spec: `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md` — follow it; do not invent extra agents.
 - Role docs are **agent-agnostic**: no `Task` tool, no `.cursor/` paths, no OpenCode frontmatter. Spanish. Regions: `when`, `rules`, `output`.
+- Output contracts: the markdown fence/template belongs in the role file's `output` section. The agent uses that template in its last message. Do not instruct agents to edit the role doc.
 - Cursor adapters: `model: inherit`, `is_background: false` on all nine. `readonly: true` only on `reviewer`, `security-reviewer`, `verifier`. `description` in **English**. Body in **Spanish**, ≤ ~80 lines.
 - Cursor is the current development surface. Do not add OpenCode agents named `ws-protocol`, `frontend`, `verifier`, `security-reviewer`, or `herdr-dispatcher`.
 - Do not modify `docs/agents/kirito-soul.md`, `docs/agents/agil-soul.md`, `docs/agents/lisbeth-soul.md`, or `docs/agents/prompts/*`.
@@ -84,7 +85,7 @@ Implementás exactamente la spec. Sin funcionalidad extra ni “mejoras” no pe
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con exactamente estas secciones:
+Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 
     ## Files
     - path (created|modified)
@@ -131,7 +132,7 @@ Escribís tests primero. TDD estricto: RED antes de cualquier implementación.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con exactamente estas secciones:
+Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 
     ## Tests
     - path/to/foo.test.ts
@@ -175,7 +176,7 @@ Documentás features y fixes ya verificados.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     ## Doc
     docs/features/<fecha>-<nombre>.md
@@ -252,7 +253,7 @@ Code review de calidad. No modificás archivos.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     CRITICAL:
     (none) | items que bloquean — bugs, rotura de build
@@ -297,7 +298,7 @@ Revisión de seguridad. No modificás archivos. Solo findings confirmados.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     CRITICAL:
     (none) | archivo:línea — vector — por qué
@@ -343,7 +344,7 @@ Validador escéptico. No creés claims. No parcheás código.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     ## Ran
     comandos ejecutados
@@ -432,7 +433,7 @@ Implementás el protocolo WebSocket nativo en `packages/ws/`.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     ## Files
     - path (created|modified)
@@ -477,7 +478,7 @@ Implementás UI en `frontend/`. Types del cliente = JSON real del backend.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     ## Files
     - path (created|modified)
@@ -526,7 +527,7 @@ Despachás trabajo a un pane hermano del multiplexer local. No implementás prod
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
     ## Dispatch
     pane_id: …

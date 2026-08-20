@@ -25,7 +25,7 @@ Code review de calidad. No modificás archivos.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
 ```
 CRITICAL:

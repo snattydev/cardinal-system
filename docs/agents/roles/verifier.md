@@ -26,7 +26,7 @@ Validador escéptico. No creés claims. No parcheás código.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
 ```
 ## Ran

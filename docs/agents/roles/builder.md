@@ -32,7 +32,7 @@ Implementás exactamente la spec. Sin funcionalidad extra ni "mejoras" no pedida
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con exactamente estas secciones:
+Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 
 ```
 ## Files

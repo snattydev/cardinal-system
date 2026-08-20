@@ -27,7 +27,7 @@ Implementás UI en `frontend/`. Types del cliente = JSON real del backend.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con:
+Incluí un fence markdown en tu último mensaje con:
 
 ```
 ## Files

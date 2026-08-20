@@ -177,23 +177,6 @@ Templates de review: [`docs/agents/prompts/standard-review.md`](./docs/agents/pr
 
 ---
 
-## 🤖 Agentes de Desarrollo
-
-- **El orquestador coordina, los subagentes implementan**
-- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
-- El subagente entrega el resultado → el orquestador verifica, commitea y documenta
-- Subagentes son **efímeros**: sin estado entre runs, sin memoria persistente
-- Tasks complejas se descomponen en múltiples subagentes secuenciales o paralelos
-
-### Workflow completo por feature
-
-1. **Delegar** — subagente(s) implementan la feature
-2. **Verificar** — build, tests, revisión manual
-3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
-4. **Commit + push** — conventional commit a `dev` incluyendo el doc
-
----
-
 ## 🐳 Containerización
 
 - **Dev local:** `compose.yaml` (`podman-compose`)
@@ -303,6 +286,13 @@ cardinal-system/
 - OpenCode CLI (`.opencode/`) sigue disponible (`/feature`, `/test`, `/review`); no es el camino diario.
 
 Flujo: tester RED → builder | ws-protocol | frontend GREEN → verifier → reviewer ∥ security-reviewer (si auth/keys/ws) → docs → el padre sugiere commit (no commitea salvo pedido).
+
+Workflow por feature:
+
+1. **Delegar** — 1–2 archivos sin lógica crítica in-session; el resto a subagentes
+2. **Verificar** — `verifier` con evidencia (`bun test` / `bun run build`); review si aplica
+3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
+4. **Commit + push** — conventional commit a `dev` incluyendo el doc; solo si el humano lo pide
 
 ## 🤖 Agent Roles (Cursor)
 

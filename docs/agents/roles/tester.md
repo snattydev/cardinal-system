@@ -27,7 +27,7 @@ Escribís tests primero. TDD estricto: RED antes de cualquier implementación.
 <!-- REGION: output -->
 ## Output (último mensaje)
 
-Incluí un fence markdown en el role doc con exactamente estas secciones:
+Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 
 ```
 ## Tests
