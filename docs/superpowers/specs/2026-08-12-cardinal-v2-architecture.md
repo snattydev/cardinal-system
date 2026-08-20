@@ -112,42 +112,79 @@ Multi-vault: hoy hay un índice (the portal). El objetivo es N vaults indexadas,
 
 ---
 
-## 6. Key pool + router interno
+## 6. Key pool + router interno (arquitectura cerrada 2026-08-20)
 
-No es un clon estricto de FreeLLMAPI; es la esencia: pool de keys que Santi administra, de donde se generan keys derivadas.
+Router provider-agnostic, inspirado en FreeLLMAPI pero con identidad de cliente. La key derivada (`sk-cardinal-*`) ES la identidad: define scopes (qué modelos puede pedir), budget y metering por agente.
 
-### Upstreams (todos OpenAI-compatible)
+### Modelo de datos (todo en DB, nada hardcodeado)
+
+```
+providers                      — lo que Santi agrega/quita sin tocar código
+├── id, name, base_url, api_key (AES-256-GCM, nunca sale del Cardinal)
+├── wire_format: openai | anthropic | gemini
+├── status: active | disabled
+├── rate_limits opcionales (rpm, tpm)
+└── cost_per_mtok (metering)
+
+provider_models                — modelos físicos por provider
+├── provider_id, model_id (ej "deepseek-v4-flash-free")
+├── capabilities (tools/vision/streaming), context_window
+
+model_routes                   — los alias lógicos (lo único que ve el consumidor)
+├── alias (ej "pro", "fast") O nombre de modelo real ("deepseek-v4-flash")
+└── fallback_chain JSON ordenado: [{provider, model_id}, ...]
+
+agent_keys (extendido)         — identidad del cliente
+├── scopes JSON (lista de alias/modelos permitidos; "*" = autorouter libre)
+├── budget_limit (tokens), budget_used (acumulado)
+└── created_by=system → auto-revocable (one-shot); created_by=human → jamás se toca
+```
+
+### Resolución (autorouter + alias)
+
+- `model="deepseek-v4-flash"` (nombre real) → AUTOROUTER: el router arma el pool de
+  providers que sirven ese modelo, usa el primero sano, y si falla salta al siguiente.
+- `model="pro"` (alias lógico) → CADENA FIJA definida por Santi en model_routes.
+- La key decide quién puede pedir qué: scope ["fast"] = solo ese alias;
+  scope ["*"] = autorouter libre; scope ["deepseek-v4-pro"] = solo ese modelo.
+
+### Flujo POST /v1/chat/completions (Bearer sk-cardinal-*)
+
+1. Auth: hash SHA-256 de la key → validar + scope (¿puede pedir este modelo?) + budget (¿le queda?)
+2. Resolver modelo → fallback_chain
+3. Por cada eslabón: health check + cooldown (429/5xx) → decrypt api_key → llamar upstream
+4. Éxito: streamear SSE o completion normal (no romper el stream al rutear)
+5. Metering: registrar tokens por key derivada + por provider (dashboard de consumo)
+6. Si todo falla: error con attempt trail
+
+### Failover transparente (la clave del diseño)
+
+"Si pido deepseek-v4-flash y hay 4 providers free, uso 1, se corta, el router pasa
+al otro SIN interrumpir al usuario final." El cliente nunca ve el failover — solo ve
+el modelo que pidió. Igual que FreeLLMAPI unified models, con identidad de cliente
+sumada: la key sabe quién es, qué puede pedir y cuánto consumió.
+
+### Upstreams (estado real 2026-08-20)
 
 | Upstream | Qué es | Estado |
 |----------|--------|--------|
-| opencode-go | Suscripción GO expuesta como endpoint OpenAI-compatible local (`opencode serve`) | Validar (spike-003) |
-| opencode-zen | Tier free, solo fallback final | Asumido |
-| deepseek-direct | API directa de DeepSeek | Asumido |
-| futuros | lo que se sume (Anthropic, Gemini, Groq...) | — |
+| opencode-zen | Tier free vía opencode CLI (`opencode/*-free`) | ✅ Funciona (validado: deepseek-v4-flash-free responde) |
+| opencode-llm-proxy | Plugin KochC en :4010 — adapta opencode a OpenAI wire | ✅ Validado que el concepto existe; usar como adapter |
+| opencode-go | Suscripción GO | ❌ CAÍDO (suscripción vencida 2026-08) — no usar como upstream primario |
+| deepseek-direct | API directa DeepSeek | ⏸️ Cuando Santi tenga key |
+| futuros | OpenRouter, Groq, etc. | — (provider agnóstico: se agregan como filas) |
 
-### Registry de alias + fallback
-
-Santi elige un **modelo lógico**, no un proveedor. El Cardinal resuelve alias → cadena de upstreams con fallback automático:
-
-```
-"pro"  → opencode-go → (fallback) deepseek-direct → (último) zen-free
-```
-
-### Keys derivadas (Key Factory)
-
-- `sk-cardinal-*` con `scopes` (JSON) y `budget_limit` duro.
-- `created_by=system` para one-shot y agentes públicos, auto-revocables.
-- `created_by=human` jamás se tocan salvo acción explícita.
+Nota spike-003 (2026-08-20): `opencode serve` NO expone `/v1/chat/completions`
+(devuelve SPA para rutas desconocidas; su API nativa es session/prompt/event). Para
+usar opencode como upstream OpenAI-compatible, va `opencode-llm-proxy` (plugin que
+levanta :4010 con wire OpenAI/Anthropic/Gemini, streaming + tool calling).
 
 ### Security boundary (la joya del pool)
 
-"Prestar" keys a agentes one-shot o públicos (chatbot del portfolio) NO presta las keys reales: acuña derivadas con scope y budget. El agente público JAMÁS ve la key del proveedor. Si se pasa del budget, el Cardinal corta solo. **La key real nunca sale del Cardinal.**
-
-### Pitfalls conocidos (heredados de Nogal Hive, ya anotados en ecosystem.md)
-
-- Tool-calling passthrough: proxies OpenAI-compat pueden descartar tools → validar passthrough.
-- Streaming (SSE): no romper el stream al ruteary.
-- Metering por key: cada token atribuible, consumo real en feed.
+"Prestar" keys a agentes one-shot o públicos (chatbot del portfolio) NO presta las
+keys reales: acuña derivadas con scope y budget. El agente público JAMÁS ve la key
+del proveedor. Si se pasa del budget, el Cardinal corta solo. **La key real nunca
+sale del Cardinal.**
 
 ---
 

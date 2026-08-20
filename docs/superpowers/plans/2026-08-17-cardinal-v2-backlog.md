@@ -2,61 +2,71 @@
 
 > Complementa la spec viva `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
 > Estado al momento: v0.2.1, `dev` limpio (cec1add), Fase 1 completa. Suite: 225 pass / 0 fail.
+> Re-priorizado 2026-08-20: Santi quiere el router + key pool deployados en local ANTES que mailbox/UI.
 
 ## Estado actual
 
 | Pilar | Estado |
 |-------|--------|
 | 4 — Identidad (`sk-cardinal-*`) | ✅ Fase 0 |
-| 3 — Blackboard | 🚧 tasks CRUD + WS broadcast (`task_update`) hechos; falta mailbox, UI, MCP tools |
+| 2 — Key pool + router | 🚧 EN CURSO (arquitectura cerrada 2026-08-20; GO caído → zen free es el upstream real) |
+| 3 — Blackboard | 🚧 tasks CRUD + WS broadcast (`task_update`) hechos; falta mailbox, UI, MCP tools (pospuesto) |
 | 1 — MCP multi-vault | 📋 solo diseño (spike-002 pendiente) |
-| 2 — Key pool + router | 📋 solo diseño (spike-003 pendiente) |
 
-## Backlog
+## Backlog (orden nuevo)
 
 | # | Item | Tipo | TDD | Depende de |
 |---|------|------|-----|-----------|
+| 6 | LLM Router: `providers`/`provider_models`/`model_routes` + `/v1/chat/completions` + fallback chain + SSE + autorouter | feature | Sí (router) | — |
+| 7 | Key Factory: `agent_keys` scopes + `budget_limit` + keys auto-revocables + metering | feature | Sí (keys) | — |
+| 5 | Seed providers/routes + e2e con zen free real | spike/e2e | — | 6, 7 |
 | 1 | Mailbox `messages` — handoff directo agente↔agente | feature | Sí (DB) | — |
-| 2 | UI del board — página Tasks + consumir `task_update` + CRUD | frontend | No (build) | — |
+| 2 | UI del board — página Tasks | frontend | No (build) | — |
 | 3 | MCP tools del blackboard (`task_create/list/claim/complete`) | feature | Sí | spike-002 |
 | 4 | Spike-002 — MCP multi-vault (`search_vaults` con origen + token budget) | spike | — | — |
-| 5 | Spike-003 — pool opencode-go (upstream + metering) | spike | — | — |
-| 6 | LLM Router `/v1/chat/completions` + `model_routes` + fallback chain | feature | Sí (router) | spike-003 |
-| 7 | Key Factory — scopes + `budget_limit` + keys dinámicas auto-revocables | feature | Sí (keys) | spike-003 |
 | 8 | Fix typecheck roto (`maxPayloadLength` vs `bun-types`) | fix | — | — |
 | 9 | Docs stale — `roadmap/fase-2.md`, `roadmap.md`, `AGENTS.md` | docs | — | — |
-| 10 | PR `dev→main` — estabilizar Fase 1 + blackboard | release | — | todos |
-
-## Orden propuesto
-
-```
-Fase 0 — Higiene (desbloquear pipeline)       → 8, 9
-Fase 1 — Cerrar pilar 3 (blackboard)          → 1 (mailbox), 2 (UI)
-Fase 2 — Validar pilares restantes (spikes)   → 4 (MCP), 5 (pool)
-Fase 3 — Build sobre lo validado              → 3 (MCP tools), 6 (router), 7 (key factory)
-Fase 4 — Estabilizar                          → 10 (PR dev→main)
-```
+| 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router | release | — | todos |
 
 ## Decisiones
 
-- **Higiene primero (8, 9).** El typecheck roto es un blocker del gate de
-  verificación para TODO lo que sigue; los docs stale ya me hicieron leer
-  "0/16" en `fase-2.md` y tener que cross-checkear contra la spec viva. Son
-  chicos y dejan el repo verificado + alineado antes de construir.
-- **Cerrar pilar 3 antes de los spikes (1, 2 antes de 4, 5).** El blackboard ya
-  está al ~60% (CRUD + broadcast). Con mailbox + UI queda funcional end-to-end,
-  con un entregable visible. Los spikes validan pilares enteros que después
-  implican features grandes (6, 7) — conviene no arrancarlas hasta validar.
-- **Spikes no se planifican con código exacto** (son experimentos throwaway,
-  ver skill `spike`). El detalle bite-sized va en el plan de implementación de
-  cada feature real (1, 6, 7), no en este backlog.
-- **CLI:** para features delegadas, **cursor-agent primero** (Plan Pro, el de
-  más uso disponible). Spikes e higiene trivial van directo o cursor-agent según
-  peso. Frontend (2) → cursor-agent.
-- **El MCP surface del blackboard (3) se expone SOLO tras validar MCP en
-  spike-002** — no construir el server MCP antes de saber que el patrón funciona.
+- **Router + Key Factory primero (6, 7).** Santi priorizó tener el sistema en testing
+  y semi-funcionamiento local: pool + router deployados en los containers de podman.
+  Blackboard queda ~60% (CRUD + broadcast) pero NO bloquea — se retoma después.
+- **Router provider-agnostic (decisión 2026-08-20).** NO es un registry de alias fijo
+  (spec vieja). Es el modelo FreeLLMAPI: `providers` como entidades configurables,
+  cada uno con sus `provider_models`, y `model_routes` que resuelven por nombre de
+  modelo (autorouter) O por alias explícito. La key derivada define scopes + budget.
+  Detalle completo en spec sección 6.
+- **Failover transparente.** "Pido deepseek-v4-flash, hay 4 providers free, uso 1,
+  se corta → el router pasa al otro sin interrumpir." El cliente nunca ve el failover.
+- **GO caído.** `opencode-go/*` no responde (suscripción vencida 2026-08). Upstream
+  real disponible: zen free (`opencode/*-free`, validado). `opencode serve` NO expone
+  `/v1/chat/completions` (spike-003) — para opencode como upstream va
+  `opencode-llm-proxy` (:4010, adapta a OpenAI wire).
+- **CLI:** features delegadas → **cursor-agent** (Santi: "usá solo cursor para
+  desarrollar en estos momentos"). Spikes e higiene trivial van directo.
+- **El MCP surface del blackboard (3) se expone SOLO tras validar MCP en spike-002.**
 
 ## Detalle por item (alcance mínimo)
+
+### 6 — LLM Router (provider-agnostic)
+- Migración: `providers`, `provider_models`, `model_routes` (ver spec sección 6).
+- `packages/router/` (nuevo workspace): resolución (autorouter por nombre de modelo
+  + alias por `model_routes`), fallback chain con health/cooldown, upstream calls
+  OpenAI-compat (streaming SSE sin romper), metering por key + por provider.
+- Endpoint `POST /v1/chat/completions` + `GET /v1/models` en `backend/src/server.ts`,
+  auth Bearer `sk-cardinal-*`.
+- TDD obligatorio (router = ámbito crítico).
+
+### 7 — Key Factory
+- Extender `agent_keys` con `scopes` (JSON), `budget_limit`, `budget_used`;
+  enforcement de budget en el router; keys `created_by=system` auto-revocables;
+  dashboard de consumo. TDD obligatorio (keys).
+
+### 5 — Seed + e2e
+- Seed: provider zen free (opencode) + alias de ejemplo ("fast" → deepseek-v4-flash-free).
+- e2e: completion real vía key derivada + verificación de metering.
 
 ### 8 — Fix typecheck (`maxPayloadLength`)
 - Investigar si `bun-types` reconoce `maxPayloadLength` en la versión instalada;
@@ -65,10 +75,8 @@ Fase 4 — Estabilizar                          → 10 (PR dev→main)
 - Verificación: `bun run typecheck` verde (backend + frontend).
 
 ### 9 — Docs stale
-- `docs/roadmap/fase-2.md` → reescribir según re-scope de Cardinal v2 (adiós
-  One-Shot Pipeline, hola blackboard + MCP + pool).
-- `docs/roadmap.md` y `AGENTS.md` → actualizar "Estado actual" (Fase 1 completa,
-  Fase 2 = Cardinal v2 en curso).
+- `docs/roadmap/fase-2.md` → reescribir según re-scope de Cardinal v2.
+- `docs/roadmap.md` y `AGENTS.md` → actualizar "Estado actual".
 - Verificación: lectura humana + `git diff`.
 
 ### 1 — Mailbox `messages`
@@ -84,26 +92,13 @@ Fase 4 — Estabilizar                          → 10 (PR dev→main)
   crear/claimar/completar, y suscribirse a `task_update` vía `connectRoster`
   (extender `ServerEvent` en `frontend/src/lib/types.ts`).
 - Verificación: `bun run build` + smoke visual.
+- ⚠️ Blocker entorno 2026-08: frontend no levanta en dev (rolldown native binding
+  EACCES/ERR_DLOPEN_FAILED por noexec en ~/Data). Mismo issue que el portfolio.
 
 ### 4 — Spike-002 (MCP multi-vault)
 - Dado el RAG proxy (host :8788) + un server MCP fino, cuando un agente llama
   `search_vaults(query)`, entonces recibe chunks con origen de vault y token
   budget. Validar con un agente MCP-capable (Hermes tiene cliente nativo).
-
-### 5 — Spike-003 (pool opencode-go)
-- Dado `opencode serve` (GO), cuando el router manda un completion, entonces
-  devuelve tokens reales y el metering por key anda. Validar passthrough de
-  tools (pitfall Nogal Hive).
-
-### 6 — LLM Router
-- `packages/router/` (nuevo workspace): tabla `model_routes` (task_type →
-  primary → fallback), endpoint `/v1/chat/completions` OpenAI-compatible,
-  fallback chain, streaming SSE. TDD obligatorio (router = ámbito crítico).
-
-### 7 — Key Factory
-- Extender `agent_keys` con `scopes` (JSON) y `budget_limit`; enforcement de
-  budget; keys `created_by=system` auto-revocables; dashboard de consumo.
-  TDD obligatorio (keys).
 
 ### 10 — PR dev→main
 - Pre-merge checklist de AGENTS.md completo (tests, build, leak audit, Security
@@ -112,6 +107,5 @@ Fase 4 — Estabilizar                          → 10 (PR dev→main)
 
 ## Próximo paso
 
-Fase 0: arrancar por **8 (typecheck)** y **9 (docs)** — chicos, desbloquean el
-pipeline y alinean los docs. Después Fase 1 (mailbox + UI) para cerrar el
-blackboard.
+Arrancar por **6 (router)** y **7 (key factory)** con cursor-agent — el deploy local
+del pool + router es la prioridad de Santi.
