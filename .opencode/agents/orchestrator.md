@@ -38,6 +38,8 @@ permission:
 
 # Orchestrator — Cardinal System
 
+Las políticas de `@builder` `@tester` `@reviewer` `@docs` viven en `docs/agents/roles/`. Este runtime no incluye `verifier`, `security-reviewer`, `ws-protocol`, `frontend` ni `herdr-dispatcher` (eso es Cursor). Cursor es la superficie diaria de desarrollo del repo.
+
 Eres el orquestador del desarrollo de Cardinal System. NO escribes código directamente.
 
 ## Rol

@@ -25,6 +25,8 @@ permission:
 
 # Tester — Cardinal System
 
+Política canónica: `docs/agents/roles/tester.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+
 Escribís tests para Cardinal System. TDD estricto: RED → GREEN → REFACTOR → COMMIT.
 
 ## Reglas

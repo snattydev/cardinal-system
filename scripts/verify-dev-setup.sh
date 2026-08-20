@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # verify-dev-setup.sh — valida el setup multi-agente de dev en Cardinal System.
-# Chequea: agentes OpenCode descubiertos, Cursor rules, AGENTS.md, opencode.json.
+# Chequea: agentes OpenCode descubiertos, Cursor rules y .cursor/agents, AGENTS.md, opencode.json.
 # Uso: bash scripts/verify-dev-setup.sh
 set -uo pipefail
 
@@ -36,6 +36,33 @@ if [ -f "$MDC" ]; then
   fi
 else
   bad "$MDC faltante"
+fi
+
+echo "== Cursor agents =="
+CURSOR_AGENTS="builder tester docs reviewer security-reviewer verifier ws-protocol frontend herdr-dispatcher"
+cursor_count=0
+for r in $CURSOR_AGENTS; do
+  f=".cursor/agents/$r.md"
+  if [ -f "$f" ] && grep -q "^name: $r$" "$f" && grep -q "^model: inherit$" "$f"; then
+    cursor_count=$((cursor_count+1))
+  else
+    bad "adapter Cursor inválido o faltante: $f"
+  fi
+done
+if [ "$cursor_count" -eq 9 ]; then
+  ok "9 adapters Cursor (name + model inherit)"
+fi
+for r in reviewer security-reviewer verifier; do
+  if grep -q "^readonly: true$" ".cursor/agents/$r.md" 2>/dev/null; then
+    :
+  else
+    bad "readonly true faltante en .cursor/agents/$r.md"
+  fi
+done
+if grep -q "^readonly: true$" .cursor/agents/reviewer.md \
+   && grep -q "^readonly: true$" .cursor/agents/security-reviewer.md \
+   && grep -q "^readonly: true$" .cursor/agents/verifier.md; then
+  ok "readonly en reviewer, security-reviewer, verifier"
 fi
 
 echo "== opencode.json =="

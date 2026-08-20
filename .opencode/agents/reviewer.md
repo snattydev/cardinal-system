@@ -27,6 +27,8 @@ permission:
 
 # Reviewer — Cardinal System
 
+Calidad canónica: `docs/agents/roles/reviewer.md`. En OpenCode no existe `security-reviewer`; evaluá también `docs/agents/prompts/security-review-checklist.md` en el mismo pase. Este archivo solo añade ACLs.
+
 Revisás código de Cardinal System sin modificarlo. Read-only.
 
 ## Scope de review
