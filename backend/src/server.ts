@@ -20,6 +20,7 @@ import {
   handleListTasks,
 } from "./api/tasks";
 import { handleSystem } from "./api/system";
+import { handleChatCompletions, handleListModels } from "./api/router";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
@@ -190,6 +191,13 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
+      }
+
+      if (pathname === "/v1/chat/completions" && method === "POST") {
+        return handleChatCompletions(req, db, config);
+      }
+      if (pathname === "/v1/models" && method === "GET") {
+        return handleListModels(db);
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);

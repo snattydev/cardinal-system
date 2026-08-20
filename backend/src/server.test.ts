@@ -20,6 +20,7 @@ function testConfig(hash: string): Config {
     adminUser: "admin",
     adminPasswordHash: hash,
     jwtSecret: "it-secret",
+    poolSecret: "test-pool-secret",
     staticDir: "/nonexistent",
     pingIntervalMs: 10_000,
   };
@@ -74,6 +75,22 @@ test("GET /api/health returns status ok and version", async () => {
   const res = await fetch(`http://localhost:${port}/api/health`);
   expect(res.status).toBe(200);
   expect(await res.json()).toEqual({ status: "ok", version: rootPkg.version });
+});
+
+test("POST /v1/chat/completions without Bearer returns 401", async () => {
+  const res = await fetch(`http://localhost:${port}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ model: "test-model", messages: [] }),
+  });
+  expect(res.status).toBe(401);
+  expect(await res.json()).toEqual({ error: "unauthorized" });
+});
+
+test("GET /v1/models returns OpenAI list format", async () => {
+  const res = await fetch(`http://localhost:${port}/v1/models`);
+  expect(res.status).toBe(200);
+  expect(await res.json()).toEqual({ object: "list", data: [] });
 });
 
 test("auth flow: bad login 401, good login sets cookie, /me with and without cookie", async () => {
