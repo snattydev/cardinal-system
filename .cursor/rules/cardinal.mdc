@@ -1,11 +1,11 @@
 ---
-description: Cardinal System development rules — leídas por Cursor (Grok 4.5 en Composer) y por OpenCode como instrucciones adicionales
+description: Cardinal System development rules — Cursor is the development surface; Composer delegates to .cursor/agents
 globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
 ---
 
 # Cardinal System — Development Rules
 
-- Lee `AGENTS.md` para las reglas completas del repo (branching, commits, TDD, versionado)
+- Lee `AGENTS.md` para las reglas completas (branching, commits, TDD, versionado)
 - Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), React + Vite + Tailwind v4, WebSocket nativo
 - Runtime siempre containerizado con Podman — no instalar dependencias nativas en el host
 - TDD obligatorio en: auth, keys, ws, db, router (RED → GREEN → REFACTOR)
@@ -18,8 +18,20 @@ globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
 - Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (usar 127.0.0.1, no localhost — cookies)
 - Ecosistema y knowledge base: `context/ecosystem.md`
 
-## Cuándo usar Cursor vs OpenCode
+## Cursor como padre
 
-- **Cursor (Grok 4.5 Composer)**: planning de features complejas, code review visual, refactors multi-archivo
-- **OpenCode CLI**: implementación concreta con `/feature`, TDD con `/test`, review rápido con `/review`
-- Ambos comparten estas reglas via `AGENTS.md` y este archivo
+Cursor Composer es la interfaz de desarrollo. Implementá vos los cambios de 1–2 archivos sin lógica crítica. Delegá siempre si toca auth/keys/ws/db/router, es multi-archivo, pide review, docs de feature, verificación, u otro pane/kind.
+
+| Subagente | Usar cuando |
+|-----------|-------------|
+| `builder` | Implementar spec en packages/ (salvo ws/) y backend/ |
+| `ws-protocol` | packages/ws/** |
+| `frontend` | frontend/** |
+| `tester` | TDD RED (use proactively en ámbitos TDD) |
+| `verifier` | Alguien dijo listo (use proactively) |
+| `reviewer` | Calidad del diff |
+| `security-reviewer` | auth/keys/ws/leaks (use proactively) |
+| `docs` | Feature ya verificada |
+| `herdr-dispatcher` | Largo, paralelo, aislamiento, otro kind — solo si HERDR_ENV=1 |
+
+Roles canónicos: `docs/agents/roles/`. No spawnees Herdr vos; usá `herdr-dispatcher`. OpenCode CLI es opcional, no el camino diario.
