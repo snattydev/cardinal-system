@@ -25,5 +25,5 @@ El swarm de OpenCode existía, pero el desarrollo diario del repo es Cursor. Hac
 
 ## Archivos creados/modificados
 
-- Creados: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), este doc
-- Modificados: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (punteros), `scripts/verify-dev-setup.sh`, spec status
+- Creados: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), `docs/superpowers/plans/2026-08-20-cursor-subagents.md`, este doc
+- Modificados: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (punteros), `scripts/verify-dev-setup.sh`, `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md` (status/footer)
