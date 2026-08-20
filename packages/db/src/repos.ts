@@ -8,15 +8,21 @@ import type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  ModelRouteRow,
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  ProviderModelRow,
+  ProviderRow,
+  ProviderStatus,
   SessionRow,
   SkillRow,
   SoulRow,
   SyncDirection,
   TaskRow,
   TaskStatus,
+  UsageLogRow,
+  WireFormat,
 } from "@cardinal/core";
 
 export type {
@@ -28,15 +34,21 @@ export type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  ModelRouteRow,
   ProfileKind,
   ProfileRow,
   ProfileStatus,
+  ProviderModelRow,
+  ProviderRow,
+  ProviderStatus,
   SessionRow,
   SkillRow,
   SoulRow,
   SyncDirection,
   TaskRow,
   TaskStatus,
+  UsageLogRow,
+  WireFormat,
 };
 
 export function registerAgent(db: Database, name: string, kind: AgentKind): void {
@@ -306,14 +318,26 @@ export function listEvents(db: Database, agentName: string, limit = 20): AgentEv
 
 export function createAgentKey(
   db: Database,
-  args: { keyHash: string; agentName: string; kindOverride?: AgentKind; createdBy?: "human" | "system" },
+  args: {
+    keyHash: string;
+    agentName: string;
+    kindOverride?: AgentKind;
+    createdBy?: "human" | "system";
+    scopes?: string[];
+    budgetLimit?: number;
+  },
 ): void {
-  db.run("INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by) VALUES (?, ?, ?, ?)", [
-    args.keyHash,
-    args.agentName,
-    args.kindOverride ?? null,
-    args.createdBy ?? "human",
-  ]);
+  db.run(
+    "INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by, scopes, budget_limit) VALUES (?, ?, ?, ?, ?, ?)",
+    [
+      args.keyHash,
+      args.agentName,
+      args.kindOverride ?? null,
+      args.createdBy ?? "human",
+      JSON.stringify(args.scopes ?? ["*"]),
+      args.budgetLimit ?? null,
+    ],
+  );
 }
 
 export function findActiveKeyByHash(db: Database, keyHash: string): AgentKeyRow | null {
@@ -328,6 +352,18 @@ export function touchKey(db: Database, id: number): void {
   db.run("UPDATE agent_keys SET last_used_at = datetime('now') WHERE id = ?", [id]);
 }
 
+export function consumeBudget(db: Database, keyHash: string, tokens: number): boolean {
+  const result = db
+    .query(
+      `UPDATE agent_keys
+       SET budget_used = budget_used + ?, last_used_at = datetime('now')
+       WHERE key_hash = ? AND revoked_at IS NULL
+         AND (budget_limit IS NULL OR budget_used + ? <= budget_limit)`,
+    )
+    .run(tokens, keyHash, tokens);
+  return result.changes > 0;
+}
+
 export function revokeKeysForAgent(db: Database, agentName: string): void {
   db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE agent_name = ? AND revoked_at IS NULL", [
     agentName,
@@ -336,6 +372,139 @@ export function revokeKeysForAgent(db: Database, agentName: string): void {
 
 export function listKeys(db: Database): AgentKeyRow[] {
   return db.query("SELECT * FROM agent_keys ORDER BY id").all() as AgentKeyRow[];
+}
+
+export interface ProviderFields {
+  name: string;
+  baseUrl: string;
+  apiKeyEnc?: string | null;
+  wireFormat?: WireFormat;
+  status?: ProviderStatus;
+  rpmLimit?: number | null;
+  tpmLimit?: number | null;
+  costPerMtok?: number;
+}
+
+export function upsertProvider(db: Database, args: ProviderFields): void {
+  db.run(
+    `INSERT INTO providers (name, base_url, api_key_enc, wire_format, status, rpm_limit, tpm_limit, cost_per_mtok)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(name) DO UPDATE SET
+       base_url = excluded.base_url,
+       api_key_enc = excluded.api_key_enc,
+       wire_format = excluded.wire_format,
+       status = excluded.status,
+       rpm_limit = excluded.rpm_limit,
+       tpm_limit = excluded.tpm_limit,
+       cost_per_mtok = excluded.cost_per_mtok`,
+    [
+      args.name,
+      args.baseUrl,
+      args.apiKeyEnc ?? null,
+      args.wireFormat ?? "openai",
+      args.status ?? "active",
+      args.rpmLimit ?? null,
+      args.tpmLimit ?? null,
+      args.costPerMtok ?? 0,
+    ],
+  );
+}
+
+export function listProviders(db: Database): ProviderRow[] {
+  return db.query("SELECT * FROM providers ORDER BY name").all() as ProviderRow[];
+}
+
+export function getProviderByName(db: Database, name: string): ProviderRow | null {
+  return (db.query("SELECT * FROM providers WHERE name = ?").get(name) as ProviderRow | null) ?? null;
+}
+
+export function setProviderStatus(db: Database, name: string, status: ProviderStatus): void {
+  db.run("UPDATE providers SET status = ? WHERE name = ?", [status, name]);
+}
+
+export interface ProviderModelFields {
+  providerId: number;
+  modelId: string;
+  capabilities?: string;
+  contextWindow?: number | null;
+}
+
+export function addProviderModel(db: Database, args: ProviderModelFields): void {
+  db.run(
+    `INSERT INTO provider_models (provider_id, model_id, capabilities, context_window)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(provider_id, model_id) DO UPDATE SET
+       capabilities = excluded.capabilities,
+       context_window = excluded.context_window`,
+    [
+      args.providerId,
+      args.modelId,
+      args.capabilities ?? "[]",
+      args.contextWindow ?? null,
+    ],
+  );
+}
+
+export function listProviderModels(db: Database, providerId: number): ProviderModelRow[] {
+  return db
+    .query("SELECT * FROM provider_models WHERE provider_id = ? ORDER BY model_id")
+    .all(providerId) as ProviderModelRow[];
+}
+
+export interface ModelRouteHop {
+  provider: string;
+  model: string;
+}
+
+export function upsertModelRoute(db: Database, alias: string, fallbackChain: ModelRouteHop[]): void {
+  db.run(
+    `INSERT INTO model_routes (alias, fallback_chain)
+     VALUES (?, ?)
+     ON CONFLICT(alias) DO UPDATE SET fallback_chain = excluded.fallback_chain`,
+    [alias, JSON.stringify(fallbackChain)],
+  );
+}
+
+export function getModelRoute(db: Database, alias: string): ModelRouteRow | null {
+  return (db.query("SELECT * FROM model_routes WHERE alias = ?").get(alias) as ModelRouteRow | null) ?? null;
+}
+
+export function listModelRoutes(db: Database): ModelRouteRow[] {
+  return db.query("SELECT * FROM model_routes ORDER BY alias").all() as ModelRouteRow[];
+}
+
+export interface UsageLogFields {
+  agentName: string;
+  keyHash: string;
+  providerId: number;
+  providerName: string;
+  modelId: string;
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+export function logUsage(db: Database, args: UsageLogFields): void {
+  db.run(
+    `INSERT INTO usage_log (agent_name, key_hash, provider_id, provider_name, model_id, prompt_tokens, completion_tokens, total_tokens)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      args.agentName,
+      args.keyHash,
+      args.providerId,
+      args.providerName,
+      args.modelId,
+      args.promptTokens,
+      args.completionTokens,
+      args.totalTokens,
+    ],
+  );
+}
+
+export function listUsage(db: Database, limit = 100): UsageLogRow[] {
+  return db
+    .query("SELECT * FROM usage_log ORDER BY id DESC LIMIT ?")
+    .all(limit) as UsageLogRow[];
 }
 
 export interface SystemCounts {

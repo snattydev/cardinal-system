@@ -4,10 +4,32 @@ import { generateKey, hashKey } from "./index";
 
 function usage(): never {
   console.error(`Usage:
-  bun run keygen -- --agent <name> [--kind agent|subagent]   create key, print it once
+  bun run keygen -- --agent <name> [--kind agent|subagent] [--scope <alias> ...] [--budget <tokens>]   create key, print it once
   bun run keygen -- --revoke <name>                          revoke all active keys of agent
   bun run keygen -- --list                                   list keys`);
   process.exit(1);
+}
+
+function parseScopes(args: string[]): string[] {
+  const scopes: string[] = [];
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === "--scope") {
+      const value = args[i + 1];
+      if (!value || value.startsWith("--")) usage();
+      scopes.push(value);
+    }
+  }
+  return scopes;
+}
+
+function parseBudget(args: string[]): number | undefined {
+  const idx = args.indexOf("--budget");
+  if (idx === -1) return undefined;
+  const value = args[idx + 1];
+  if (!value || value.startsWith("--")) usage();
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) usage();
+  return parsed;
 }
 
 function main(): void {
@@ -25,12 +47,16 @@ function main(): void {
         if (value !== "agent" && value !== "subagent") usage();
         kind = value;
       }
+      const scopes = parseScopes(args);
+      const budgetLimit = parseBudget(args);
       registerAgent(db, agent, kind ?? "agent");
       const key = generateKey();
       createAgentKey(db, {
         keyHash: hashKey(key),
         agentName: agent,
         kindOverride: kind,
+        scopes: scopes.length > 0 ? scopes : ["*"],
+        budgetLimit,
       });
       console.log(key);
     } else if (cmd === "--revoke") {
