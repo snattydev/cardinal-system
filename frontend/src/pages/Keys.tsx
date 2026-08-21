@@ -12,7 +12,9 @@ function fmtWhen(value: string | null): string {
 
 export default function Keys() {
   const [keys, setKeys] = useState<KeyItem[]>([]);
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [history, setHistory] = useState<KeyItem[] | null>(null);
+  const [historyLoadStatus, setHistoryLoadStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [showHistory, setShowHistory] = useState(false);
   const showHistoryRef = useRef(false);
   const [pendingId, setPendingId] = useState<number | null>(null);
@@ -22,10 +24,16 @@ export default function Keys() {
     let cancelled = false;
     api<{ keys: KeyItem[] }>("/api/keys")
       .then((res) => {
-        if (!cancelled) setKeys(res.keys);
+        if (!cancelled) {
+          setKeys(res.keys);
+          setLoadStatus("ready");
+        }
       })
       .catch(() => {
-        if (!cancelled) setError("failed to load keys");
+        if (!cancelled) {
+          setError("failed to load keys");
+          setLoadStatus("error");
+        }
       });
     return () => {
       cancelled = true;
@@ -43,26 +51,31 @@ export default function Keys() {
   }
 
   async function toggleHistory(): Promise<void> {
+    setError(null);
     const next = !showHistory;
     showHistoryRef.current = next;
     setShowHistory(next);
     if (next && history === null) {
+      setHistoryLoadStatus("loading");
       try {
         await loadHistory();
+        setHistoryLoadStatus("ready");
       } catch {
         setError("failed to load history");
+        setHistoryLoadStatus("error");
       }
     }
   }
 
   async function confirmRevoke(id: number): Promise<void> {
+    setError(null);
     try {
       const res = await api<{ key: KeyItem }>(`/api/keys/${id}/revoke`, { method: "POST" });
       setKeys((prev) => prev.filter((k) => k.id !== id));
       if (showHistoryRef.current) {
         setHistory((prev) => {
-          const historyKeys = prev ?? [];
-          return [res.key, ...historyKeys.filter((key) => key.id !== res.key.id)];
+          if (prev === null) return null;
+          return [res.key, ...prev.filter((key) => key.id !== res.key.id)];
         });
       }
       setPendingId(null);
@@ -95,7 +108,7 @@ export default function Keys() {
 
       {error && <p className="font-mono text-sm text-red-400">{error}</p>}
 
-      {keys.length === 0 ? (
+      {loadStatus === "ready" && keys.length === 0 ? (
         <p className="rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-6 font-mono text-sm text-slate-500">
           no persistent keys — create one with{" "}
           <span className="text-sao-accent">bun run keygen -- --agent &lt;name&gt;</span>
@@ -145,7 +158,9 @@ export default function Keys() {
       {showHistory && (
         <section className="flex flex-col gap-2">
           <h2 className="font-mono text-xs tracking-widest text-slate-500">PASADAS</h2>
-          {history === null ? (
+          {historyLoadStatus === "error" ? (
+            <p className="font-mono text-sm text-red-400">failed to load history</p>
+          ) : history === null ? (
             <p className="font-mono text-sm text-slate-600">loading…</p>
           ) : history.length === 0 ? (
             <p className="font-mono text-sm text-slate-600">no revoked keys</p>
