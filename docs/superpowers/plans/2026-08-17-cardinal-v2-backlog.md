@@ -28,7 +28,7 @@
 | 9 | Docs stale — `roadmap/fase-2.md`, `roadmap.md`, `AGENTS.md` | docs | — | — |
 | 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router | release | — | todos |
 | 11 | Bootstrap admin password **sin el modelo** (TTY `read -s` → solo hash en env/secret) | security / deploy | — | **blocker cloud** |
-| 12 | Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí (keys API) | — |
+| 12 | ✅ Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí (keys API) | — |
 | 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar (rastro en log del one-shot, no en historial) | feature | Sí | pipeline one-shot |
 
 ## Decisiones
@@ -117,6 +117,7 @@
 - Ver `docs/security.md` § "Bootstrap de password admin".
 
 ### 12 — Keys dashboard (listar + revocar persistentes)
+- ✅ Implementado el 2026-08-21.
 - Spec: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md).
 - Página `/keys`, JWT, sin plaintext. Historial human-revoked detrás de icono log.
 - Crear sigue en CLI. TDD en API keys.
@@ -129,5 +130,5 @@
 
 ## Próximo paso
 
-Router + key factory ya están en `dev`. Siguiente slice de UI cuando se retome:
-**12 (Keys dashboard)** según la spec del 2026-08-20. No implementar 13 todavía.
+Router + key factory y el dashboard de keys ya están en `dev`. El item 13 sigue
+diferido hasta que exista el pipeline one-shot; no implementarlo todavía.

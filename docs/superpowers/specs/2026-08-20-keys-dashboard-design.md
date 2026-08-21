@@ -1,9 +1,8 @@
 # Keys Dashboard — diseño (listar + revocar)
 
 > Fecha: 2026-08-20
-> Estado: **aprobado** (brainstorm Santi). Spec persistida. Sin implementar.
+> Estado: **implementado** (plan `2026-08-21-keys-dashboard.md`, 2026-08-21).
 > Relación: cierra el hueco UI de Fase 0 (“Keys → Fase 2”) ahora que el backend de keys existe.
-> Próxima sesión: plan de implementación (`writing-plans`) → TDD API → página `/keys`.
 > Fuera de este slice (anotado, no implementar): bloque live one-shot y borrado duro de keys one-shot.
 
 ---
