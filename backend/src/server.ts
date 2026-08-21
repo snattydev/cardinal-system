@@ -20,6 +20,7 @@ import {
   handleListTasks,
 } from "./api/tasks";
 import { handleSystem } from "./api/system";
+import { handleListKeys, handleRevokeKey } from "./api/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -100,6 +101,19 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleSystem(config, db);
+      }
+
+      if (pathname === "/api/keys" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListKeys(db, req);
+      }
+
+      const keyRevokeMatch = pathname.match(/^\/api\/keys\/([^/]+)\/revoke$/);
+      if (keyRevokeMatch && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleRevokeKey(db, decodeURIComponent(keyRevokeMatch[1]!));
       }
 
       const soulMatch = pathname.match(/^\/api\/souls\/([^/]+)$/);

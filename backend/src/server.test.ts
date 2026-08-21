@@ -274,3 +274,18 @@ test("ping timeout disconnects an agent that misses 2 pings", async () => {
   ws.close();
   server2.stop(true);
 });
+
+test("GET /api/keys and POST /api/keys/:id/revoke require a session cookie", async () => {
+  const anonGet = await fetch(`http://localhost:${port}/api/keys`);
+  expect(anonGet.status).toBe(401);
+  expect(await anonGet.json()).toEqual({ error: "unauthorized" });
+
+  const anonPost = await fetch(`http://localhost:${port}/api/keys/1/revoke`, { method: "POST" });
+  expect(anonPost.status).toBe(401);
+
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/keys`, { headers: { cookie } });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { keys: unknown[] };
+  expect(Array.isArray(body.keys)).toBe(true);
+});
