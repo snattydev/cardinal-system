@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../lib/api";
 import type { KeyItem } from "../lib/types";
 
@@ -14,6 +14,7 @@ export default function Keys() {
   const [keys, setKeys] = useState<KeyItem[]>([]);
   const [history, setHistory] = useState<KeyItem[] | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const showHistoryRef = useRef(false);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,6 +44,7 @@ export default function Keys() {
 
   async function toggleHistory(): Promise<void> {
     const next = !showHistory;
+    showHistoryRef.current = next;
     setShowHistory(next);
     if (next && history === null) {
       try {
@@ -57,7 +59,7 @@ export default function Keys() {
     try {
       const res = await api<{ key: KeyItem }>(`/api/keys/${id}/revoke`, { method: "POST" });
       setKeys((prev) => prev.filter((k) => k.id !== id));
-      if (showHistory) {
+      if (showHistoryRef.current) {
         setHistory((prev) => {
           const historyKeys = prev ?? [];
           return [res.key, ...historyKeys.filter((key) => key.id !== res.key.id)];
