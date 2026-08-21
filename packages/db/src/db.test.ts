@@ -6,6 +6,9 @@ import {
   consumeBudget,
   createAgentKey,
   findActiveKeyByHash,
+  getKeyById,
+  listHumanKeys,
+  revokeKeyById,
   getAgent,
   getConfigTemplate,
   getMemoryMirror,
@@ -861,6 +864,58 @@ describe("keys repo", () => {
     expect(def!.budget_used).toBe(0);
     db.close();
   });
+
+  test("listHumanKeys returns only human keys, newest id first, filtered by status", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    registerAgent(db, "kirito", "agent");
+    createAgentKey(db, { keyHash: "h-old", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-new", agentName: "kirito" });
+    createAgentKey(db, { keyHash: "sys", agentName: "shinon", createdBy: "system" });
+    const older = findActiveKeyByHash(db, "h-old")!;
+    revokeKeyById(db, older.id);
+
+    const active = listHumanKeys(db, "active");
+    expect(active.map((k) => k.key_hash)).toEqual(["h-new"]);
+    expect(active.every((k) => k.created_by === "human")).toBe(true);
+
+    const revoked = listHumanKeys(db, "revoked");
+    expect(revoked.map((k) => k.key_hash)).toEqual(["h-old"]);
+    expect(revoked[0]!.revoked_at).not.toBeNull();
+
+    expect(listKeys(db)).toHaveLength(3);
+    db.close();
+  });
+
+  test("getKeyById returns the row or null", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-1", agentName: "shinon" });
+    const id = findActiveKeyByHash(db, "h-1")!.id;
+    expect(getKeyById(db, id)?.key_hash).toBe("h-1");
+    expect(getKeyById(db, 99999)).toBeNull();
+    db.close();
+  });
+
+  test("revokeKeyById revokes one row and leaves sibling keys of the same agent active", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "keep", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "drop", agentName: "shinon" });
+    const dropId = findActiveKeyByHash(db, "drop")!.id;
+    const keepId = findActiveKeyByHash(db, "keep")!.id;
+
+    const revoked = revokeKeyById(db, dropId);
+    expect(revoked).not.toBeNull();
+    expect(revoked!.id).toBe(dropId);
+    expect(revoked!.revoked_at).not.toBeNull();
+    expect(findActiveKeyByHash(db, "drop")).toBeNull();
+    expect(findActiveKeyByHash(db, "keep")!.id).toBe(keepId);
+
+    expect(revokeKeyById(db, dropId)).toBeNull();
+    expect(revokeKeyById(db, 99999)).toBeNull();
+    db.close();
+  });
 });
 
 describe("providers repo", () => {
@@ -1071,6 +1126,25 @@ describe("getSystemCounts", () => {
     expect(getSystemCounts(db)).toEqual({
       agentsTotal: 2,
       agentsOnline: 1,
+      keysActive: 1,
+      keysRevoked: 1,
+    });
+    db.close();
+  });
+
+  test("keysActive and keysRevoked count only created_by=human", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "human-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "human-dead", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "sys-live", agentName: "shinon", createdBy: "system" });
+    createAgentKey(db, { keyHash: "sys-dead", agentName: "shinon", createdBy: "system" });
+    revokeKeyById(db, findActiveKeyByHash(db, "human-dead")!.id);
+    revokeKeyById(db, findActiveKeyByHash(db, "sys-dead")!.id);
+
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 1,
+      agentsOnline: 0,
       keysActive: 1,
       keysRevoked: 1,
     });

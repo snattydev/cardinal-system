@@ -374,6 +374,28 @@ export function listKeys(db: Database): AgentKeyRow[] {
   return db.query("SELECT * FROM agent_keys ORDER BY id").all() as AgentKeyRow[];
 }
 
+export function listHumanKeys(db: Database, status: "active" | "revoked"): AgentKeyRow[] {
+  const revokedClause = status === "active" ? "revoked_at IS NULL" : "revoked_at IS NOT NULL";
+  return db
+    .query(
+      `SELECT * FROM agent_keys
+       WHERE created_by = 'human' AND ${revokedClause}
+       ORDER BY id DESC`,
+    )
+    .all() as AgentKeyRow[];
+}
+
+export function getKeyById(db: Database, id: number): AgentKeyRow | null {
+  return (db.query("SELECT * FROM agent_keys WHERE id = ?").get(id) as AgentKeyRow | null) ?? null;
+}
+
+export function revokeKeyById(db: Database, id: number): AgentKeyRow | null {
+  const existing = getKeyById(db, id);
+  if (existing === null || existing.revoked_at !== null) return null;
+  db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE id = ?", [id]);
+  return getKeyById(db, id);
+}
+
 export interface ProviderFields {
   name: string;
   baseUrl: string;
@@ -526,8 +548,12 @@ export function getSystemCounts(db: Database): SystemCounts {
   return {
     agentsTotal: count("SELECT COUNT(*) AS count FROM agents"),
     agentsOnline: count("SELECT COUNT(*) AS count FROM agents WHERE connected = 1"),
-    keysActive: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL"),
-    keysRevoked: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL"),
+    keysActive: count(
+      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL AND created_by = 'human'",
+    ),
+    keysRevoked: count(
+      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL AND created_by = 'human'",
+    ),
   };
 }
 
