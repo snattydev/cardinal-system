@@ -7,6 +7,7 @@ import Overview from "./pages/Overview";
 import Agents from "./pages/Agents";
 import AgentDetail from "./pages/AgentDetail";
 import Settings from "./pages/Settings";
+import Keys from "./pages/Keys";
 
 export default function App() {
   return (
@@ -18,6 +19,7 @@ export default function App() {
             <Route path="/" element={<Overview />} />
             <Route path="/agents" element={<Agents />} />
             <Route path="/agents/:name" element={<AgentDetail />} />
+            <Route path="/keys" element={<Keys />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Route>

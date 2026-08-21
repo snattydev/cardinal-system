@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useSystem } from "../lib/system";
 import { fmtBytes } from "../lib/types";
 
@@ -25,7 +26,12 @@ export default function Settings() {
       </Section>
 
       <Section title="API KEYS MANAGEMENT">
-        <p className="font-mono text-xs italic text-slate-600">coming in Fase 2</p>
+        <Link
+          to="/keys"
+          className="font-mono text-xs text-sao-accent transition-colors hover:text-white"
+        >
+          manage keys →
+        </Link>
       </Section>
 
       <Section title="MODEL ROUTER">

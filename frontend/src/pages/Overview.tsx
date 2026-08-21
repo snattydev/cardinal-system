@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useSystem } from "../lib/system";
 import { fmtBytes } from "../lib/types";
 
@@ -13,7 +14,7 @@ export default function Overview() {
           label="Agents Online"
           value={`${info.agents_online} / ${info.agents_total}`}
         />
-        <StatCard label="Keys Active" value={String(info.keys_active)} />
+        <StatCard label="Keys Active" value={String(info.keys_active)} to="/keys" />
         <StatCard
           label="DB Size"
           value={info.db_size_bytes > 0 ? fmtBytes(info.db_size_bytes) : "—"}
@@ -24,11 +25,23 @@ export default function Overview() {
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-5">
+function StatCard({ label, value, to }: { label: string; value: string; to?: string }) {
+  const card = (
+    <div
+      className={`flex flex-col gap-2 rounded-lg border bg-sao-panel/60 p-5 ${
+        to
+          ? "border-sao-accent/20 transition-colors hover:border-sao-accent/50"
+          : "border-sao-accent/20"
+      }`}
+    >
       <span className="font-mono text-xs text-slate-500">{label}</span>
       <span className="font-mono text-2xl text-sao-accent">{value}</span>
     </div>
+  );
+  if (!to) return card;
+  return (
+    <Link to={to} className="block">
+      {card}
+    </Link>
   );
 }

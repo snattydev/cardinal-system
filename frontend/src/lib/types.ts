@@ -30,6 +30,19 @@ export interface SystemInfo {
   keys_revoked: number;
 }
 
+/** Raw shape from GET /api/keys and POST /api/keys/:id/revoke */
+export interface KeyItem {
+  id: number;
+  agentName: string;
+  createdBy: string;
+  scopes: string[];
+  budgetLimit: number | null;
+  budgetUsed: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
 export function fmtUptime(s: number): string {
   if (s < 60) return `${Math.floor(s)}s`;
   const m = Math.floor(s / 60);

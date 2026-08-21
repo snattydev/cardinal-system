@@ -6,8 +6,10 @@ import { api } from "../lib/api";
 export default function Layout() {
   const { logout } = useAuth();
   const [version, setVersion] = useState<string>("");
-  const [agentsOpen, setAgentsOpen] = useState(false);
   const location = useLocation();
+  const [agentsOpen, setAgentsOpen] = useState(
+    () => location.pathname.startsWith("/agents") || location.pathname.startsWith("/keys"),
+  );
 
   useEffect(() => {
     api<{ version: string }>("/api/health")
@@ -55,10 +57,9 @@ export default function Layout() {
                 <NavLink to="/agents" end className={linkClass}>
                   Hub
                 </NavLink>
-                <span className="flex items-center justify-between rounded border border-transparent px-3 py-2 font-mono text-sm text-slate-600 select-none">
+                <NavLink to="/keys" className={linkClass}>
                   Keys
-                  <span className="text-xs text-slate-600">Fase 2</span>
-                </span>
+                </NavLink>
               </div>
             )}
           </div>
