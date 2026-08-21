@@ -33,7 +33,12 @@ export default function Keys() {
 
   async function loadHistory(): Promise<void> {
     const res = await api<{ keys: KeyItem[] }>("/api/keys?status=revoked");
-    setHistory(res.keys);
+    setHistory((prev) => {
+      if (prev === null) return res.keys;
+
+      const existingIds = new Set(prev.map((key) => key.id));
+      return [...prev, ...res.keys.filter((key) => !existingIds.has(key.id))];
+    });
   }
 
   async function toggleHistory(): Promise<void> {
@@ -52,7 +57,12 @@ export default function Keys() {
     try {
       const res = await api<{ key: KeyItem }>(`/api/keys/${id}/revoke`, { method: "POST" });
       setKeys((prev) => prev.filter((k) => k.id !== id));
-      setHistory((prev) => (prev === null ? prev : [res.key, ...prev]));
+      if (showHistory) {
+        setHistory((prev) => {
+          const historyKeys = prev ?? [];
+          return [res.key, ...historyKeys.filter((key) => key.id !== res.key.id)];
+        });
+      }
       setPendingId(null);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : "revoke failed";
