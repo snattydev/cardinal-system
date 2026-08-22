@@ -59,7 +59,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 16 tables and sets user_version to 12", () => {
+  test("migrate creates the 17 tables and sets user_version to 13", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -67,6 +67,7 @@ describe("migrations", () => {
       "agents",
       "config_templates",
       "memory_mirror",
+      "messages",
       "model_routes",
       "profile_skills",
       "profiles",
@@ -80,7 +81,7 @@ describe("migrations", () => {
       "usage_log",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
+    expect(row.user_version).toBe(13);
     db.close();
   });
 
@@ -89,8 +90,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
-    expect(tableNames(db)).toHaveLength(16);
+    expect(row.user_version).toBe(13);
+    expect(tableNames(db)).toHaveLength(17);
     db.close();
   });
 
@@ -100,7 +101,7 @@ describe("migrations", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("device_info");
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
+    expect(row.user_version).toBe(13);
     db.close();
   });
 
@@ -169,6 +170,72 @@ describe("migrations", () => {
     expect(row.total_tokens).toBe(0);
     expect(typeof row.created_at).toBe("string");
     expect(row.created_at).not.toBe("");
+
+    db.close();
+  });
+
+  test("migration 12 creates the messages table with columns, DEFAULT read=0 and created_at", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("messages");
+
+    const cols = db.query("PRAGMA table_info(messages)").all() as Array<{
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+      pk: number;
+    }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "from_agent",
+      "to_agent",
+      "type",
+      "payload_ref",
+      "read",
+      "created_at",
+    ]);
+
+    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
+    expect(byName.id.pk).toBe(1);
+    expect(byName.from_agent.notnull).toBe(1);
+    expect(byName.to_agent.notnull).toBe(1);
+    expect(byName.type.notnull).toBe(1);
+    expect(byName.payload_ref.notnull).toBe(0);
+    expect(byName.read.notnull).toBe(1);
+    expect(byName.read.dflt_value).toBe("0");
+    expect(byName.created_at.notnull).toBe(1);
+    expect(typeof byName.created_at.dflt_value).toBe("string");
+    expect(byName.created_at.dflt_value).toContain("datetime");
+
+    db.query("INSERT INTO messages (id, from_agent, to_agent, type) VALUES (?, ?, ?, ?)").run(
+      "m1",
+      "shinon",
+      "kirito",
+      "handoff",
+    );
+    const row = db.query("SELECT * FROM messages WHERE id = ?").get("m1") as Record<string, unknown>;
+    expect(row.read).toBe(0);
+    expect(row.payload_ref).toBeNull();
+    expect(typeof row.created_at).toBe("string");
+    expect(row.created_at).not.toBe("");
+
+    db.query("INSERT INTO messages (id, from_agent, to_agent, type) VALUES (?, ?, ?, ?)").run(
+      "m-ghost",
+      "ghost-from",
+      "ghost-to",
+      "custom-type",
+    );
+
+    expect(() =>
+      db.query("INSERT INTO messages (id, to_agent, type) VALUES (?, ?, ?)").run("m2", "kirito", "handoff"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO messages (id, from_agent, type) VALUES (?, ?, ?)").run("m3", "shinon", "handoff"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO messages (id, from_agent, to_agent) VALUES (?, ?, ?)").run("m4", "shinon", "kirito"),
+    ).toThrow();
 
     db.close();
   });

@@ -175,6 +175,17 @@ CREATE TABLE usage_log (
   created_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+CREATE TABLE messages (
+  id          TEXT PRIMARY KEY,
+  from_agent  TEXT NOT NULL,
+  to_agent    TEXT NOT NULL,
+  type        TEXT NOT NULL,
+  payload_ref TEXT,
+  read        INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
 ];
 
 export function migrate(db: Database): void {

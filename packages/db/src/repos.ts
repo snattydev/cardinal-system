@@ -8,6 +8,7 @@ import type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  MessageRow,
   ModelRouteRow,
   ProfileKind,
   ProfileRow,
@@ -34,6 +35,7 @@ export type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  MessageRow,
   ModelRouteRow,
   ProfileKind,
   ProfileRow,
@@ -803,4 +805,35 @@ export function completeTask(
     [args.summary ?? null, args.artifactRef ?? null, id],
   );
   return getTask(db, id);
+}
+
+export function getMessage(db: Database, id: string): MessageRow | null {
+  return (db.query("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow | null) ?? null;
+}
+
+export function sendMessage(
+  db: Database,
+  args: { fromAgent: string; toAgent: string; type: string; payloadRef?: string | null },
+): MessageRow {
+  const id = crypto.randomUUID();
+  db.run("INSERT INTO messages (id, from_agent, to_agent, type, payload_ref) VALUES (?, ?, ?, ?, ?)", [
+    id,
+    args.fromAgent,
+    args.toAgent,
+    args.type,
+    args.payloadRef ?? null,
+  ]);
+  return getMessage(db, id)!;
+}
+
+export function listInbox(db: Database, toAgent: string): MessageRow[] {
+  return db
+    .query("SELECT * FROM messages WHERE to_agent = ? ORDER BY created_at ASC")
+    .all(toAgent) as MessageRow[];
+}
+
+export function markMessageRead(db: Database, id: string): MessageRow | null {
+  if (getMessage(db, id) === null) return null;
+  db.run("UPDATE messages SET read = 1 WHERE id = ?", [id]);
+  return getMessage(db, id);
 }

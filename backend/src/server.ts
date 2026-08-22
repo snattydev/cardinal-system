@@ -19,6 +19,7 @@ import {
   handleGetTask,
   handleListTasks,
 } from "./api/tasks";
+import { handleInbox, handleMarkRead, handleSendMessage } from "./api/messages";
 import { handleSystem } from "./api/system";
 import { handleListKeys, handleRevokeKey } from "./api/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
@@ -205,6 +206,27 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
+      }
+
+      if (pathname === "/api/messages" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleInbox(db, req);
+      }
+
+      if (pathname === "/api/messages" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleSendMessage(db, req, (m) => hub.broadcastMessage(m));
+      }
+
+      const messageReadMatch = pathname.match(/^\/api\/messages\/([^/]+)\/read$/);
+      if (messageReadMatch && method === "PUT") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleMarkRead(db, decodeURIComponent(messageReadMatch[1]!), req, (m) =>
+          hub.broadcastMessage(m),
+        );
       }
 
       if (pathname === "/v1/chat/completions" && method === "POST") {
