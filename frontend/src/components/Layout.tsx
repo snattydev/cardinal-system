@@ -64,6 +64,10 @@ export default function Layout() {
             )}
           </div>
 
+          <NavLink to="/tasks" className={linkClass}>
+            Tasks
+          </NavLink>
+
           <NavLink to="/settings" className={linkClass}>
             Settings
           </NavLink>

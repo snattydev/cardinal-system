@@ -17,7 +17,22 @@ export interface AgentEvent {
 
 export type ServerEvent =
   | { type: "roster"; agents: AgentPayload[] }
-  | { type: "agent_update"; agent: AgentPayload };
+  | { type: "agent_update"; agent: AgentPayload }
+  | { type: "task_update"; task: TaskPayload };
+
+/** Wire shape from WS `task_update` (camelCase). REST `/api/tasks` is snake_case. */
+export interface TaskPayload {
+  id: string;
+  goal: string;
+  status: "open" | "claimed" | "done" | "blocked";
+  assignedTo: string | null;
+  createdBy: string;
+  parentId: string | null;
+  summary: string | null;
+  artifactRef: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
 
 /** Raw shape from GET /api/system */
 export interface SystemInfo {
