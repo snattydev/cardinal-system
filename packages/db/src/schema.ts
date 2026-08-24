@@ -132,6 +132,49 @@ CREATE TABLE tasks (
   updated_at  TEXT
 );
 `,
+  `
+CREATE TABLE providers (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  name          TEXT NOT NULL UNIQUE,
+  base_url      TEXT NOT NULL,
+  api_key_enc   TEXT,
+  wire_format   TEXT NOT NULL DEFAULT 'openai' CHECK (wire_format IN ('openai','anthropic','gemini')),
+  status        TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','disabled')),
+  rpm_limit     INTEGER,
+  tpm_limit     INTEGER,
+  cost_per_mtok REAL NOT NULL DEFAULT 0,
+  created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE provider_models (
+  provider_id    INTEGER NOT NULL REFERENCES providers(id),
+  model_id       TEXT NOT NULL,
+  capabilities   TEXT NOT NULL DEFAULT '[]',
+  context_window INTEGER,
+  PRIMARY KEY (provider_id, model_id)
+);
+CREATE TABLE model_routes (
+  alias          TEXT PRIMARY KEY,
+  fallback_chain TEXT NOT NULL DEFAULT '[]',
+  created_at     TEXT NOT NULL DEFAULT (datetime('now'))
+);
+ALTER TABLE agent_keys ADD COLUMN scopes TEXT NOT NULL DEFAULT '["*"]';
+ALTER TABLE agent_keys ADD COLUMN budget_limit INTEGER;
+ALTER TABLE agent_keys ADD COLUMN budget_used INTEGER NOT NULL DEFAULT 0;
+`,
+  `
+CREATE TABLE usage_log (
+  id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_name         TEXT,
+  key_hash           TEXT,
+  provider_id        INTEGER,
+  provider_name      TEXT,
+  model_id           TEXT,
+  prompt_tokens      INTEGER NOT NULL DEFAULT 0,
+  completion_tokens  INTEGER NOT NULL DEFAULT 0,
+  total_tokens       INTEGER NOT NULL DEFAULT 0,
+  created_at         TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
 ];
 
 export function migrate(db: Database): void {

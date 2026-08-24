@@ -8,6 +8,7 @@ export type { ConfigTemplateRow } from "./types";
 export type { MemoryTarget, SyncDirection, MemoryMirrorRow } from "./types";
 export type { SessionRow } from "./types";
 export type { TaskStatus, TaskRow } from "./types";
+export type { WireFormat, ProviderStatus, ProviderRow, ProviderModelRow, ModelRouteRow, UsageLogRow } from "./types";
 export type { ClientMessage, ParseResult } from "./protocol";
 export { clientMessageSchema, parseClientMessage, resolveKind } from "./protocol";
 export { json } from "./http";

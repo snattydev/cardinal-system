@@ -53,9 +53,35 @@ El sistema de scopes fino (lectura/escritura por servicio) se implementa en Fase
 | Qué | Dónde NO va | Dónde SÍ va |
 |-----|-------------|-------------|
 | `.env` (JWT_SECRET, credenciales) | ❌ Git, logs, diffs | Solo en el server |
+| Password admin en texto plano | ❌ Chat de agentes, logs, git, tickets | Solo TTY local del humano (stdin, sin echo) |
 | API keys en texto plano | ❌ Git, logs, DB | Solo se imprimen UNA vez al crearlas |
 | Tokens, secrets, paths absolutos | ❌ Commits, PR descriptions | — |
 | `.env.example` | — | ✅ Template sin valores reales |
+
+---
+
+## Bootstrap de password admin (imprescindible pre-nube)
+
+Decisión 2026-08-20 (Santi): en **dev/testing local** cualquier password sirve
+(incluso una generada en sesión de agente). Eso **no** es el flujo de producción.
+
+Antes del primer deploy a la nube — aunque el único usuario sea el owner —
+el alta o rotación de `ADMIN_PASSWORD_HASH` **no puede pasar por el modelo**.
+La password en claro entra al contexto del agente, queda en transcripts y se
+puede filtrar. Un usuario no invalida el requisito.
+
+**Flujo requerido (aún no implementado — blocker de deploy cloud):**
+
+1. Script interactivo en TTY del humano (`read -s` / equivalente): pide la
+   password, no la imprime, no la loguea.
+2. Hashea con `Bun.password.hash` **en esa misma máquina**.
+3. Escribe **solo el hash** a `~/.config/cardinal/env` o a un Podman secret.
+4. El agente puede saber que el bootstrap corrió (ok/fail). Nunca ve ni genera
+   el plaintext. Tampoco lo pide "pasámela por el chat".
+
+Hasta que ese script exista, el cloud deploy no se considera listo. Detalle de
+seguimiento: item 11 del
+[`plan de backlog v2`](superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
 
 ---
 
@@ -78,4 +104,4 @@ Antes de cada push a `dev`:
 
 ---
 
-*Actualizado: 2026-07-28.*
+*Actualizado: 2026-08-20.*

@@ -71,6 +71,7 @@ describe("routes", () => {
       adminUser: "admin",
       adminPasswordHash: await Bun.password.hash("sao123"),
       jwtSecret: "test-secret",
+      poolSecret: "test-pool-secret",
       staticDir: "x",
       pingIntervalMs: 1000,
     };

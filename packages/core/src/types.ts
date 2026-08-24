@@ -42,6 +42,51 @@ export interface AgentKeyRow {
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
+  scopes: string;
+  budget_limit: number | null;
+  budget_used: number;
+}
+
+export type WireFormat = "openai" | "anthropic" | "gemini";
+export type ProviderStatus = "active" | "disabled";
+
+export interface ProviderRow {
+  id: number;
+  name: string;
+  base_url: string;
+  api_key_enc: string | null;
+  wire_format: WireFormat;
+  status: ProviderStatus;
+  rpm_limit: number | null;
+  tpm_limit: number | null;
+  cost_per_mtok: number;
+  created_at: string;
+}
+
+export interface ProviderModelRow {
+  provider_id: number;
+  model_id: string;
+  capabilities: string;
+  context_window: number | null;
+}
+
+export interface ModelRouteRow {
+  alias: string;
+  fallback_chain: string;
+  created_at: string;
+}
+
+export interface UsageLogRow {
+  id: number;
+  agent_name: string | null;
+  key_hash: string | null;
+  provider_id: number | null;
+  provider_name: string | null;
+  model_id: string | null;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  created_at: string;
 }
 
 export interface AgentEventRow {

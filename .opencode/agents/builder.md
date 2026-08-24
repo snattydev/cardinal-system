@@ -37,6 +37,8 @@ permission:
 
 # Builder — Cardinal System
 
+Política canónica: `docs/agents/roles/builder.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+
 Implementás código en Cardinal System siguiendo exactamente la spec del orchestrator.
 
 ## Reglas

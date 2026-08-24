@@ -1,3 +1,5 @@
+export { deriveKey, encryptSecret, decryptSecret, maskSecret } from "./crypto";
+
 export const KEY_PREFIX = "sk-cardinal-";
 
 export function generateKey(): string {

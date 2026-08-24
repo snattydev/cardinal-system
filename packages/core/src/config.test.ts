@@ -5,6 +5,7 @@ const requiredEnv: Record<string, string> = {
   ADMIN_USER: "admin",
   ADMIN_PASSWORD_HASH: "argon2:fakehash",
   JWT_SECRET: "test-secret",
+  POOL_SECRET: "test-pool-secret",
 };
 
 describe("loadConfig", () => {
@@ -26,6 +27,12 @@ describe("loadConfig", () => {
     expect(() => loadConfig(env)).toThrow("JWT_SECRET is required");
   });
 
+  test("throws when POOL_SECRET is missing", () => {
+    const env = { ...requiredEnv };
+    delete env.POOL_SECRET;
+    expect(() => loadConfig(env)).toThrow("POOL_SECRET is required");
+  });
+
   test("returns defaults when only the required vars are present", () => {
     const config = loadConfig({ ...requiredEnv });
     expect(config.port).toBe(8787);
@@ -35,6 +42,7 @@ describe("loadConfig", () => {
     expect(config.adminUser).toBe("admin");
     expect(config.adminPasswordHash).toBe("argon2:fakehash");
     expect(config.jwtSecret).toBe("test-secret");
+    expect(config.poolSecret).toBe("test-pool-secret");
   });
 
   test("respects explicit overrides", () => {

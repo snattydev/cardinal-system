@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { json } from "@cardinal/core";
-import type { TaskStatus } from "@cardinal/core";
+import type { TaskStatus, TaskRow } from "@cardinal/core";
 import { claimTask, completeTask, createTask, getTask, listTasks } from "@cardinal/db";
 
 const TASK_STATUSES: TaskStatus[] = ["open", "claimed", "done", "blocked"];
@@ -13,7 +13,11 @@ export function handleListTasks(db: Database, req: Request): Response {
   return json({ tasks: listTasks(db, (statusParam as TaskStatus) || undefined) });
 }
 
-export async function handleCreateTask(db: Database, req: Request): Promise<Response> {
+export async function handleCreateTask(
+  db: Database,
+  req: Request,
+  onChange?: (task: TaskRow) => void,
+): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
@@ -32,6 +36,7 @@ export async function handleCreateTask(db: Database, req: Request): Promise<Resp
     return json({ error: "parent_not_found" }, 400);
   }
   const task = createTask(db, { goal: raw.goal, createdBy, parentId });
+  onChange?.(task);
   return json({ task });
 }
 
@@ -41,7 +46,12 @@ export function handleGetTask(db: Database, id: string): Response {
   return json({ task });
 }
 
-export async function handleClaimTask(db: Database, id: string, req: Request): Promise<Response> {
+export async function handleClaimTask(
+  db: Database,
+  id: string,
+  req: Request,
+  onChange?: (task: TaskRow) => void,
+): Promise<Response> {
   let body: unknown;
   try {
     body = await req.json();
@@ -60,10 +70,16 @@ export async function handleClaimTask(db: Database, id: string, req: Request): P
       ? json({ error: "not_found" }, 404)
       : json({ error: "not_open" }, 409);
   }
+  onChange?.(task);
   return json({ task });
 }
 
-export async function handleCompleteTask(db: Database, id: string, req: Request): Promise<Response> {
+export async function handleCompleteTask(
+  db: Database,
+  id: string,
+  req: Request,
+  onChange?: (task: TaskRow) => void,
+): Promise<Response> {
   let summary: string | null = null;
   let artifactRef: string | null = null;
   try {
@@ -80,5 +96,6 @@ export async function handleCompleteTask(db: Database, id: string, req: Request)
 
   const task = completeTask(db, id, { summary, artifactRef });
   if (!task) return json({ error: "not_found" }, 404);
+  onChange?.(task);
   return json({ task });
 }

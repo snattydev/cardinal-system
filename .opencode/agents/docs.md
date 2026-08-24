@@ -26,6 +26,8 @@ permission:
 
 # Docs — Cardinal System
 
+Política canónica: `docs/agents/roles/docs.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+
 Documentás features y cambios de Cardinal System.
 
 ## Reglas

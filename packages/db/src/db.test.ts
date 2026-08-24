@@ -1,13 +1,17 @@
 import { describe, expect, test } from "bun:test";
 import { createDb, migrate } from "./schema";
 import {
+  addProviderModel,
   addSkillToProfile,
+  consumeBudget,
   createAgentKey,
   findActiveKeyByHash,
   getAgent,
   getConfigTemplate,
   getMemoryMirror,
+  getModelRoute,
   getProfile,
+  getProviderByName,
   getSession,
   getSkill,
   getSoul,
@@ -17,20 +21,28 @@ import {
   listDevices,
   listEvents,
   listKeys,
+  listModelRoutes,
   listProfiles,
+  listProviderModels,
+  listProviders,
   listSessions,
   listSkills,
   listSkillsForProfile,
+  listUsage,
+  logUsage,
   markAgentDisconnected,
   registerAgent,
   revokeKeysForAgent,
+  setProviderStatus,
   touchKey,
   updateAgentDeviceInfo,
   updateAgentStatus,
   upsertAgentOnConnect,
   upsertConfigTemplate,
   upsertMemoryMirror,
+  upsertModelRoute,
   upsertProfile,
+  upsertProvider,
   upsertSession,
   upsertSkill,
   upsertSoul,
@@ -44,7 +56,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 12 tables and sets user_version to 10", () => {
+  test("migrate creates the 16 tables and sets user_version to 12", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -52,16 +64,20 @@ describe("migrations", () => {
       "agents",
       "config_templates",
       "memory_mirror",
+      "model_routes",
       "profile_skills",
       "profiles",
+      "provider_models",
+      "providers",
       "rag_cache",
       "sessions_index",
       "skills",
       "souls",
       "tasks",
+      "usage_log",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(10);
+    expect(row.user_version).toBe(12);
     db.close();
   });
 
@@ -70,8 +86,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(10);
-    expect(tableNames(db)).toHaveLength(12);
+    expect(row.user_version).toBe(12);
+    expect(tableNames(db)).toHaveLength(16);
     db.close();
   });
 
@@ -81,7 +97,76 @@ describe("migrations", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("device_info");
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(10);
+    expect(row.user_version).toBe(12);
+    db.close();
+  });
+
+  test("migration 10 creates providers/provider_models/model_routes and extends agent_keys", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("providers");
+    expect(tableNames(db)).toContain("provider_models");
+    expect(tableNames(db)).toContain("model_routes");
+
+    const cols = db.query("PRAGMA table_info(agent_keys)").all() as Array<{ name: string }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("scopes");
+    expect(names).toContain("budget_limit");
+    expect(names).toContain("budget_used");
+
+    db.query(
+      "INSERT INTO providers (name, base_url, wire_format, cost_per_mtok) VALUES (?, ?, ?, ?)",
+    ).run("opencode-go", "http://localhost:4343/v1", "openai", 0.5);
+
+    const p = db.query("SELECT * FROM providers WHERE name = ?").get("opencode-go") as Record<string, unknown>;
+    expect(p!.wire_format).toBe("openai");
+    expect(p!.status).toBe("active");
+    expect(p!.api_key_enc).toBeNull();
+    expect(p!.cost_per_mtok).toBe(0.5);
+
+    expect(() =>
+      db.query("INSERT INTO providers (name, base_url, wire_format) VALUES (?, ?, ?)").run("bad", "http://x", "cohere"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO providers (name, base_url, status) VALUES (?, ?, ?)").run("bad2", "http://x", "zombie"),
+    ).toThrow();
+
+    db.query("INSERT INTO model_routes (alias) VALUES (?)").run("pro");
+    const r = db.query("SELECT * FROM model_routes WHERE alias = ?").get("pro") as Record<string, unknown>;
+    expect(r!.fallback_chain).toBe("[]");
+
+    db.close();
+  });
+
+  test("migration 11 creates usage_log with token columns and created_at default", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("usage_log");
+
+    const cols = db.query("PRAGMA table_info(usage_log)").all() as Array<{ name: string; notnull: number }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "agent_name",
+      "key_hash",
+      "provider_id",
+      "provider_name",
+      "model_id",
+      "prompt_tokens",
+      "completion_tokens",
+      "total_tokens",
+      "created_at",
+    ]);
+
+    db.query(
+      "INSERT INTO usage_log (agent_name, key_hash, provider_id, provider_name, model_id) VALUES (?, ?, ?, ?, ?)",
+    ).run("shinon", "hash-1", 1, "mock-a", "test-model");
+
+    const row = db.query("SELECT * FROM usage_log WHERE key_hash = ?").get("hash-1") as Record<string, unknown>;
+    expect(row.prompt_tokens).toBe(0);
+    expect(row.completion_tokens).toBe(0);
+    expect(row.total_tokens).toBe(0);
+    expect(typeof row.created_at).toBe("string");
+    expect(row.created_at).not.toBe("");
+
     db.close();
   });
 
@@ -756,6 +841,208 @@ describe("keys repo", () => {
     expect(keys[0].kind_override).toBe("agent");
     expect(keys[1].key_hash).toBe("hash-2");
     expect(keys[1].created_by).toBe("system");
+    db.close();
+  });
+
+  test("createAgentKey stores scopes and budget_limit, defaults scopes to [\"*\"]", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-scoped", agentName: "shinon", scopes: ["fast", "pro"], budgetLimit: 50000 });
+    const key = findActiveKeyByHash(db, "hash-scoped");
+    expect(key).not.toBeNull();
+    expect(JSON.parse(key!.scopes)).toEqual(["fast", "pro"]);
+    expect(key!.budget_limit).toBe(50000);
+    expect(key!.budget_used).toBe(0);
+
+    createAgentKey(db, { keyHash: "hash-default", agentName: "shinon" });
+    const def = findActiveKeyByHash(db, "hash-default");
+    expect(JSON.parse(def!.scopes)).toEqual(["*"]);
+    expect(def!.budget_limit).toBeNull();
+    expect(def!.budget_used).toBe(0);
+    db.close();
+  });
+});
+
+describe("providers repo", () => {
+  test("upsertProvider + listProviders + getProviderByName", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "opencode-go", baseUrl: "http://localhost:4343/v1", wireFormat: "openai", costPerMtok: 0.5 });
+    upsertProvider(db, { name: "deepseek", baseUrl: "https://api.deepseek.com/v1" });
+    const providers = listProviders(db);
+    expect(providers.map((p) => p.name)).toEqual(["deepseek", "opencode-go"]);
+    const p = getProviderByName(db, "opencode-go");
+    expect(p).not.toBeNull();
+    expect(p!.base_url).toBe("http://localhost:4343/v1");
+    expect(p!.wire_format).toBe("openai");
+    expect(p!.status).toBe("active");
+    expect(p!.cost_per_mtok).toBe(0.5);
+    expect(p!.api_key_enc).toBeNull();
+    expect(p!.rpm_limit).toBeNull();
+    expect(getProviderByName(db, "missing")).toBeNull();
+    db.close();
+  });
+
+  test("upsertProvider updates existing row by name (ON CONFLICT)", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "pro", baseUrl: "http://a" });
+    upsertProvider(db, { name: "pro", baseUrl: "http://b", wireFormat: "anthropic", status: "disabled", rpmLimit: 10, tpmLimit: 1000, costPerMtok: 0.1 });
+    expect(listProviders(db)).toHaveLength(1);
+    const p = getProviderByName(db, "pro")!;
+    expect(p.base_url).toBe("http://b");
+    expect(p.wire_format).toBe("anthropic");
+    expect(p.status).toBe("disabled");
+    expect(p.rpm_limit).toBe(10);
+    expect(p.tpm_limit).toBe(1000);
+    expect(p.cost_per_mtok).toBe(0.1);
+    db.close();
+  });
+
+  test("setProviderStatus changes status", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "pro", baseUrl: "http://a" });
+    setProviderStatus(db, "pro", "disabled");
+    expect(getProviderByName(db, "pro")!.status).toBe("disabled");
+    db.close();
+  });
+});
+
+describe("provider_models repo", () => {
+  test("addProviderModel + listProviderModels with defaults", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "pro", baseUrl: "http://a" });
+    const provider = getProviderByName(db, "pro")!;
+    addProviderModel(db, { providerId: provider.id, modelId: "gpt-4o", capabilities: '["chat","tools"]', contextWindow: 128000 });
+    addProviderModel(db, { providerId: provider.id, modelId: "gpt-4o-mini" });
+    const models = listProviderModels(db, provider.id);
+    expect(models.map((m) => m.model_id)).toEqual(["gpt-4o", "gpt-4o-mini"]);
+    expect(models[0].capabilities).toBe('["chat","tools"]');
+    expect(models[0].context_window).toBe(128000);
+    expect(models[1].capabilities).toBe("[]");
+    expect(models[1].context_window).toBeNull();
+    db.close();
+  });
+
+  test("addProviderModel updates on conflict", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "pro", baseUrl: "http://a" });
+    const provider = getProviderByName(db, "pro")!;
+    addProviderModel(db, { providerId: provider.id, modelId: "m", capabilities: "[]" });
+    addProviderModel(db, { providerId: provider.id, modelId: "m", capabilities: '["vision"]', contextWindow: 2000 });
+    const models = listProviderModels(db, provider.id);
+    expect(models).toHaveLength(1);
+    expect(models[0].capabilities).toBe('["vision"]');
+    expect(models[0].context_window).toBe(2000);
+    db.close();
+  });
+});
+
+describe("model_routes repo", () => {
+  test("upsertModelRoute + getModelRoute roundtrip fallback_chain JSON", () => {
+    const db = createDb(":memory:");
+    const chain = [
+      { provider: "opencode-go", model: "deepseek-v4-pro" },
+      { provider: "deepseek", model: "deepseek-chat" },
+    ];
+    upsertModelRoute(db, "pro", chain);
+    const route = getModelRoute(db, "pro");
+    expect(route).not.toBeNull();
+    expect(JSON.parse(route!.fallback_chain)).toEqual(chain);
+    expect(route!.created_at).not.toBeNull();
+    expect(getModelRoute(db, "missing")).toBeNull();
+    db.close();
+  });
+
+  test("upsertModelRoute overwrites fallback_chain and listModelRoutes orders by alias", () => {
+    const db = createDb(":memory:");
+    upsertModelRoute(db, "pro", [{ provider: "a", model: "m1" }]);
+    upsertModelRoute(db, "fast", [{ provider: "b", model: "m2" }]);
+    upsertModelRoute(db, "pro", [{ provider: "a", model: "m3" }]);
+    const routes = listModelRoutes(db);
+    expect(routes.map((r) => r.alias)).toEqual(["fast", "pro"]);
+    expect(JSON.parse(getModelRoute(db, "pro")!.fallback_chain)).toEqual([{ provider: "a", model: "m3" }]);
+    db.close();
+  });
+});
+
+describe("consumeBudget", () => {
+  test("key with budget consumes until limit then returns false", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-budget", agentName: "shinon", budgetLimit: 100 });
+    expect(consumeBudget(db, "hash-budget", 60)).toBe(true);
+    expect(consumeBudget(db, "hash-budget", 40)).toBe(true);
+    expect(consumeBudget(db, "hash-budget", 1)).toBe(false);
+    const key = findActiveKeyByHash(db, "hash-budget");
+    expect(key!.budget_used).toBe(100);
+    expect(key!.last_used_at).not.toBeNull();
+    db.close();
+  });
+
+  test("key without budget_limit never fails", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-nolimit", agentName: "shinon" });
+    expect(consumeBudget(db, "hash-nolimit", 10000000)).toBe(true);
+    expect(findActiveKeyByHash(db, "hash-nolimit")!.budget_used).toBe(10000000);
+    db.close();
+  });
+
+  test("consumeBudget on revoked key returns false", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-revoked", agentName: "shinon", budgetLimit: 100 });
+    revokeKeysForAgent(db, "shinon");
+    expect(consumeBudget(db, "hash-revoked", 10)).toBe(false);
+    db.close();
+  });
+
+  test("consumeBudget on unknown key returns false", () => {
+    const db = createDb(":memory:");
+    expect(consumeBudget(db, "ghost-hash", 10)).toBe(false);
+    db.close();
+  });
+});
+
+describe("usage_log repo", () => {
+  test("logUsage inserts a row and listUsage returns newest first", () => {
+    const db = createDb(":memory:");
+    logUsage(db, {
+      agentName: "shinon",
+      keyHash: "hash-a",
+      providerId: 1,
+      providerName: "mock-a",
+      modelId: "test-model",
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+    });
+    logUsage(db, {
+      agentName: "kirito",
+      keyHash: "hash-b",
+      providerId: 2,
+      providerName: "mock-b",
+      modelId: "other",
+      promptTokens: 1,
+      completionTokens: 1,
+      totalTokens: 2,
+    });
+
+    const rows = listUsage(db);
+    expect(rows).toHaveLength(2);
+    expect(rows[0].agent_name).toBe("kirito");
+    expect(rows[0].key_hash).toBe("hash-b");
+    expect(rows[0].provider_id).toBe(2);
+    expect(rows[0].provider_name).toBe("mock-b");
+    expect(rows[0].model_id).toBe("other");
+    expect(rows[0].prompt_tokens).toBe(1);
+    expect(rows[0].completion_tokens).toBe(1);
+    expect(rows[0].total_tokens).toBe(2);
+    expect(rows[1].agent_name).toBe("shinon");
+    expect(rows[1].total_tokens).toBe(15);
+
+    const limited = listUsage(db, 1);
+    expect(limited).toHaveLength(1);
+    expect(limited[0].agent_name).toBe("kirito");
     db.close();
   });
 });

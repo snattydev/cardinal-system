@@ -177,23 +177,6 @@ Templates de review: [`docs/agents/prompts/standard-review.md`](./docs/agents/pr
 
 ---
 
-## 🤖 Agentes de Desarrollo
-
-- **El orquestador coordina, los subagentes implementan**
-- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
-- El subagente entrega el resultado → el orquestador verifica, commitea y documenta
-- Subagentes son **efímeros**: sin estado entre runs, sin memoria persistente
-- Tasks complejas se descomponen en múltiples subagentes secuenciales o paralelos
-
-### Workflow completo por feature
-
-1. **Delegar** — subagente(s) implementan la feature
-2. **Verificar** — build, tests, revisión manual
-3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
-4. **Commit + push** — conventional commit a `dev` incluyendo el doc
-
----
-
 ## 🐳 Containerización
 
 - **Dev local:** `compose.yaml` (`podman-compose`)
@@ -241,6 +224,9 @@ Esto aplica a: SOULs, prompts de review, checklists de seguridad.
 
 ```
 cardinal-system/
+├── .cursor/
+│   ├── agents/              subagentes Cursor (adapters)
+│   └── rules/
 ├── packages/                  ← Bun workspaces (paquetes internos)
 │   ├── core/                  tipos compartidos, config, zod schemas
 │   ├── auth/                  JWT sign/verify, login, logout
@@ -261,7 +247,8 @@ cardinal-system/
 ├── docs/
 │   ├── features/              documentación de features completadas
 │   ├── agents/                SOULs, prompts, checklists de revisión
-│   │   └── prompts/
+│   │   ├── prompts/
+│   │   └── roles/           roles canónicos (agnósticos)
 │   ├── superpowers/
 │   │   ├── specs/             specs de diseño por fase
 │   │   └── plans/             planes de implementación
@@ -288,42 +275,55 @@ cardinal-system/
 
 ---
 
-## 🕸️ Swarm Workflow (OpenCode)
+## 🕸️ Swarm Workflow
 
-El repo tiene setup multi-agente de OpenCode (ver `.opencode/`).
+**Cursor es la superficie de desarrollo ahora.** Composer es el padre: implementa cambios de 1–2 archivos sin lógica crítica; delega el resto a subagentes en `.cursor/agents/`.
 
-- **Features de 1-2 archivos sin lógica crítica** → implementación directa, sin workflow completo
-- **Features con dependencias o lógica crítica** → `/feature "descripción"` desde OpenCode
-- **`/review`** → code review del working tree contra `dev`
-- **`/test [path]`** → TDD workflow (tester escribe RED, builder hace GREEN)
-- **`/deploy`** → build + tests + containers + healthcheck
-- El orquestador (primary agent) descompone, delega y verifica. Los subagentes son efímeros.
+- TDD obligatorio (auth, keys, ws, db, router), multi-archivo, review, docs de feature, verificación, u otro pane/kind → delegar.
+- Invocación: automática por `description`, o explícita (`/builder`, `/verifier`, “usá el subagente frontend”).
+- Tras un “listo”, siempre `verifier` con evidencia (`bun test` / `bun run build`).
+- Herdr (otra instancia de Cursor u otro kind) **solo** vía `herdr-dispatcher`, y solo si `HERDR_ENV=1`. Si no, in-session.
+- OpenCode CLI (`.opencode/`) sigue disponible (`/feature`, `/test`, `/review`); no es el camino diario.
 
-## 🤖 Agent Roles (OpenCode)
+Flujo: tester RED → builder | ws-protocol | frontend GREEN → verifier → reviewer ∥ security-reviewer (si auth/keys/ws) → docs → el padre sugiere commit (no commitea salvo pedido).
 
-| Agente | Modo | Modelo | Rol |
-|--------|------|--------|-----|
-| `orchestrator` | primary | `opencode-go/deepseek-v4-pro` | Descompone, delega, verifica, sugiere commits. No escribe código |
-| `builder` | subagent | hereda | Implementa features (packages, backend, frontend) |
-| `tester` | subagent | hereda | TDD estricto (RED → GREEN) en `*.test.ts` |
-| `reviewer` | subagent | hereda | Code review read-only, output CRITICAL/HIGH/LOW |
-| `docs` | subagent | hereda | Documentación en `docs/features/` |
+Workflow por feature:
 
-Los subagentes heredan el modelo del primario. El default del proyecto es `opencode-go/deepseek-v4-flash`.
+1. **Delegar** — 1–2 archivos sin lógica crítica in-session; el resto a subagentes
+2. **Verificar** — `verifier` con evidencia (`bun test` / `bun run build`); review si aplica
+3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
+4. **Commit + push** — conventional commit a `dev` incluyendo el doc; solo si el humano lo pide
+
+## 🤖 Agent Roles (Cursor)
+
+| Agente | Readonly | Rol |
+|--------|----------|-----|
+| `builder` | no | Implementa spec en `packages/` (salvo `ws/`) y `backend/` |
+| `ws-protocol` | no | Protocolo en `packages/ws/` |
+| `frontend` | no | `frontend/**`, types 1:1 con JSON, WS a `:8787` |
+| `tester` | no | TDD RED en `*.test.ts` |
+| `verifier` | sí | Corre tests/build; no cree claims; no parchea |
+| `reviewer` | sí | Calidad CRITICAL/HIGH/LOW |
+| `security-reviewer` | sí | Auth/keys/ws/leaks; findings confirmados |
+| `docs` | no | `docs/features/` tras verificar |
+| `herdr-dispatcher` | no | Split/start/prompt en Herdr; no implementa producto |
+
+Políticas canónicas: `docs/agents/roles/<rol>.md`. Adapters: `.cursor/agents/<rol>.md`. Built-ins de Cursor (`explore`, `bash`, `browser`) no se redefinen.
 
 ## 📤 Delegation Rules
 
-- El orchestrator **no escribe código** — solo coordina, verifica y sugiere commits
-- Un subagente = una responsabilidad concreta (feature, refactor, auditoría, fix)
-- El orchestrator verifica resultados (tests, build, diff) antes de marcar completo
-- Los commits los hace el humano (o el orquestador con identidad del owner) después de revisar el diff
+- Padre Cursor: trabajo chico in-session; no es un orchestrator estricto.
+- Un subagente = una responsabilidad. `builder` no pisa `ws-protocol` ni `frontend`.
+- Backend+UI en paralelo (`builder`/`ws-protocol` + `frontend`). TDD nunca al revés (RED antes de GREEN).
+- El padre verifica resultados antes de marcar completo. `verifier` FAIL → re-delegar.
+- Commits: identidad del owner (`git config`); jamás nombre de agente. Solo si el humano lo pide.
+- Cardinal-producto no spawnea agentes en Herdr.
 
 ## 🖥️ Cursor Section
 
-- Cursor lee `AGENTS.md` automáticamente como Cursor Rules + `.cursor/rules/cardinal.mdc`
-- **Grok 4.5 en Composer** para: planning de features complejas, code review visual, refactors multi-archivo
-- **OpenCode CLI** para: implementación concreta (`/feature`), TDD (`/test`), review rápido (`/review`)
-- Ambos comparten reglas vía `AGENTS.md` y `.cursor/rules/`
+- Cursor lee `AGENTS.md` + `.cursor/rules/cardinal.mdc` + `.cursor/agents/`.
+- Composer orquesta e implementa lo chico. Especialistas y Herdr se delegan.
+- OpenCode CLI es swarm legado, no el camino diario.
 
 ## ⚙️ OpenCode Config Reference
 

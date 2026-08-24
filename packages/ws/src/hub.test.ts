@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { ServerWebSocket } from "bun";
-import { createDb, createAgentKey, getAgent, listEvents, registerAgent } from "@cardinal/db";
+import { createDb, createAgentKey, createTask, getAgent, listEvents, registerAgent } from "@cardinal/db";
 import { hashKey } from "@cardinal/keys";
-import { Hub } from "./hub";
+import { Hub, taskToPayload } from "./hub";
 import type { ConnData } from "./hub";
 
 const TEST_KEY = "sk-cardinal-" + "ab".repeat(32);
@@ -220,5 +220,43 @@ describe("Hub", () => {
     // Active session's close DOES disconnect
     hub.websocket.close(second.ws);
     expect(getAgent(db, "shinon")?.connected).toBe(0);
+  });
+});
+
+describe("task broadcast", () => {
+  test("taskToPayload mapea snake_case → camelCase", () => {
+    const { db } = makeHub();
+    const row = createTask(db, { goal: "build x", createdBy: "shinon" });
+    expect(taskToPayload(row)).toMatchObject({
+      id: row.id,
+      goal: "build x",
+      status: "open",
+      assignedTo: null,
+      createdBy: "shinon",
+      parentId: null,
+      summary: null,
+      artifactRef: null,
+      createdAt: row.created_at,
+      updatedAt: null,
+    });
+  });
+
+  test("broadcastTask emite task_update a dashboards suscritos", () => {
+    const { db, hub } = makeHub();
+    const dash = mockWs({ dashboardAuthed: true });
+    hub.websocket.message(dash.ws, JSON.stringify({ type: "subscribe" }));
+    const row = createTask(db, { goal: "do it", createdBy: "system" });
+
+    hub.broadcastTask(row);
+
+    const msg = dash.sent[dash.sent.length - 1] as { type: string; task: Record<string, unknown> };
+    expect(msg.type).toBe("task_update");
+    expect(msg.task).toMatchObject({ id: row.id, goal: "do it", status: "open", assignedTo: null });
+  });
+
+  test("broadcastTask sin dashboards no lanza", () => {
+    const { db, hub } = makeHub();
+    const row = createTask(db, { goal: "x", createdBy: "system" });
+    expect(() => hub.broadcastTask(row)).not.toThrow();
   });
 });

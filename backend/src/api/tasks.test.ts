@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import type { TaskRow } from "@cardinal/core";
 import { createDb } from "@cardinal/db";
 import {
   handleClaimTask,
@@ -338,6 +339,70 @@ describe("tasks status CHECK", () => {
         "invalid",
       ]),
     ).toThrow();
+    db.close();
+  });
+});
+
+describe("onChange callback", () => {
+  test("create llama onChange con la task creada", async () => {
+    const db = createDb(":memory:");
+    const calls: TaskRow[] = [];
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "notify" }),
+      (t) => calls.push(t),
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ goal: "notify", status: "open", created_by: "system" });
+    db.close();
+  });
+
+  test("claim llama onChange con la task claimada", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "claim notify");
+    const calls: TaskRow[] = [];
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "shinon" }),
+      (t) => calls.push(t),
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ id: created.id, status: "claimed", assigned_to: "shinon" });
+    db.close();
+  });
+
+  test("complete llama onChange con la task completada", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "complete notify");
+    const calls: TaskRow[] = [];
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", { summary: "done" }),
+      (t) => calls.push(t),
+    );
+    expect(res.status).toBe(200);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({ id: created.id, status: "done", summary: "done" });
+    db.close();
+  });
+
+  test("claim fallido (not_open) NO llama onChange", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "already done");
+    await handleCompleteTask(db, created.id, jsonReq("http://localhost/api/tasks/x/complete", "PUT", {}));
+    const calls: TaskRow[] = [];
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "shinon" }),
+      (t) => calls.push(t),
+    );
+    expect(res.status).toBe(409);
+    expect(calls).toHaveLength(0);
     db.close();
   });
 });

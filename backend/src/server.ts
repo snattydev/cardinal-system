@@ -20,6 +20,7 @@ import {
   handleListTasks,
 } from "./api/tasks";
 import { handleSystem } from "./api/system";
+import { handleChatCompletions, handleListModels } from "./api/router";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
@@ -30,7 +31,6 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
   return Bun.serve<ConnData>({
     port: config.port,
-    maxPayloadLength: 4096, // protocolo usa mensajes ~200 bytes; default Bun es 16 MiB
 
     async fetch(req, server) {
       const { pathname } = new URL(req.url);
@@ -169,21 +169,21 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (pathname === "/api/tasks" && method === "POST") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleCreateTask(db, req);
+        return handleCreateTask(db, req, (t) => hub.broadcastTask(t));
       }
 
       const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
       if (taskClaimMatch && method === "PUT") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req);
+        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
       if (taskCompleteMatch && method === "PUT") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req);
+        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
@@ -193,6 +193,13 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
       }
 
+      if (pathname === "/v1/chat/completions" && method === "POST") {
+        return handleChatCompletions(req, db, config);
+      }
+      if (pathname === "/v1/models" && method === "GET") {
+        return handleListModels(db);
+      }
+
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);
 
       if (method === "GET") return serveStatic(req, config.staticDir);
@@ -200,6 +207,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       return json({ error: "method_not_allowed" }, 405);
     },
 
-    websocket: hub.websocket,
+    websocket: {
+      ...hub.websocket,
+      maxPayloadLength: 4096, // protocolo usa mensajes ~200 bytes; default Bun es 16 MiB
+    },
   });
 }
