@@ -5,8 +5,8 @@
   "terminals": [
     {
       "name": "backend",
-      "command": "bun run dev:backend",
-      "description": "Bun API + WebSocket server on http://localhost:8787 (hot reload)."
+      "command": "bash .cursor/start.sh && bun run dev:backend",
+      "description": "Ensure .env exists, then start the Bun API + WebSocket server on http://localhost:8787 (hot reload)."
     },
     {
       "name": "frontend",
