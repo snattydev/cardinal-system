@@ -30,7 +30,10 @@ export async function handlePutConfig(
   const raw = (body ?? {}) as Record<string, unknown>;
 
   if (raw.config_yaml !== undefined) {
-    fields.config_yaml = typeof raw.config_yaml === "string" ? raw.config_yaml : null;
+    if (typeof raw.config_yaml !== "string") {
+      return json({ error: "invalid_config_yaml" }, 400);
+    }
+    fields.config_yaml = raw.config_yaml;
   }
 
   upsertConfigTemplate(db, profileName, fields);
