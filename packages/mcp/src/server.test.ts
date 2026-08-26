@@ -154,8 +154,18 @@ describe("MCP server /mcp", () => {
   test("cardinal_search_memory proxyea al backend y filtra por scope de vault", async () => {
     const state = makeState();
     state.searchResults = [
-      { source: "the portal/index.md", score: 0.9, text: "portal" },
-      { source: "for-my-agents/tasks.md", score: 0.8, text: "tasks" },
+      {
+        path: "/data/vaults/the portal/index.md",
+        score: 0.9,
+        content: "portal",
+        source: "vault",
+      },
+      {
+        path: "/data/vaults/for-my-agents/tasks.md",
+        score: 0.8,
+        content: "tasks",
+        source: "vault",
+      },
     ];
     const scoped = makeDeps(state);
     // key scoped a "the portal": solo ve resultados de esa vault
@@ -167,7 +177,8 @@ describe("MCP server /mcp", () => {
     });
     const content = JSON.parse(json.result.content[0].text);
     expect(content.results).toHaveLength(1);
-    expect(content.results[0].source).toBe("the portal/index.md");
+    expect(content.results[0].vault).toBe("the portal");
+    expect(content.results[0].path).toBe("index.md");
 
     // key con * ve ambos
     const all = makeDeps(state);

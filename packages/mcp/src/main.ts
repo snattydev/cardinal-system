@@ -17,5 +17,7 @@ const knownVaults = (process.env.CARDINAL_VAULTS ?? "")
   .map((v) => v.trim())
   .filter((v) => v.length > 0);
 
-const mcp = createMcpServer({ backendUrl, vaultsRoot, knownVaults });
+const serviceKey = process.env.CARDINAL_SERVICE_KEY ?? "";
+
+const mcp = createMcpServer({ backendUrl, vaultsRoot, knownVaults, serviceKey });
 mcp.start();

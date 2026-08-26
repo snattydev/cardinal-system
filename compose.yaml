@@ -76,6 +76,9 @@ services:
     volumes:
       # Mount workspace sources for hot-reload via bun --watch
       - ./packages:/app/packages
+      # backend/frontend dirs must exist for the root workspaces glob (bun install)
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
       # Root workspace manifests (bun install must run from monorepo root)
       - ./package.json:/app/package.json
       - ./bun.lock:/app/bun.lock
@@ -86,6 +89,7 @@ services:
       CARDINAL_BACKEND_URL: http://backend:8787
       CARDINAL_VAULTS_ROOT: /data/vaults
       CARDINAL_VAULTS: "the portal,for-my-agents"
+      CARDINAL_SERVICE_KEY: ${CARDINAL_SERVICE_KEY}
     depends_on:
       - backend
     networks:

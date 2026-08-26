@@ -9,6 +9,8 @@ import {
 
 export interface McpServerOptions extends ValidatorOptions {
   backendUrl: string;
+  /** Service key del MCP contra el backend (para /api/rag/search). */
+  serviceKey?: string;
   vaultsRoot: string;
   knownVaults: readonly string[];
   fetchImpl?: typeof fetch;
@@ -89,24 +91,35 @@ export function createMcpServer(options: McpServerOptions) {
 
     const res = await doFetch(`${options.backendUrl}/api/rag/search`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(options.serviceKey ? { authorization: `Bearer ${options.serviceKey}` } : {}),
+      },
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`backend rag/search failed (${res.status})`);
     const data = (await res.json()) as { results?: Array<Record<string, unknown>> };
     const results = data.results ?? [];
 
-    // Clasificar por vault y filtrar según scope. El vault es el primer
-    // segmento del source ("vault/path.md"); si no matchea ninguna vault
-    // conocida se etiqueta como "(root)".
+    // Clasificar por vault. El backend normaliza cada resultado a
+    // {path: <abs path en el host>, score, content, source: "vault"}: la vault
+    // real hay que deducirla del path absoluto matcheando los knownVaults.
     const allowed = allowedVaults(identity.scopes, knownVaults);
     const wanted = typeof args.vault === "string" ? args.vault : null;
     const classified = results.map((r) => {
-      const source = String(r.source ?? "");
-      const slash = source.indexOf("/");
-      const vault = slash === -1 ? source : source.slice(0, slash);
-      const inKnown = knownVaults.includes(vault);
-      return { ...r, vault: inKnown ? vault : "(root)", path: inKnown ? source.slice(slash + 1) : source };
+      const absPath = String(r.path ?? "");
+      let vault = "(root)";
+      let relPath = absPath;
+      for (const candidate of knownVaults) {
+        const marker = `/${candidate}/`;
+        const idx = absPath.indexOf(marker);
+        if (idx !== -1) {
+          vault = candidate;
+          relPath = absPath.slice(idx + marker.length);
+          break;
+        }
+      }
+      return { ...r, vault, path: relPath };
     });
     const filtered = classified.filter(
       (r) =>
