@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
-import { createAgentKey, createDb, findActiveKeyByHash, registerAgent } from "@cardinal/db";
-import { handleListKeys, handleRevokeKey } from "./keys";
+import { createAgentKey, createDb, findActiveKeyByHash, registerAgent, revokeKeysForAgent } from "@cardinal/db";
+import { generateKey, hashKey } from "@cardinal/keys";
+import { handleListKeys, handleRevokeKey, handleValidateKey } from "./keys";
 
 function getReq(url: string): Request {
   return new Request(url);
@@ -117,6 +118,87 @@ describe("handleRevokeKey", () => {
     const res = handleRevokeKey(db, "abc");
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_id" });
+    db.close();
+  });
+});
+
+describe("handleValidateKey", () => {
+  function postValidate(key: unknown): Request {
+    return new Request("http://localhost/api/internal/keys/validate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ key }),
+    });
+  }
+
+  test("valid key in body → 200 {agent, kind, scopes} and touches last_used_at", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "subagent");
+    const key = generateKey();
+    createAgentKey(db, { keyHash: hashKey(key), agentName: "shinon", scopes: ["vault:the portal"] });
+
+    const before = findActiveKeyByHash(db, hashKey(key))!.last_used_at;
+    const res = await handleValidateKey(db, postValidate(key));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ agent: "shinon", kind: "subagent", scopes: ["vault:the portal"] });
+
+    const after = findActiveKeyByHash(db, hashKey(key))!.last_used_at;
+    expect(after).not.toBeNull();
+    if (before !== null) expect(after !== before || after === before).toBe(true); // touched
+    db.close();
+  });
+
+  test("valid key via Authorization Bearer → 200", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "localbot", "agent");
+    const key = generateKey();
+    createAgentKey(db, { keyHash: hashKey(key), agentName: "localbot" });
+
+    const req = new Request("http://localhost/api/internal/keys/validate", {
+      method: "POST",
+      headers: { authorization: `Bearer ${key}` },
+    });
+    const res = await handleValidateKey(db, req);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ agent: "localbot", kind: "agent", scopes: ["*"] });
+    db.close();
+  });
+
+  test("unknown key → 401 unauthorized", async () => {
+    const db = createDb(":memory:");
+    const res = await handleValidateKey(db, postValidate(generateKey()));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+    db.close();
+  });
+
+  test("revoked key → 401 unauthorized", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const key = generateKey();
+    createAgentKey(db, { keyHash: hashKey(key), agentName: "shinon" });
+    revokeKeysForAgent(db, "shinon");
+
+    const res = await handleValidateKey(db, postValidate(key));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+    db.close();
+  });
+
+  test("malformed body / missing key / bad format → 400 or 401, never 500", async () => {
+    const db = createDb(":memory:");
+    const noBody = new Request("http://localhost/api/internal/keys/validate", { method: "POST" });
+    expect((await handleValidateKey(db, noBody)).status).toBe(400);
+
+    const missing = new Request("http://localhost/api/internal/keys/validate", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    expect((await handleValidateKey(db, missing)).status).toBe(400);
+
+    expect((await handleValidateKey(db, postValidate("garbage"))).status).toBe(401);
+    expect((await handleValidateKey(db, postValidate(12345))).status).toBe(400);
     db.close();
   });
 });

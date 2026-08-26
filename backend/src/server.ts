@@ -21,7 +21,7 @@ import {
 } from "./api/tasks";
 import { handleInbox, handleMarkRead, handleSendMessage } from "./api/messages";
 import { handleSystem } from "./api/system";
-import { handleListKeys, handleRevokeKey } from "./api/keys";
+import { handleListKeys, handleRevokeKey, handleValidateKey } from "./api/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -47,6 +47,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/health") return handleHealth();
+
+      // Service-to-service: valida agent keys sin JWT de dashboard. Solo responde
+      // si la key es válida (401 si no), así se protege por naturaleza.
+      if (pathname === "/api/internal/keys/validate" && method === "POST") {
+        return handleValidateKey(db, req);
+      }
 
       if (pathname === "/api/auth/login" && method === "POST") return handleLogin(req, config);
       if (pathname === "/api/auth/logout" && method === "POST") return handleLogout();

@@ -1,7 +1,15 @@
 import type { Database } from "bun:sqlite";
 import type { AgentKeyRow } from "@cardinal/core";
 import { json } from "@cardinal/core";
-import { getKeyById, listHumanKeys, revokeKeyById } from "@cardinal/db";
+import {
+  findActiveKeyByHash,
+  getAgent,
+  getKeyById,
+  listHumanKeys,
+  revokeKeyById,
+  touchKey,
+} from "@cardinal/db";
+import { hashKey, isKeyFormat } from "@cardinal/keys";
 
 export interface KeyItem {
   id: number;
@@ -59,4 +67,47 @@ export function handleRevokeKey(db: Database, idRaw: string): Response {
   const row = revokeKeyById(db, id);
   if (row === null) return json({ error: "not_found" }, 404);
   return json({ key: toKeyItem(row) });
+}
+
+function parseScopes(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((s) => typeof s === "string")) {
+      return parsed;
+    }
+  } catch {
+    // fall through
+  }
+  return [];
+}
+
+export async function handleValidateKey(db: Database, req: Request): Promise<Response> {
+  // La key puede venir en el body (JSON) o como Authorization Bearer.
+  let key: unknown;
+  const auth = req.headers.get("authorization");
+  if (auth !== null && auth.startsWith("Bearer ")) {
+    key = auth.slice("Bearer ".length).trim();
+  } else {
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: "bad_request" }, 400);
+    }
+    if (body === null || typeof body !== "object") return json({ error: "bad_request" }, 400);
+    key = (body as Record<string, unknown>).key;
+  }
+
+  if (typeof key !== "string") return json({ error: "bad_request" }, 400);
+  if (!isKeyFormat(key)) return json({ error: "unauthorized" }, 401);
+
+  const row = findActiveKeyByHash(db, hashKey(key));
+  if (row === null) return json({ error: "unauthorized" }, 401);
+
+  touchKey(db, row.id);
+  return json({
+    agent: row.agent_name,
+    kind: row.kind_override ?? getAgent(db, row.agent_name)?.kind ?? "agent",
+    scopes: parseScopes(row.scopes),
+  });
 }

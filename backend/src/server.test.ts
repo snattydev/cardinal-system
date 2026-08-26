@@ -87,6 +87,23 @@ test("POST /v1/chat/completions without Bearer returns 401", async () => {
   expect(await res.json()).toEqual({ error: "unauthorized" });
 });
 
+test("POST /api/internal/keys/validate: valid key → agent info, invalid → 401", async () => {
+  const ok = await fetch(`http://localhost:${port}/api/internal/keys/validate`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ agent: "shinon", kind: "agent", scopes: ["*"] });
+
+  const bad = await fetch(`http://localhost:${port}/api/internal/keys/validate`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ key: generateKey() }),
+  });
+  expect(bad.status).toBe(401);
+  expect(await bad.json()).toEqual({ error: "unauthorized" });
+});
+
 test("GET /v1/models returns OpenAI list format", async () => {
   const res = await fetch(`http://localhost:${port}/v1/models`);
   expect(res.status).toBe(200);
