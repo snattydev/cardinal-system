@@ -22,6 +22,9 @@ import {
 import { handleInbox, handleMarkRead, handleSendMessage } from "./api/messages";
 import { handleSystem } from "./api/system";
 import { handleListKeys, handleRevokeKey, handleValidateKey } from "./api/keys";
+import { extractBearerKey } from "./api/router";
+import { findActiveKeyByHash } from "@cardinal/db";
+import { hashKey } from "@cardinal/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -176,8 +179,14 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/rag/search" && method === "POST") {
+        // Dashboard (JWT) o servicio interno con agent key (cardinal-mcp).
         const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!user) {
+          const svcKey = extractBearerKey(req);
+          const keyRow =
+            svcKey !== null ? findActiveKeyByHash(db, hashKey(svcKey)) : null;
+          if (!keyRow) return json({ error: "unauthorized" }, 401);
+        }
         return handleRagSearch(db, req);
       }
 
