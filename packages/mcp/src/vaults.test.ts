@@ -1,7 +1,7 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { createVaultTools, makeListVaultFiles, makeReadVaultFile } from "./vaults";
+import { makeListVaultFiles, makeReadVaultFile } from "./vaults";
 
 const ROOT = join(import.meta.dir, ".tmp-vaults-test");
 

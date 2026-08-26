@@ -1,7 +1,10 @@
 import type { KeyIdentity } from "./auth";
 
+/** Firma mínima de fetch, inyectable para tests (el fetch de Bun tiene extras). */
+export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Response>;
+
 export interface ValidatorOptions {
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
   /** TTL de la cache en memoria (default 60s). */
   ttlMs?: number;
   /** Inyectable para tests. */
