@@ -3,16 +3,30 @@ import { createMcpServer } from "./server";
 
 const VAULTS = ["the portal", "for-my-agents"] as const;
 
+interface FakeTask {
+  id: string;
+  goal: string;
+  status: string;
+  created_by: string;
+  assigned_to: string | null;
+  summary: string | null;
+  artifact_ref: string | null;
+  parent_id: string | null;
+}
+
 interface FakeBackendState {
   validKeys: Map<string, { agent: string; kind: string; scopes: string[] }>;
   searchResults?: unknown;
+  tasks: FakeTask[];
 }
 
 function makeDeps(state: FakeBackendState) {
   const fetchImpl = (async (url: any, init?: any): Promise<Response> => {
     const urlStr = String(url);
+    const method = String(init?.method ?? "GET").toUpperCase();
+    const auth = (init?.headers as Record<string, string>)?.authorization ?? "";
+
     if (urlStr.endsWith("/api/internal/keys/validate")) {
-      const auth = (init?.headers as Record<string, string>)?.authorization ?? "";
       const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
       const id = state.validKeys.get(key);
       if (!id) return Response.json({ error: "unauthorized" }, { status: 401 });
@@ -21,9 +35,52 @@ function makeDeps(state: FakeBackendState) {
     if (urlStr.includes("/api/rag/search")) {
       return Response.json({ results: state.searchResults ?? [] });
     }
+
+    // Board API stubs (agent Bearer auth is assumed already accepted by backend).
+    const tasksUrl = new URL(urlStr, "http://backend:8787");
+    if (tasksUrl.pathname === "/api/tasks" && method === "GET") {
+      const status = tasksUrl.searchParams.get("status");
+      const tasks = status ? state.tasks.filter((t) => t.status === status) : state.tasks;
+      return Response.json({ tasks });
+    }
+    if (tasksUrl.pathname === "/api/tasks" && method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      const task: FakeTask = {
+        id: crypto.randomUUID(),
+        goal: String(body.goal ?? ""),
+        status: "open",
+        created_by: typeof body.created_by === "string" ? body.created_by : "system",
+        assigned_to: null,
+        summary: null,
+        artifact_ref: null,
+        parent_id: typeof body.parent_id === "string" ? body.parent_id : null,
+      };
+      state.tasks.push(task);
+      return Response.json({ task });
+    }
+    const claimMatch = tasksUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
+    if (claimMatch && method === "PUT") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      const task = state.tasks.find((t) => t.id === decodeURIComponent(claimMatch[1]!));
+      if (!task) return Response.json({ error: "not_found" }, { status: 404 });
+      if (task.status !== "open") return Response.json({ error: "not_open" }, { status: 409 });
+      task.status = "claimed";
+      task.assigned_to = String(body.by ?? "");
+      return Response.json({ task });
+    }
+    const completeMatch = tasksUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
+    if (completeMatch && method === "PUT") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      const task = state.tasks.find((t) => t.id === decodeURIComponent(completeMatch[1]!));
+      if (!task) return Response.json({ error: "not_found" }, { status: 404 });
+      task.status = "done";
+      task.summary = typeof body.summary === "string" ? body.summary : null;
+      task.artifact_ref = typeof body.artifact_ref === "string" ? body.artifact_ref : null;
+      return Response.json({ task });
+    }
+
     return new Response("not found", { status: 404 });
   }) as typeof fetch;
-
   const server = createMcpServer({
     backendUrl: "http://backend:8787",
     vaultsRoot: "/nonexistent",
@@ -63,6 +120,7 @@ function makeState(): FakeBackendState {
       [KEY_OK, { agent: "shinon", kind: "agent", scopes: ["*"] }],
       [KEY_SCOPED, { agent: "writer", kind: "agent", scopes: ["vault:the portal"] }],
     ]),
+    tasks: [],
   };
 }
 
@@ -108,11 +166,97 @@ describe("MCP server /mcp", () => {
     expect(await res.text()).toBe("");
   });
 
-  test("key con * ve las tres tools en tools/list", async () => {
+  test("key con * ve memory + board tools en tools/list", async () => {
     const { rpcJson } = makeDeps(makeState());
     const { json } = await rpcJson(KEY_OK, { jsonrpc: "2.0", id: 2, method: "tools/list" });
     const names = json.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual(["cardinal_list_memory", "cardinal_read_memory", "cardinal_search_memory"]);
+    expect(names).toEqual([
+      "cardinal_list_memory",
+      "cardinal_read_memory",
+      "cardinal_search_memory",
+      "cardinal_task_claim",
+      "cardinal_task_complete",
+      "cardinal_task_create",
+      "cardinal_task_list",
+    ]);
+  });
+
+  test("key sin vaults sigue viendo board tools", async () => {
+    const state = makeState();
+    state.validKeys.set("sk-cardinal-novault", {
+      agent: "worker",
+      kind: "agent",
+      scopes: ["fast"],
+    });
+    const { rpcJson } = makeDeps(state);
+    const { json } = await rpcJson("sk-cardinal-novault", {
+      jsonrpc: "2.0",
+      id: 20,
+      method: "tools/list",
+    });
+    const names = json.result.tools.map((t: any) => t.name).sort();
+    expect(names).toEqual([
+      "cardinal_task_claim",
+      "cardinal_task_complete",
+      "cardinal_task_create",
+      "cardinal_task_list",
+    ]);
+  });
+
+  test("cardinal_task_create/list/claim/complete proxyea al backend", async () => {
+    const state = makeState();
+    const { rpcJson } = makeDeps(state);
+
+    const created = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 21,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_create",
+        arguments: { goal: "ship board mcp", parent_id: null },
+      },
+    });
+    expect(created.json.result.isError).toBeUndefined();
+    const createdTask = JSON.parse(created.json.result.content[0].text).task;
+    expect(createdTask.goal).toBe("ship board mcp");
+    expect(createdTask.status).toBe("open");
+    expect(createdTask.created_by).toBe("shinon");
+
+    const listed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 22,
+      method: "tools/call",
+      params: { name: "cardinal_task_list", arguments: { status: "open" } },
+    });
+    const openTasks = JSON.parse(listed.json.result.content[0].text).tasks;
+    expect(openTasks.some((t: any) => t.id === createdTask.id)).toBe(true);
+
+    const claimed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 23,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_claim",
+        arguments: { id: createdTask.id },
+      },
+    });
+    const claimedTask = JSON.parse(claimed.json.result.content[0].text).task;
+    expect(claimedTask.status).toBe("claimed");
+    expect(claimedTask.assigned_to).toBe("shinon");
+
+    const completed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 24,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_complete",
+        arguments: { id: createdTask.id, summary: "board tools live", artifact_ref: "docs/x.md" },
+      },
+    });
+    const doneTask = JSON.parse(completed.json.result.content[0].text).task;
+    expect(doneTask.status).toBe("done");
+    expect(doneTask.summary).toBe("board tools live");
+    expect(doneTask.artifact_ref).toBe("docs/x.md");
   });
 
   test("ping → result vacío", async () => {

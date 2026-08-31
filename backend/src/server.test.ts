@@ -306,3 +306,72 @@ test("GET /api/keys and POST /api/keys/:id/revoke require a session cookie", asy
   const body = (await res.json()) as { keys: unknown[] };
   expect(Array.isArray(body.keys)).toBe(true);
 });
+
+test("POST /api/tasks accepts JWT session or agent Bearer key", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ goal: "anon should fail" }),
+  });
+  expect(anon.status).toBe(401);
+
+  const cookie = await login();
+  const viaJwt = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ goal: "from dashboard" }),
+  });
+  expect(viaJwt.status).toBe(200);
+  const jwtBody = (await viaJwt.json()) as { task: { id: string; goal: string; status: string } };
+  expect(jwtBody.task.goal).toBe("from dashboard");
+  expect(jwtBody.task.status).toBe("open");
+
+  const viaKey = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ goal: "from agent key" }),
+  });
+  expect(viaKey.status).toBe(200);
+  const keyBody = (await viaKey.json()) as { task: { id: string; goal: string; created_by: string } };
+  expect(keyBody.task.goal).toBe("from agent key");
+  // Agent callers may omit created_by; backend defaults to "system" unless body sets it.
+  expect(typeof keyBody.task.created_by).toBe("string");
+
+  const listViaKey = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(listViaKey.status).toBe(200);
+  const listed = (await listViaKey.json()) as { tasks: Array<{ id: string }> };
+  expect(listed.tasks.some((t) => t.id === keyBody.task.id)).toBe(true);
+
+  const claim = await fetch(`http://localhost:${port}/api/tasks/${keyBody.task.id}/claim`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ by: "shinon" }),
+  });
+  expect(claim.status).toBe(200);
+  expect(((await claim.json()) as { task: { status: string; assigned_to: string } }).task).toMatchObject({
+    status: "claimed",
+    assigned_to: "shinon",
+  });
+
+  const complete = await fetch(`http://localhost:${port}/api/tasks/${keyBody.task.id}/complete`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ summary: "done via key" }),
+  });
+  expect(complete.status).toBe(200);
+  expect(((await complete.json()) as { task: { status: string; summary: string } }).task).toMatchObject({
+    status: "done",
+    summary: "done via key",
+  });
+});

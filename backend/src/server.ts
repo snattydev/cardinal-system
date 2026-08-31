@@ -31,6 +31,19 @@ import { getSessionUser } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
 import { serveStatic } from "./static";
 
+/** Dashboard JWT or active agent key. Used by board endpoints agents call via MCP. */
+async function requireDashboardOrAgentKey(
+  req: Request,
+  jwtSecret: string,
+  db: Database,
+): Promise<boolean> {
+  const user = await getSessionUser(req, jwtSecret);
+  if (user) return true;
+  const svcKey = extractBearerKey(req);
+  if (svcKey === null) return false;
+  return findActiveKeyByHash(db, hashKey(svcKey)) !== null;
+}
+
 export function createServer(config: Config, db: Database): Server<ConnData> {
   const hub = new Hub(db, { pingIntervalMs: config.pingIntervalMs });
 
@@ -191,35 +204,40 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/tasks" && method === "GET") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleListTasks(db, req);
       }
 
       if (pathname === "/api/tasks" && method === "POST") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleCreateTask(db, req, (t) => hub.broadcastTask(t));
       }
 
       const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
       if (taskClaimMatch && method === "PUT") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
       if (taskCompleteMatch && method === "PUT") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req, (t) => hub.broadcastTask(t));
       }
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
       if (taskMatch && method === "GET") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
+        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
       }
 

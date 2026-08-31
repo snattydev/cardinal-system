@@ -60,6 +60,68 @@ const LIST_TOOL: ToolDef = {
   },
 };
 
+const TASK_CREATE_TOOL: ToolDef = {
+  name: "cardinal_task_create",
+  description: "Crea una task en el blackboard de Cardinal.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      goal: { type: "string", description: "Objetivo de la task" },
+      parent_id: { type: "string", description: "ID de task padre (opcional)" },
+    },
+    required: ["goal"],
+  },
+};
+
+const TASK_LIST_TOOL: ToolDef = {
+  name: "cardinal_task_list",
+  description: "Lista tasks del blackboard (opcionalmente filtradas por status).",
+  inputSchema: {
+    type: "object",
+    properties: {
+      status: {
+        type: "string",
+        description: "Filtro de status: open | claimed | done | blocked",
+      },
+    },
+  },
+};
+
+const TASK_CLAIM_TOOL: ToolDef = {
+  name: "cardinal_task_claim",
+  description: "Claima una task open. assigned_to = agent de la key.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "ID de la task" },
+    },
+    required: ["id"],
+  },
+};
+
+const TASK_COMPLETE_TOOL: ToolDef = {
+  name: "cardinal_task_complete",
+  description: "Marca una task como done con summary y artifact_ref opcionales.",
+  inputSchema: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "ID de la task" },
+      summary: { type: "string", description: "Resumen acotado del resultado" },
+      artifact_ref: { type: "string", description: "Referencia al artefacto (path/URL)" },
+    },
+    required: ["id"],
+  },
+};
+
+const BOARD_TOOLS: ToolDef[] = [
+  TASK_CREATE_TOOL,
+  TASK_LIST_TOOL,
+  TASK_CLAIM_TOOL,
+  TASK_COMPLETE_TOOL,
+];
+
+const MEMORY_TOOLS: ToolDef[] = [SEARCH_TOOL, READ_TOOL, LIST_TOOL];
+
 function textResult(text: string, isError = false) {
   return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
 }
@@ -72,9 +134,41 @@ export function createMcpServer(options: McpServerOptions) {
   const doFetch = options.fetchImpl ?? fetch;
 
   function toolsFor(identity: KeyIdentity): ToolDef[] {
-    // Sin acceso a ninguna vault no tiene sentido exponer tools de memoria.
-    if (allowedVaults(identity.scopes, knownVaults).size === 0) return [];
-    return [SEARCH_TOOL, READ_TOOL, LIST_TOOL];
+    const tools: ToolDef[] = [...BOARD_TOOLS];
+    // Memory tools only when the key can reach at least one vault.
+    if (allowedVaults(identity.scopes, knownVaults).size > 0) {
+      tools.push(...MEMORY_TOOLS);
+    }
+    return tools;
+  }
+
+  function bearerHeaders(identityKey: string): Record<string, string> {
+    return {
+      "content-type": "application/json",
+      authorization: `Bearer ${identityKey}`,
+    };
+  }
+
+  async function backendJson(
+    identityKey: string,
+    path: string,
+    init?: { method?: string; body?: unknown },
+  ): Promise<unknown> {
+    const res = await doFetch(`${options.backendUrl}${path}`, {
+      method: init?.method ?? "GET",
+      headers: bearerHeaders(identityKey),
+      body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
+    });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        detail = await res.text();
+      } catch {
+        /* ignore */
+      }
+      throw new Error(`backend ${path} failed (${res.status})${detail ? `: ${detail}` : ""}`);
+    }
+    return res.json();
   }
 
   function assertScope(identity: KeyIdentity, vault: string): void {
@@ -154,8 +248,60 @@ export function createMcpServer(options: McpServerOptions) {
     return JSON.stringify(listing, null, 2);
   }
 
+  async function callTaskCreate(
+    identity: KeyIdentity,
+    identityKey: string,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const goal = typeof args.goal === "string" ? args.goal.trim() : "";
+    if (goal === "") throw new Error("missing goal");
+    const body: Record<string, unknown> = { goal, created_by: identity.agent };
+    if (typeof args.parent_id === "string" && args.parent_id.trim() !== "") {
+      body.parent_id = args.parent_id;
+    }
+    const data = await backendJson(identityKey, "/api/tasks", { method: "POST", body });
+    return JSON.stringify(data, null, 2);
+  }
+
+  async function callTaskList(identityKey: string, args: Record<string, unknown>): Promise<string> {
+    const qs =
+      typeof args.status === "string" && args.status.trim() !== ""
+        ? `?status=${encodeURIComponent(args.status.trim())}`
+        : "";
+    const data = await backendJson(identityKey, `/api/tasks${qs}`);
+    return JSON.stringify(data, null, 2);
+  }
+
+  async function callTaskClaim(
+    identity: KeyIdentity,
+    identityKey: string,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const id = typeof args.id === "string" ? args.id.trim() : "";
+    if (id === "") throw new Error("missing id");
+    const data = await backendJson(identityKey, `/api/tasks/${encodeURIComponent(id)}/claim`, {
+      method: "PUT",
+      body: { by: identity.agent },
+    });
+    return JSON.stringify(data, null, 2);
+  }
+
+  async function callTaskComplete(identityKey: string, args: Record<string, unknown>): Promise<string> {
+    const id = typeof args.id === "string" ? args.id.trim() : "";
+    if (id === "") throw new Error("missing id");
+    const body: Record<string, unknown> = {};
+    if (typeof args.summary === "string") body.summary = args.summary;
+    if (typeof args.artifact_ref === "string") body.artifact_ref = args.artifact_ref;
+    const data = await backendJson(identityKey, `/api/tasks/${encodeURIComponent(id)}/complete`, {
+      method: "PUT",
+      body,
+    });
+    return JSON.stringify(data, null, 2);
+  }
+
   async function dispatch(
     identity: KeyIdentity,
+    identityKey: string,
     name: string,
     args: Record<string, unknown>,
   ): Promise<string> {
@@ -166,6 +312,14 @@ export function createMcpServer(options: McpServerOptions) {
         return callRead(identity, args);
       case "cardinal_list_memory":
         return callList(identity, args);
+      case "cardinal_task_create":
+        return callTaskCreate(identity, identityKey, args);
+      case "cardinal_task_list":
+        return callTaskList(identityKey, args);
+      case "cardinal_task_claim":
+        return callTaskClaim(identity, identityKey, args);
+      case "cardinal_task_complete":
+        return callTaskComplete(identityKey, args);
       default:
         throw new Error(`unknown tool: ${name}`);
     }
@@ -173,12 +327,12 @@ export function createMcpServer(options: McpServerOptions) {
 
   class ScopeError extends Error {}
 
-  async function handleRpc(msg: any, identity: KeyIdentity): Promise<Response> {
+  async function handleRpc(msg: any, identity: KeyIdentity, identityKey: string): Promise<Response> {
     const method: string | undefined = msg.method;
     const hasId = msg.id !== undefined && msg.id !== null;
 
     if (!hasId) {
-      // Notificación: sin respuesta (pitfall conocido del protocolo).
+      // Notification: no response body (known protocol pitfall).
       return new Response(null, { status: 202 });
     }
     const id = msg.id;
@@ -205,7 +359,7 @@ export function createMcpServer(options: McpServerOptions) {
           return errorReply(-32602, "invalid params");
         }
         try {
-          const text = await dispatch(identity, name, args as Record<string, unknown>);
+          const text = await dispatch(identity, identityKey, name, args as Record<string, unknown>);
           return reply(textResult(text));
         } catch (err) {
           if (err instanceof ScopeError) {
@@ -233,12 +387,13 @@ export function createMcpServer(options: McpServerOptions) {
         return Response.json({ error: "method_not_allowed" }, { status: 405 });
       }
 
-      // Auth: Bearer key → validar contra el backend (cache TTL).
+      // Auth: Bearer key → validate against backend (TTL cache).
       const auth = req.headers.get("authorization");
       if (auth === null || !auth.startsWith("Bearer ")) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
-      const identity = await validate(auth.slice(7).trim());
+      const identityKey = auth.slice(7).trim();
+      const identity = await validate(identityKey);
       if (identity === null) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
@@ -252,7 +407,7 @@ export function createMcpServer(options: McpServerOptions) {
           { status: 200 },
         );
       }
-      return handleRpc(msg, identity);
+      return handleRpc(msg, identity, identityKey);
     },
 
     start(port = Number(process.env.PORT ?? 8789)) {
