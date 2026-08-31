@@ -1,19 +1,20 @@
 # Cardinal System — Roadmap
 
-> Actualizado: 2026-08-06. Single source of truth de prioridades.
+> Actualizado: 2026-08-31. Single source of truth de prioridades.
 
 ---
 
-## 📋 Ahora: Fase 1 — Context Store (✅ Completa — v0.2.0, 2026-08-06)
+## Ahora: Fase 2 — Cardinal v2 (🚧 en curso — v0.2.3)
 
-Pre-Fase 1 (refactors Bun workspaces) completada en PR #5 (v0.1.1).
-Ver [`roadmap/fase-1.md`](roadmap/fase-1.md) para el detalle de features.
+Fase 1 (Context Store) completa en `dev` desde v0.2.0. Fase 2 en progreso:
+blackboard + MCP hub + router/keys. Ver [`roadmap/fase-2.md`](roadmap/fase-2.md).
 
-> Nota (2026-08-10): features 1.3–1.8 mergeadas en `dev` + bump a 0.2.0. Falta PR `dev → main` con la Fase 1 completa cuando se decida estabilizar.
+Pendiente de estabilización: PR `dev → main` cuando se decida freeze (Fase 1 + 2
+parciales acumuladas en `dev`).
 
 ---
 
-## 🗺️ Fases
+## Fases
 
 | Fase | Nombre | Estado | Roadmap |
 |------|--------|--------|---------|
@@ -23,22 +24,20 @@ Ver [`roadmap/fase-1.md`](roadmap/fase-1.md) para el detalle de features.
 | 3 | Grafo de Conocimiento | 🔮 Futuro | — |
 | 4 | Automations | 🔮 Futuro | — |
 
-### Fase 2 — estado
+### Fase 2 — estado (2026-08-31)
 
-Re-scopeada por Cardinal v2 (2026-08-12): la orquestación es commodity, el
-Cardinal es cerebro (identidad + contexto + blackboard). El cuello de botella
-ya no es el VPS (webhooks); ahora es **validar los pilares con spikes** (001
-blackboard ✅, 002 MCP multi-vault, 003 pool opencode-go). Ver
-[`roadmap/fase-2.md`](roadmap/fase-2.md) y el
-[plan de backlog](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
+| Pilar | Hecho | Falta |
+|-------|-------|-------|
+| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools | mailbox MCP tools |
+| 1 MCP hub | `packages/mcp` memory + board, compose `:8789` | — |
+| 2 Pool/router | router, key factory, `/keys` UI | spike-003 pool opencode-go (opcional) |
 
-El desbloqueo por polling local de la API de GitHub (decisión 2026-08-10) sigue
-válido como alternativa para triggers externos, pero dejó de ser el cuello de
-botella de Fase 2.
+Tesis: orquestación es commodity; Cardinal es cerebro (identidad + contexto +
+blackboard); herdr/Hermes/CLIs son las manos.
 
 ---
 
-## 🎯 Arsenal
+## Arsenal
 
 | Herramienta | Hasta | Rol |
 |-------------|-------|-----|
@@ -49,7 +48,7 @@ botella de Fase 2.
 
 ---
 
-## 📐 Convenciones
+## Convenciones
 
 - **Versionado:** `MAJOR.FASE.PATCH` (source: `package.json`)
 - **Commits:** Conventional Commits (inglés ≤72 chars, body español)

@@ -1,35 +1,36 @@
 # Cardinal v2 — Backlog & Plan de Ejecución
 
 > Complementa la spec viva `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
-> Estado al momento: v0.2.1, `dev` limpio (cec1add), Fase 1 completa. Suite: 225 pass / 0 fail.
-> Re-priorizado 2026-08-20: Santi quiere el router + key pool deployados en local ANTES que mailbox/UI.
+> Estado al momento: v0.2.3 (2026-08-31). Fase 1 completa. Fase 2 avanzada en `dev`.
+> Re-priorizado 2026-08-20: router + key pool primero; luego blackboard/MCP.
 
 ## Estado actual
 
 | Pilar | Estado |
 |-------|--------|
 | 4 — Identidad (`sk-cardinal-*`) | ✅ Fase 0 |
-| 2 — Key pool + router | 🚧 EN CURSO (arquitectura cerrada 2026-08-20; GO caído → zen free es el upstream real) |
-| 3 — Blackboard | 🚧 tasks CRUD + WS broadcast (`task_update`) hechos; falta mailbox, UI, MCP tools (pospuesto) |
-| 1 — MCP multi-vault | 📋 solo diseño (spike-002 pendiente) |
+| 2 — Key pool + router | ✅ router + key factory + `/keys` UI (v0.2.2) |
+| 3 — Blackboard | 🚧 tasks CRUD + WS + mailbox API + UI `/tasks` + MCP board tools; falta mailbox MCP |
+| 1 — MCP multi-vault | ✅ memory tools + board tools (`packages/mcp`, compose `:8789`) |
 
 ## Backlog (orden nuevo)
 
 | # | Item | Tipo | TDD | Depende de |
 |---|------|------|-----|-----------|
-| 6 | LLM Router: `providers`/`provider_models`/`model_routes` + `/v1/chat/completions` + fallback chain + SSE + autorouter | feature | Sí (router) | — |
-| 7 | Key Factory: `agent_keys` scopes + `budget_limit` + keys auto-revocables + metering | feature | Sí (keys) | — |
+| 6 | ✅ LLM Router provider-agnostic | feature | Sí | — |
+| 7 | ✅ Key Factory scopes + budget + encryption | feature | Sí | — |
 | 5 | Seed providers/routes + e2e con zen free real | spike/e2e | — | 6, 7 |
-| 1 | Mailbox `messages` — handoff directo agente↔agente | feature | Sí (DB) | — |
-| 2 | UI del board — página Tasks | frontend | No (build) | — |
-| 3 | MCP tools del blackboard (`task_create/list/claim/complete`) | feature | Sí | spike-002 |
-| 4 | Spike-002 — MCP multi-vault (`search_vaults` con origen + token budget) | spike | — | — |
-| 8 | Fix typecheck roto (`maxPayloadLength` vs `bun-types`) | fix | — | — |
-| 9 | Docs stale — `roadmap/fase-2.md`, `roadmap.md`, `AGENTS.md` | docs | — | — |
-| 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router | release | — | todos |
+| 1 | ✅ Mailbox `messages` API (handoff agente↔agente) | feature | Sí | — |
+| 2 | ✅ UI del board — página `/tasks` | frontend | No | — |
+| 3 | ✅ MCP board tools + dual-auth `/api/tasks` (2026-08-31) | feature | Sí | MCP hub |
+| 4 | ✅ MCP multi-vault memory tools (`packages/mcp`) | feature | Sí | — |
+| 8 | ✅ Fix typecheck `maxPayloadLength` | fix | — | — |
+| 9 | Docs stale — refresh (2026-08-31 partial) | docs | — | — |
+| 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router + MCP | release | — | todos |
 | 11 | Bootstrap admin password **sin el modelo** (TTY `read -s` → solo hash en env/secret) | security / deploy | — | **blocker cloud** |
-| 12 | ✅ Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí (keys API) | — |
-| 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar (rastro en log del one-shot, no en historial) | feature | Sí | pipeline one-shot |
+| 12 | ✅ Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí | — |
+| 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar | feature | Sí | pipeline one-shot |
+| 14 | MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` | feature | Sí | 1, 3 |
 
 ## Decisiones
 
