@@ -1,0 +1,21 @@
+{
+  "name": "Cardinal System",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "backend",
+      "command": "bash .cursor/start.sh && bun run dev:backend",
+      "description": "Ensure .env exists, then start the Bun API + WebSocket server on http://localhost:8787 (hot reload)."
+    },
+    {
+      "name": "frontend",
+      "command": "VITE_HOST=0.0.0.0 bun run dev:frontend",
+      "description": "Vite dev server on http://localhost:5173, proxying /api and /ws to the backend. Bound to 0.0.0.0 so 127.0.0.1 and the VM host can reach it."
+    }
+  ],
+  "ports": [
+    { "name": "backend", "port": 8787 },
+    { "name": "frontend", "port": 5173 }
+  ]
+}
