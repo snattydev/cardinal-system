@@ -1,17 +1,18 @@
 # Cardinal v2 — Backlog & Plan de Ejecución
 
 > Complementa la spec viva `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
-> Estado al momento: v0.2.3 (2026-08-31). Fase 1 completa. Fase 2 avanzada en `dev`.
+> Estado al momento: v0.2.5 (2026-09-03). Fase 1 completa. Fase 2 avanzada en `dev`.
 > Re-priorizado 2026-08-20: router + key pool primero; luego blackboard/MCP.
+> Superficie router 2026-09-03: dashboard `/router` + key create/limits + fusion.
 
 ## Estado actual
 
 | Pilar | Estado |
 |-------|--------|
 | 4 — Identidad (`sk-cardinal-*`) | ✅ Fase 0 |
-| 2 — Key pool + router | ✅ router + key factory + `/keys` UI (v0.2.2) |
-| 3 — Blackboard | 🚧 tasks CRUD + WS + mailbox API + UI `/tasks` + MCP board tools; falta mailbox MCP |
-| 1 — MCP multi-vault | ✅ memory tools + board tools (`packages/mcp`, compose `:8789`) |
+| 2 — Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA (v0.2.5) |
+| 3 — Blackboard | ✅ tasks CRUD + WS + mailbox API + UI `/tasks` + MCP board + MCP mailbox |
+| 1 — MCP multi-vault | ✅ memory + board + mailbox tools (`packages/mcp`, compose `:8789`) |
 
 ## Backlog (orden nuevo)
 
@@ -25,12 +26,15 @@
 | 3 | ✅ MCP board tools + dual-auth `/api/tasks` (2026-08-31) | feature | Sí | MCP hub |
 | 4 | ✅ MCP multi-vault memory tools (`packages/mcp`) | feature | Sí | — |
 | 8 | ✅ Fix typecheck `maxPayloadLength` | fix | — | — |
-| 9 | Docs stale — refresh (2026-08-31 partial) | docs | — | — |
+| 9 | ✅ Docs stale — refresh (2026-08-31 + 2026-09-03 superficie router) | docs | — | — |
 | 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router + MCP | release | — | todos |
 | 11 | Bootstrap admin password **sin el modelo** (TTY `read -s` → solo hash en env/secret) | security / deploy | — | **blocker cloud** |
 | 12 | ✅ Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí | — |
 | 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar | feature | Sí | pipeline one-shot |
-| 14 | MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` | feature | Sí | 1, 3 |
+| 14 | ✅ MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` (2026-08-31) | feature | Sí | 1, 3 |
+| 15 | ✅ Dashboard JWT `/router` + API providers/routes (2026-09-03) | feature | Sí | 6 |
+| 16 | ✅ `POST /api/keys` create + expiry + tope USD (2026-09-03) | feature | Sí | 7, 12 |
+| 17 | ✅ Fusion / MoA (`model=fusion`, judge synthesize) (2026-09-03) | feature | Sí | 6 |
 
 ## Decisiones
 
@@ -79,9 +83,10 @@
 - Verificación: `bun run typecheck` verde (backend + frontend).
 
 ### 9 — Docs stale
-- `docs/roadmap/fase-2.md` → reescribir según re-scope de Cardinal v2.
-- `docs/roadmap.md` y `AGENTS.md` → actualizar "Estado actual".
-- Verificación: lectura humana + `git diff`.
+- ✅ Refresh 2026-08-31 (Fase 2 re-scope) y 2026-09-03 (superficie router:
+  [`2026-09-03-router-surface.md`](../../features/2026-09-03-router-surface.md)).
+- `docs/roadmap.md`, `fase-2.md`, `AGENTS.md`, README, backlog, manual
+  `docs/guides/router-usage.md`.
 
 ### 1 — Mailbox `messages`
 - Tabla `messages` (id, from_agent, to_agent, type, payload_ref, read, created_at)
@@ -118,10 +123,10 @@
 - Ver `docs/security.md` § "Bootstrap de password admin".
 
 ### 12 — Keys dashboard (listar + revocar persistentes)
-- ✅ Implementado el 2026-08-21.
-- Spec: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md).
-- Página `/keys`, JWT, sin plaintext. Historial human-revoked detrás de icono log.
-- Crear sigue en CLI. TDD en API keys.
+- ✅ Implementado el 2026-08-21. Create + expiry + USD: item **16** (2026-09-03).
+- Spec original: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md)
+  (create era CLI-only; eso quedó obsoleto).
+- Página `/keys`, JWT. Historial human-revoked detrás de icono log.
 
 ### 13 — One-shot keys (diferido)
 - Bloque compacto abajo a la izquierda en `/keys` para `created_by=system` vivas.
@@ -129,7 +134,33 @@
   agente, no en el historial de `/keys`.
 - Depende del pipeline one-shot. Detalle en spec §6.
 
+### 14 — MCP mailbox tools + dual-auth `/api/messages`
+- ✅ Implementado el 2026-08-31. Doc:
+  [`2026-08-31-mcp-mailbox-tools.md`](../../features/2026-08-31-mcp-mailbox-tools.md).
+- Tools `cardinal_agent_send` / `cardinal_agent_inbox` (siempre listadas). Dual-auth
+  JWT o agent key; la key no spoofea `from_agent`, no lee inbox ajeno, no mark-read
+  de otro mailbox.
+
+### 15 — Dashboard JWT `/router`
+- ✅ 2026-09-03. Doc: [`2026-09-03-router-dashboard.md`](../../features/2026-09-03-router-dashboard.md).
+- `GET/PATCH /api/router/providers`, `GET/PUT /api/router/routes`. UI `/router`
+  read-only (tablas SAO). No Fusion editor.
+
+### 16 — Key create + expiry + USD
+- ✅ 2026-09-03. Doc: [`2026-09-03-key-create-limits.md`](../../features/2026-09-03-key-create-limits.md).
+- `POST /api/keys` JWT; form en `/keys`; plaintext una vez. Router: expiry →
+  unauthorized; USD ≥ limit → 402.
+
+### 17 — Fusion / MoA
+- ✅ 2026-09-03. Doc: [`2026-09-03-router-fusion.md`](../../features/2026-09-03-router-fusion.md).
+- `fallback_chain` objeto `{mode:fusion, panel, judge}`. v1: `synthesize`, no
+  stream. Seed por SQL (`upsertModelRoute` sigue siendo arrays).
+
 ## Próximo paso
 
-Router + key factory y el dashboard de keys ya están en `dev`. El item 13 sigue
-diferido hasta que exista el pipeline one-shot; no implementarlo todavía.
+Superficie router (15–17) y mailbox MCP (14) están en el working tree (`dev`).
+Siguiente: item **5** (seed providers/routes + e2e zen free), item **11**
+(bootstrap admin password TTY, blocker cloud), item **10** (PR `dev→main`
+cuando se freeze). Follow-ups de 15–17 (no ahora): UI mutar cadenas, mostrar
+Fusion en `/router`, USD hop-level en Fusion. El item 13 sigue diferido hasta
+el pipeline one-shot; **no implementarlo**.

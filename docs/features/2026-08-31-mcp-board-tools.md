@@ -20,7 +20,7 @@ Cardinal v2 MCP surface (spec 2026-08-12) lists board tools after the multi-vaul
 
 ## Out of scope (follow-ups)
 
-- Mailbox MCP tools (`agent_send` / `agent_inbox`) — same dual-auth pattern on `/api/messages`
+- ~~Mailbox MCP tools (`agent_send` / `agent_inbox`) — same dual-auth pattern on `/api/messages`~~ **Hecho** — [`2026-08-31-mcp-mailbox-tools.md`](./2026-08-31-mcp-mailbox-tools.md)
 - `task_comment` / `task_get` if needed later
 - Scope narrowing for board (e.g. `board` scope) — any active key can use tasks for now
 

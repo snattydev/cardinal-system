@@ -14,10 +14,20 @@ interface FakeTask {
   parent_id: string | null;
 }
 
+interface FakeMessage {
+  id: string;
+  from_agent: string;
+  to_agent: string;
+  type: string;
+  payload_ref: string | null;
+  read: number;
+}
+
 interface FakeBackendState {
   validKeys: Map<string, { agent: string; kind: string; scopes: string[] }>;
   searchResults?: unknown;
   tasks: FakeTask[];
+  messages: FakeMessage[];
 }
 
 function makeDeps(state: FakeBackendState) {
@@ -79,6 +89,29 @@ function makeDeps(state: FakeBackendState) {
       return Response.json({ task });
     }
 
+    const messagesUrl = new URL(urlStr, "http://backend:8787");
+    if (messagesUrl.pathname === "/api/messages" && method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      const message: FakeMessage = {
+        id: crypto.randomUUID(),
+        from_agent: String(body.from_agent ?? ""),
+        to_agent: String(body.to_agent ?? ""),
+        type: String(body.type ?? ""),
+        payload_ref: typeof body.payload_ref === "string" ? body.payload_ref : null,
+        read: 0,
+      };
+      state.messages.push(message);
+      return Response.json({ message });
+    }
+    if (messagesUrl.pathname === "/api/messages" && method === "GET") {
+      const toAgent = messagesUrl.searchParams.get("to_agent");
+      if (!toAgent) {
+        return Response.json({ error: "missing_to_agent" }, { status: 400 });
+      }
+      const messages = state.messages.filter((m) => m.to_agent === toAgent);
+      return Response.json({ messages });
+    }
+
     return new Response("not found", { status: 404 });
   }) as typeof fetch;
   const server = createMcpServer({
@@ -121,6 +154,7 @@ function makeState(): FakeBackendState {
       [KEY_SCOPED, { agent: "writer", kind: "agent", scopes: ["vault:the portal"] }],
     ]),
     tasks: [],
+    messages: [],
   };
 }
 
@@ -171,6 +205,8 @@ describe("MCP server /mcp", () => {
     const { json } = await rpcJson(KEY_OK, { jsonrpc: "2.0", id: 2, method: "tools/list" });
     const names = json.result.tools.map((t: any) => t.name).sort();
     expect(names).toEqual([
+      "cardinal_agent_inbox",
+      "cardinal_agent_send",
       "cardinal_list_memory",
       "cardinal_read_memory",
       "cardinal_search_memory",
@@ -196,6 +232,8 @@ describe("MCP server /mcp", () => {
     });
     const names = json.result.tools.map((t: any) => t.name).sort();
     expect(names).toEqual([
+      "cardinal_agent_inbox",
+      "cardinal_agent_send",
       "cardinal_task_claim",
       "cardinal_task_complete",
       "cardinal_task_create",
@@ -257,6 +295,52 @@ describe("MCP server /mcp", () => {
     expect(doneTask.status).toBe("done");
     expect(doneTask.summary).toBe("board tools live");
     expect(doneTask.artifact_ref).toBe("docs/x.md");
+  });
+
+  test("cardinal_agent_send/inbox proxyea al backend", async () => {
+    const state = makeState();
+    const { rpcJson } = makeDeps(state);
+
+    const sent = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 25,
+      method: "tools/call",
+      params: {
+        name: "cardinal_agent_send",
+        arguments: { to_agent: "shinon", type: "handoff", payload_ref: "notes/x.md" },
+      },
+    });
+    expect(sent.json.result.isError).toBeUndefined();
+    const message = JSON.parse(sent.json.result.content[0].text).message;
+    expect(message.from_agent).toBe("shinon");
+    expect(message.to_agent).toBe("shinon");
+    expect(message.type).toBe("handoff");
+    expect(message.payload_ref).toBe("notes/x.md");
+    expect(message.read).toBe(0);
+
+    const other = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 26,
+      method: "tools/call",
+      params: {
+        name: "cardinal_agent_send",
+        arguments: { to_agent: "kirito", type: "other" },
+      },
+    });
+    expect(other.json.result.isError).toBeUndefined();
+    const otherMessage = JSON.parse(other.json.result.content[0].text).message;
+    expect(otherMessage.to_agent).toBe("kirito");
+
+    const inbox = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 27,
+      method: "tools/call",
+      params: { name: "cardinal_agent_inbox", arguments: {} },
+    });
+    expect(inbox.json.result.isError).toBeUndefined();
+    const listed = JSON.parse(inbox.json.result.content[0].text).messages;
+    expect(listed.some((m: { id: string }) => m.id === message.id)).toBe(true);
+    expect(listed.some((m: { id: string }) => m.id === otherMessage.id)).toBe(false);
   });
 
   test("ping → result vacío", async () => {

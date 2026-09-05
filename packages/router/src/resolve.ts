@@ -10,6 +10,7 @@ export interface ResolvedHop {
   apiKeyEnc: string | null;
   wireFormat: string;
   modelId: string;
+  costPerMtok: number;
 }
 
 function isUsableProvider(provider: ProviderRow): boolean {
@@ -42,6 +43,7 @@ function toHop(provider: ProviderRow, modelId: string): ResolvedHop {
     apiKeyEnc: provider.api_key_enc,
     wireFormat: provider.wire_format,
     modelId,
+    costPerMtok: provider.cost_per_mtok ?? 0,
   };
 }
 
@@ -52,6 +54,7 @@ interface AutorouterRow {
   api_key_enc: string | null;
   wire_format: string;
   model_id: string;
+  cost_per_mtok: number;
 }
 
 export async function resolveModelChain(db: Database, model: string): Promise<ResolvedHop[]> {
@@ -70,7 +73,7 @@ export async function resolveModelChain(db: Database, model: string): Promise<Re
   const rows = db
     .query(
       `SELECT p.id AS provider_id, p.name AS provider_name, p.base_url, p.api_key_enc,
-              p.wire_format, pm.model_id
+              p.wire_format, p.cost_per_mtok, pm.model_id
        FROM provider_models pm
        JOIN providers p ON p.id = pm.provider_id
        WHERE pm.model_id = ? AND p.status = 'active' AND length(p.base_url) > 0
@@ -85,6 +88,7 @@ export async function resolveModelChain(db: Database, model: string): Promise<Re
     apiKeyEnc: row.api_key_enc,
     wireFormat: row.wire_format,
     modelId: row.model_id,
+    costPerMtok: row.cost_per_mtok ?? 0,
   }));
 
   if (chain.length === 0) throw new RouterError("model_not_found");

@@ -35,7 +35,12 @@ export default function Settings() {
       </Section>
 
       <Section title="MODEL ROUTER">
-        <p className="font-mono text-xs italic text-slate-600">coming in Fase 2</p>
+        <Link
+          to="/router"
+          className="font-mono text-xs text-sao-accent transition-colors hover:text-white"
+        >
+          open router →
+        </Link>
       </Section>
 
       <p className="font-mono text-xs text-slate-600">

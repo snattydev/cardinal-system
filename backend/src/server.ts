@@ -21,27 +21,37 @@ import {
 } from "./api/tasks";
 import { handleInbox, handleMarkRead, handleSendMessage } from "./api/messages";
 import { handleSystem } from "./api/system";
-import { handleListKeys, handleRevokeKey, handleValidateKey } from "./api/keys";
+import { handleCreateKey, handleListKeys, handleRevokeKey, handleValidateKey } from "./api/keys";
 import { extractBearerKey } from "./api/router";
 import { findActiveKeyByHash } from "@cardinal/db";
 import { hashKey } from "@cardinal/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
+import {
+  handleListRouterProviders,
+  handleListRouterRoutes,
+  handlePatchRouterProvider,
+  handlePutRouterRoute,
+} from "./api/router-dashboard";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
 import { serveStatic } from "./static";
+
+type DashboardOrAgent = { kind: "dashboard" } | { kind: "agent"; agent: string };
 
 /** Dashboard JWT or active agent key. Used by board endpoints agents call via MCP. */
 async function requireDashboardOrAgentKey(
   req: Request,
   jwtSecret: string,
   db: Database,
-): Promise<boolean> {
+): Promise<DashboardOrAgent | null> {
   const user = await getSessionUser(req, jwtSecret);
-  if (user) return true;
+  if (user) return { kind: "dashboard" };
   const svcKey = extractBearerKey(req);
-  if (svcKey === null) return false;
-  return findActiveKeyByHash(db, hashKey(svcKey)) !== null;
+  if (svcKey === null) return null;
+  const keyRow = findActiveKeyByHash(db, hashKey(svcKey));
+  if (keyRow === null) return null;
+  return { kind: "agent", agent: keyRow.agent_name };
 }
 
 export function createServer(config: Config, db: Database): Server<ConnData> {
@@ -132,6 +142,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         return handleListKeys(db, req);
       }
 
+      if (pathname === "/api/keys" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleCreateKey(db, req);
+      }
+
       const keyRevokeMatch = pathname.match(/^\/api\/keys\/([^/]+)\/revoke$/);
       if (keyRevokeMatch && method === "POST") {
         const user = await getSessionUser(req, config.jwtSecret);
@@ -204,14 +220,14 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/tasks" && method === "GET") {
-        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
           return json({ error: "unauthorized" }, 401);
         }
         return handleListTasks(db, req);
       }
 
       if (pathname === "/api/tasks" && method === "POST") {
-        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
           return json({ error: "unauthorized" }, 401);
         }
         return handleCreateTask(db, req, (t) => hub.broadcastTask(t));
@@ -219,7 +235,7 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
       const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
       if (taskClaimMatch && method === "PUT") {
-        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
           return json({ error: "unauthorized" }, 401);
         }
         return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t));
@@ -227,7 +243,7 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
       const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
       if (taskCompleteMatch && method === "PUT") {
-        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
           return json({ error: "unauthorized" }, 401);
         }
         return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req, (t) => hub.broadcastTask(t));
@@ -235,30 +251,45 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
       if (taskMatch && method === "GET") {
-        if (!(await requireDashboardOrAgentKey(req, config.jwtSecret, db))) {
+        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
           return json({ error: "unauthorized" }, 401);
         }
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
       }
 
       if (pathname === "/api/messages" && method === "GET") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
-        return handleInbox(db, req);
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) {
+          return json({ error: "unauthorized" }, 401);
+        }
+        return handleInbox(db, req, auth.kind === "agent" ? auth.agent : undefined);
       }
 
       if (pathname === "/api/messages" && method === "POST") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
-        return handleSendMessage(db, req, (m) => hub.broadcastMessage(m));
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) {
+          return json({ error: "unauthorized" }, 401);
+        }
+        return handleSendMessage(
+          db,
+          req,
+          (m) => hub.broadcastMessage(m),
+          auth.kind === "agent" ? auth.agent : undefined,
+        );
       }
 
       const messageReadMatch = pathname.match(/^\/api\/messages\/([^/]+)\/read$/);
       if (messageReadMatch && method === "PUT") {
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) return json({ error: "unauthorized" }, 401);
-        return handleMarkRead(db, decodeURIComponent(messageReadMatch[1]!), req, (m) =>
-          hub.broadcastMessage(m),
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) {
+          return json({ error: "unauthorized" }, 401);
+        }
+        return handleMarkRead(
+          db,
+          decodeURIComponent(messageReadMatch[1]!),
+          req,
+          (m) => hub.broadcastMessage(m),
+          auth.kind === "agent" ? auth.agent : undefined,
         );
       }
 
@@ -267,6 +298,32 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
       if (pathname === "/v1/models" && method === "GET") {
         return handleListModels(db);
+      }
+
+      if (pathname === "/api/router/providers" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListRouterProviders(db);
+      }
+
+      if (pathname === "/api/router/routes" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListRouterRoutes(db);
+      }
+
+      const routerProviderMatch = pathname.match(/^\/api\/router\/providers\/([^/]+)$/);
+      if (routerProviderMatch && method === "PATCH") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handlePatchRouterProvider(db, decodeURIComponent(routerProviderMatch[1]!), req);
+      }
+
+      const routerRouteMatch = pathname.match(/^\/api\/router\/routes\/([^/]+)$/);
+      if (routerRouteMatch && method === "PUT") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handlePutRouterRoute(db, routerRouteMatch[1]!, req);
       }
 
       if (pathname.startsWith("/api/")) return json({ error: "not_found" }, 404);

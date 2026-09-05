@@ -170,6 +170,13 @@ al otro SIN interrumpir al usuario final." El cliente nunca ve el failover — s
 el modelo que pidió. Igual que FreeLLMAPI unified models, con identidad de cliente
 sumada: la key sabe quién es, qué puede pedir y cuánto consumió.
 
+**Estado de implementación (2026-09-03, v0.2.5):** motor `/v1` ✅; dashboard
+JWT `/router` ✅ (UI read-only); create de keys con tokens/expiry/USD ✅;
+Fusion/MoA (`mode:fusion` + judge synthesize) ✅. Índice:
+[`docs/features/2026-09-03-router-surface.md`](../../features/2026-09-03-router-surface.md).
+Follow-ups: mutar cadenas desde la UI, mostrar Fusion en `/router`, USD
+hop-level en Fusion, e2e zen free.
+
 ### Upstreams (estado real 2026-08-20)
 
 | Upstream | Qué es | Estado |

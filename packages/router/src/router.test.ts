@@ -60,8 +60,14 @@ afterAll(() => {
   mock.stop(true);
 });
 
-function seedProvider(db: Database, name: string, baseUrl: string, modelId = "test-model"): number {
-  upsertProvider(db, { name, baseUrl });
+function seedProvider(
+  db: Database,
+  name: string,
+  baseUrl: string,
+  modelId = "test-model",
+  costPerMtok?: number,
+): number {
+  upsertProvider(db, { name, baseUrl, costPerMtok });
   const provider = getProviderByName(db, name);
   if (provider === null) throw new Error(`provider ${name} missing after upsert`);
   addProviderModel(db, { providerId: provider.id, modelId });
@@ -70,7 +76,14 @@ function seedProvider(db: Database, name: string, baseUrl: string, modelId = "te
 
 function makeKey(
   db: Database,
-  opts: { scopes?: string[]; budgetLimit?: number; budgetUsed?: number } = {},
+  opts: {
+    scopes?: string[];
+    budgetLimit?: number;
+    budgetUsed?: number;
+    expiresAt?: string;
+    budgetUsdLimit?: number;
+    budgetUsdUsed?: number;
+  } = {},
 ): string {
   registerAgent(db, "router-agent", "agent");
   const keyHash = hashKey(generateKey());
@@ -79,9 +92,14 @@ function makeKey(
     agentName: "router-agent",
     scopes: opts.scopes,
     budgetLimit: opts.budgetLimit,
+    expiresAt: opts.expiresAt,
+    budgetUsdLimit: opts.budgetUsdLimit,
   });
   if (opts.budgetUsed !== undefined) {
     db.run("UPDATE agent_keys SET budget_used = ? WHERE key_hash = ?", [opts.budgetUsed, keyHash]);
+  }
+  if (opts.budgetUsdUsed !== undefined) {
+    db.run("UPDATE agent_keys SET budget_usd_used = ? WHERE key_hash = ?", [opts.budgetUsdUsed, keyHash]);
   }
   return keyHash;
 }
@@ -200,6 +218,91 @@ describe("routeCompletion", () => {
       () => routeCompletion(db, hashKey(generateKey()), baseRequest, { decryptKey }),
       "unauthorized",
     );
+    db.close();
+  });
+
+  test("expired key (expires_at in the past) → unauthorized and no usage", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "exp-a", baseA);
+    const keyHash = makeKey(db, { expiresAt: "1999-01-01T00:00:00Z" });
+
+    await expectRouterError(
+      () => routeCompletion(db, keyHash, baseRequest, { decryptKey }),
+      "unauthorized",
+    );
+    expect(listUsage(db)).toHaveLength(0);
+    db.close();
+  });
+
+  test("budget_usd_limit already spent → budget_exceeded before upstream", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "busd-a", baseA, "test-model", 2);
+    const keyHash = makeKey(db, { budgetUsdLimit: 1, budgetUsdUsed: 1 });
+
+    await expectRouterError(
+      () => routeCompletion(db, keyHash, baseRequest, { decryptKey }),
+      "budget_exceeded",
+    );
+    expect(listUsage(db)).toHaveLength(0);
+    db.close();
+  });
+
+  test("USD budget overshoot revokes the key after a successful upstream call", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "busd-over-a", baseA, "test-model", 1_000_000);
+    const keyHash = makeKey(db, { budgetUsdLimit: 1 });
+
+    const response = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(response.status).toBe(200);
+
+    expect(findActiveKeyByHash(db, keyHash)).toBeNull();
+    const stored = listKeys(db).find((row) => row.key_hash === keyHash);
+    expect(stored).toBeDefined();
+    expect(stored!.revoked_at).not.toBeNull();
+    expect(stored!.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("meters USD from hop cost_per_mtok when budget_usd_limit is set", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "usd-a", baseA, "test-model", 2);
+    const keyHash = makeKey(db, { budgetUsdLimit: 1 });
+
+    const response = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(response.status).toBe(200);
+
+    const key = findActiveKeyByHash(db, keyHash);
+    expect(key).not.toBeNull();
+    expect(key!.budget_used).toBe(15);
+    expect(key!.budget_usd_used).toBeCloseTo((15 / 1e6) * 2, 8);
+    db.close();
+  });
+
+  test("cost_per_mtok 0 with budgetUsdLimit set → 200 and budget_usd_used stays 0", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "usd0-a", baseA);
+    const keyHash = makeKey(db, { budgetUsdLimit: 1 });
+
+    const response = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(response.status).toBe(200);
+
+    const key = findActiveKeyByHash(db, keyHash);
+    expect(key).not.toBeNull();
+    expect(key!.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("no budget_usd_limit with provider cost → 200 and budget_usd_used stays 0", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "usdnl-a", baseA, "test-model", 2);
+    const keyHash = makeKey(db);
+
+    const response = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(response.status).toBe(200);
+
+    const key = findActiveKeyByHash(db, keyHash);
+    expect(key).not.toBeNull();
+    expect(key!.budget_usd_used).toBe(0);
     db.close();
   });
 });

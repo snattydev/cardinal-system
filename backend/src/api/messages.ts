@@ -1,7 +1,7 @@
 import type { Database } from "bun:sqlite";
 import { json } from "@cardinal/core";
 import type { MessageRow } from "@cardinal/core";
-import { listInbox, markMessageRead, sendMessage } from "@cardinal/db";
+import { getMessage, listInbox, markMessageRead, sendMessage } from "@cardinal/db";
 import { z } from "zod";
 
 const sendSchema = z.object({
@@ -15,6 +15,7 @@ export async function handleSendMessage(
   db: Database,
   req: Request,
   onChange?: (m: MessageRow) => void,
+  fromAgentOverride?: string,
 ): Promise<Response> {
   let body: unknown;
   try {
@@ -29,7 +30,7 @@ export async function handleSendMessage(
   }
 
   const message = sendMessage(db, {
-    fromAgent: parsed.data.from_agent,
+    fromAgent: fromAgentOverride ?? parsed.data.from_agent,
     toAgent: parsed.data.to_agent,
     type: parsed.data.type,
     payloadRef: parsed.data.payload_ref,
@@ -38,8 +39,8 @@ export async function handleSendMessage(
   return json({ message });
 }
 
-export function handleInbox(db: Database, req: Request): Response {
-  const toAgent = new URL(req.url).searchParams.get("to_agent");
+export function handleInbox(db: Database, req: Request, toAgentOverride?: string): Response {
+  const toAgent = toAgentOverride ?? new URL(req.url).searchParams.get("to_agent");
   if (toAgent === null || toAgent === "") {
     return json({ error: "missing_to_agent" }, 400);
   }
@@ -51,8 +52,14 @@ export async function handleMarkRead(
   id: string,
   req: Request,
   onChange?: (m: MessageRow) => void,
+  actorAgent?: string,
 ): Promise<Response> {
   void req;
+  const existing = getMessage(db, id);
+  if (!existing) return json({ error: "not_found" }, 404);
+  if (actorAgent !== undefined && existing.to_agent !== actorAgent) {
+    return json({ error: "forbidden" }, 403);
+  }
   const message = markMessageRead(db, id);
   if (!message) return json({ error: "not_found" }, 404);
   onChange?.(message);

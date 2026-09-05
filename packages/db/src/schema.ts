@@ -186,6 +186,11 @@ CREATE TABLE messages (
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+ALTER TABLE agent_keys ADD COLUMN expires_at TEXT;
+ALTER TABLE agent_keys ADD COLUMN budget_usd_limit REAL;
+ALTER TABLE agent_keys ADD COLUMN budget_usd_used REAL NOT NULL DEFAULT 0;
+`,
 ];
 
 export function migrate(db: Database): void {

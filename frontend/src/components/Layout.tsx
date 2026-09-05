@@ -68,6 +68,10 @@ export default function Layout() {
             Tasks
           </NavLink>
 
+          <NavLink to="/router" className={linkClass}>
+            Router
+          </NavLink>
+
           <NavLink to="/settings" className={linkClass}>
             Settings
           </NavLink>

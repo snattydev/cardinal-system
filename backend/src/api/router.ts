@@ -37,6 +37,12 @@ function routerErrorResponse(err: RouterError): Response {
       return json({ error: "budget_exceeded" }, 402);
     case "model_not_found":
       return json({ error: "model_not_found" }, 404);
+    case "fusion_not_configured":
+      return json({ error: "fusion_not_configured" }, 400);
+    case "fusion_streaming_unsupported":
+      return json({ error: "fusion_streaming_unsupported" }, 400);
+    case "fusion_strategy_unsupported":
+      return json({ error: "fusion_strategy_unsupported" }, 501);
     case "all_providers_failed":
       return json({ error: "all_providers_failed", details: err.details }, 502);
     default:

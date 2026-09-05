@@ -113,11 +113,36 @@ const TASK_COMPLETE_TOOL: ToolDef = {
   },
 };
 
+const AGENT_SEND_TOOL: ToolDef = {
+  name: "cardinal_agent_send",
+  description: "envía un mensaje al mailbox de otro agente",
+  inputSchema: {
+    type: "object",
+    properties: {
+      to_agent: { type: "string", description: "Agente destinatario" },
+      type: { type: "string", description: "Tipo de mensaje" },
+      payload_ref: { type: "string", description: "Referencia al payload (opcional)" },
+    },
+    required: ["to_agent", "type"],
+  },
+};
+
+const AGENT_INBOX_TOOL: ToolDef = {
+  name: "cardinal_agent_inbox",
+  description: "lista mensajes del inbox del agente de la key",
+  inputSchema: {
+    type: "object",
+    properties: {},
+  },
+};
+
 const BOARD_TOOLS: ToolDef[] = [
   TASK_CREATE_TOOL,
   TASK_LIST_TOOL,
   TASK_CLAIM_TOOL,
   TASK_COMPLETE_TOOL,
+  AGENT_SEND_TOOL,
+  AGENT_INBOX_TOOL,
 ];
 
 const MEMORY_TOOLS: ToolDef[] = [SEARCH_TOOL, READ_TOOL, LIST_TOOL];
@@ -299,6 +324,29 @@ export function createMcpServer(options: McpServerOptions) {
     return JSON.stringify(data, null, 2);
   }
 
+  async function callAgentSend(
+    identity: KeyIdentity,
+    identityKey: string,
+    args: Record<string, unknown>,
+  ): Promise<string> {
+    const to_agent = typeof args.to_agent === "string" ? args.to_agent.trim() : "";
+    const type = typeof args.type === "string" ? args.type.trim() : "";
+    if (to_agent === "") throw new Error("missing to_agent");
+    if (type === "") throw new Error("missing type");
+    const body: Record<string, unknown> = { from_agent: identity.agent, to_agent, type };
+    if (typeof args.payload_ref === "string") body.payload_ref = args.payload_ref;
+    const data = await backendJson(identityKey, "/api/messages", { method: "POST", body });
+    return JSON.stringify(data, null, 2);
+  }
+
+  async function callAgentInbox(identity: KeyIdentity, identityKey: string): Promise<string> {
+    const data = await backendJson(
+      identityKey,
+      `/api/messages?to_agent=${encodeURIComponent(identity.agent)}`,
+    );
+    return JSON.stringify(data, null, 2);
+  }
+
   async function dispatch(
     identity: KeyIdentity,
     identityKey: string,
@@ -320,6 +368,10 @@ export function createMcpServer(options: McpServerOptions) {
         return callTaskClaim(identity, identityKey, args);
       case "cardinal_task_complete":
         return callTaskComplete(identityKey, args);
+      case "cardinal_agent_send":
+        return callAgentSend(identity, identityKey, args);
+      case "cardinal_agent_inbox":
+        return callAgentInbox(identity, identityKey);
       default:
         throw new Error(`unknown tool: ${name}`);
     }

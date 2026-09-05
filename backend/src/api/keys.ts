@@ -2,6 +2,7 @@ import type { Database } from "bun:sqlite";
 import type { AgentKeyRow } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import {
+  createAgentKey,
   findActiveKeyByHash,
   getAgent,
   getKeyById,
@@ -9,7 +10,7 @@ import {
   revokeKeyById,
   touchKey,
 } from "@cardinal/db";
-import { hashKey, isKeyFormat } from "@cardinal/keys";
+import { generateKey, hashKey, isKeyFormat } from "@cardinal/keys";
 
 export interface KeyItem {
   id: number;
@@ -18,6 +19,9 @@ export interface KeyItem {
   scopes: string[];
   budgetLimit: number | null;
   budgetUsed: number;
+  expiresAt: string | null;
+  budgetUsdLimit: number | null;
+  budgetUsdUsed: number;
   createdAt: string;
   lastUsedAt: string | null;
   revokedAt: string | null;
@@ -40,10 +44,87 @@ export function toKeyItem(row: AgentKeyRow): KeyItem {
     scopes,
     budgetLimit: row.budget_limit,
     budgetUsed: row.budget_used,
+    expiresAt: row.expires_at,
+    budgetUsdLimit: row.budget_usd_limit,
+    budgetUsdUsed: row.budget_usd_used,
     createdAt: row.created_at,
     lastUsedAt: row.last_used_at,
     revokedAt: row.revoked_at,
   };
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+export async function handleCreateKey(db: Database, req: Request): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  const payload = body as Record<string, unknown>;
+
+  if (typeof payload.agentName !== "string" || payload.agentName.length === 0) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  const agentName = payload.agentName;
+
+  let scopes: string[] | undefined;
+  if (payload.scopes !== undefined) {
+    if (!Array.isArray(payload.scopes) || !payload.scopes.every((s) => typeof s === "string")) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    scopes = payload.scopes;
+  }
+
+  let budgetLimit: number | undefined;
+  if (payload.budgetLimit !== undefined && payload.budgetLimit !== null) {
+    if (!isNonNegativeFinite(payload.budgetLimit)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    budgetLimit = payload.budgetLimit;
+  }
+
+  let budgetUsdLimit: number | undefined;
+  if (payload.budgetUsdLimit !== undefined && payload.budgetUsdLimit !== null) {
+    if (!isNonNegativeFinite(payload.budgetUsdLimit)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    budgetUsdLimit = payload.budgetUsdLimit;
+  }
+
+  let expiresAt: string | undefined;
+  if (payload.expiresAt !== undefined && payload.expiresAt !== null) {
+    if (typeof payload.expiresAt !== "string") {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    const t = Date.parse(payload.expiresAt);
+    if (Number.isNaN(t) || t <= Date.now()) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    expiresAt = payload.expiresAt;
+  }
+
+  if (getAgent(db, agentName) === null) {
+    return json({ error: "agent_not_found" }, 400);
+  }
+
+  const plaintext = generateKey();
+  createAgentKey(db, {
+    keyHash: hashKey(plaintext),
+    agentName,
+    scopes,
+    budgetLimit,
+    expiresAt,
+    budgetUsdLimit,
+  });
+  const row = findActiveKeyByHash(db, hashKey(plaintext));
+  return json({ key: plaintext, item: toKeyItem(row!) });
 }
 
 export function handleListKeys(db: Database, req: Request): Response {

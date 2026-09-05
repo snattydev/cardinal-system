@@ -1,6 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
+import { useRoster } from "../hooks/useRoster";
 import type { KeyItem } from "../lib/types";
+
+const inputClass =
+  "rounded border border-sao-accent/20 bg-sao-bg px-3 py-2 font-mono text-sm outline-none focus:border-sao-accent";
 
 function fmtBudget(used: number, limit: number | null): string {
   return limit === null ? `${used} / ∞` : `${used} / ${limit}`;
@@ -10,7 +14,24 @@ function fmtWhen(value: string | null): string {
   return value ?? "never";
 }
 
+function fmtExpiry(value: string | null): string {
+  return value ?? "∞";
+}
+
+function parseScopes(raw: string): string[] {
+  const parts = raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
+  return parts.length === 0 ? ["*"] : parts;
+}
+
+function parseOptionalNumber(raw: string): number | undefined {
+  const t = raw.trim();
+  if (t === "") return undefined;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export default function Keys() {
+  const roster = useRoster();
   const [keys, setKeys] = useState<KeyItem[]>([]);
   const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading");
   const [history, setHistory] = useState<KeyItem[] | null>(null);
@@ -19,6 +40,15 @@ export default function Keys() {
   const showHistoryRef = useRef(false);
   const [pendingId, setPendingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const [agentName, setAgentName] = useState("");
+  const [scopes, setScopes] = useState("*");
+  const [budgetTokens, setBudgetTokens] = useState("");
+  const [expires, setExpires] = useState("");
+  const [usdCap, setUsdCap] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +116,68 @@ export default function Keys() {
     }
   }
 
+  async function onCreate(e: FormEvent): Promise<void> {
+    e.preventDefault();
+    setError(null);
+    setCopied(false);
+
+    const name = agentName.trim();
+    if (name.length === 0) return;
+
+    const body: {
+      agentName: string;
+      scopes?: string[];
+      budgetLimit?: number | null;
+      expiresAt?: string | null;
+      budgetUsdLimit?: number | null;
+    } = {
+      agentName: name,
+      scopes: parseScopes(scopes),
+    };
+
+    const tokens = parseOptionalNumber(budgetTokens);
+    if (tokens !== undefined) body.budgetLimit = tokens;
+
+    if (expires.trim().length > 0) {
+      body.expiresAt = new Date(expires).toISOString();
+    }
+
+    const usd = parseOptionalNumber(usdCap);
+    if (usd !== undefined) body.budgetUsdLimit = usd;
+
+    setCreating(true);
+    try {
+      const res = await api<{ key: string; item: KeyItem }>("/api/keys", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setCreatedKey(res.key);
+      setKeys((prev) => [res.item, ...prev.filter((k) => k.id !== res.item.id)]);
+      setAgentName("");
+      setScopes("*");
+      setBudgetTokens("");
+      setExpires("");
+      setUsdCap("");
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : "create failed";
+      setError(message);
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function copyCreatedKey(): Promise<void> {
+    if (createdKey === null) return;
+    try {
+      await navigator.clipboard.writeText(createdKey);
+      setCopied(true);
+    } catch {
+      setError("copy failed");
+    }
+  }
+
+  const rosterNames = [...roster.keys()];
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -106,12 +198,97 @@ export default function Keys() {
         </button>
       </div>
 
+      <form
+        onSubmit={(e) => void onCreate(e)}
+        className="flex flex-col gap-3 rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-4"
+      >
+        <div className="flex flex-wrap gap-3">
+          <label className="flex min-w-40 flex-1 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">agent name</span>
+            <input
+              value={agentName}
+              onChange={(e) => setAgentName(e.target.value)}
+              list="roster-agents"
+              placeholder="agent"
+              required
+              className={inputClass}
+            />
+            <datalist id="roster-agents">
+              {rosterNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
+          </label>
+          <label className="flex min-w-40 flex-1 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">scopes</span>
+            <input
+              value={scopes}
+              onChange={(e) => setScopes(e.target.value)}
+              placeholder="*"
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-32 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">budget tokens</span>
+            <input
+              type="number"
+              value={budgetTokens}
+              onChange={(e) => setBudgetTokens(e.target.value)}
+              placeholder="∞"
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-44 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">expires</span>
+            <input
+              type="datetime-local"
+              value={expires}
+              onChange={(e) => setExpires(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-32 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">USD cap</span>
+            <input
+              type="number"
+              value={usdCap}
+              onChange={(e) => setUsdCap(e.target.value)}
+              step="any"
+              placeholder="∞"
+              className={inputClass}
+            />
+          </label>
+        </div>
+        <button
+          type="submit"
+          disabled={creating}
+          className="w-fit rounded border border-sao-accent bg-sao-accent/10 px-3 py-2 font-mono text-sm text-sao-accent transition-colors hover:bg-sao-accent/20 disabled:opacity-50"
+        >
+          crear
+        </button>
+      </form>
+
       {error && <p className="font-mono text-sm text-red-400">{error}</p>}
+
+      {createdKey !== null && (
+        <div className="flex flex-col gap-2 rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-4">
+          <p className="font-mono text-xs tracking-widest text-sao-accent">PLAINTEXT — shown once</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <code className="break-all font-mono text-sm text-sao-accent">{createdKey}</code>
+            <button
+              type="button"
+              onClick={() => void copyCreatedKey()}
+              className="rounded border border-sao-accent bg-sao-accent/10 px-3 py-1.5 font-mono text-xs tracking-widest text-sao-accent transition-colors hover:bg-sao-accent/20"
+            >
+              {copied ? "copied" : "copy"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {loadStatus === "ready" && keys.length === 0 ? (
         <p className="rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-6 font-mono text-sm text-slate-500">
-          no persistent keys — create one with{" "}
-          <span className="text-sao-accent">bun run keygen -- --agent &lt;name&gt;</span>
+          no persistent keys — create one with the form above
         </p>
       ) : (
         <div className="flex flex-col divide-y divide-sao-accent/10 rounded-lg border border-sao-accent/20 bg-sao-panel/60">
@@ -120,6 +297,8 @@ export default function Keys() {
               <span className="text-sao-accent">{key.agentName}</span>
               <span className="text-slate-400">{key.scopes.join(", ")}</span>
               <span className="text-slate-400">{fmtBudget(key.budgetUsed, key.budgetLimit)}</span>
+              <span className="text-slate-500">exp {fmtExpiry(key.expiresAt)}</span>
+              <span className="text-slate-400">{fmtBudget(key.budgetUsdUsed, key.budgetUsdLimit)}</span>
               <span className="text-slate-500">created {fmtWhen(key.createdAt)}</span>
               <span className="text-slate-500">last used {fmtWhen(key.lastUsedAt)}</span>
               <span className="ml-auto">
@@ -171,6 +350,8 @@ export default function Keys() {
                   <span>{key.agentName}</span>
                   <span>{key.scopes.join(", ")}</span>
                   <span>{fmtBudget(key.budgetUsed, key.budgetLimit)}</span>
+                  <span>exp {fmtExpiry(key.expiresAt)}</span>
+                  <span>{fmtBudget(key.budgetUsdUsed, key.budgetUsdLimit)}</span>
                   <span>revoked {fmtWhen(key.revokedAt)}</span>
                 </div>
               ))}

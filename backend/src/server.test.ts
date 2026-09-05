@@ -1,7 +1,16 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { Config } from "@cardinal/core";
-import { createDb, createAgentKey, getAgent, registerAgent } from "@cardinal/db";
+import {
+  addProviderModel,
+  createAgentKey,
+  createDb,
+  getAgent,
+  getProviderByName,
+  registerAgent,
+  upsertModelRoute,
+  upsertProvider,
+} from "@cardinal/db";
 import { generateKey, hashKey } from "@cardinal/keys";
 import { createServer } from "./server";
 import rootPkg from "../../package.json";
@@ -307,6 +316,105 @@ test("GET /api/keys and POST /api/keys/:id/revoke require a session cookie", asy
   expect(Array.isArray(body.keys)).toBe(true);
 });
 
+test("POST /api/keys requires a session cookie and creates a key for shinon", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/keys`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ agentName: "shinon" }),
+  });
+  expect(anon.status).toBe(401);
+  expect(await anon.json()).toEqual({ error: "unauthorized" });
+
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/keys`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ agentName: "shinon" }),
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as { key: string; item: { agentName: string } };
+  expect(body.key.startsWith("sk-cardinal-")).toBe(true);
+  expect(body.item.agentName).toBe("shinon");
+});
+
+test("GET /api/router/providers and GET /api/router/routes without cookie → 401", async () => {
+  const providers = await fetch(`http://localhost:${port}/api/router/providers`);
+  expect(providers.status).toBe(401);
+  expect(await providers.json()).toEqual({ error: "unauthorized" });
+
+  const routes = await fetch(`http://localhost:${port}/api/router/routes`);
+  expect(routes.status).toBe(401);
+  expect(await routes.json()).toEqual({ error: "unauthorized" });
+});
+
+test("GET /api/router/providers and GET /api/router/routes with session cookie → 200", async () => {
+  const cookie = await login();
+
+  const providers = await fetch(`http://localhost:${port}/api/router/providers`, { headers: { cookie } });
+  expect(providers.status).toBe(200);
+  const providersBody = (await providers.json()) as { providers: unknown[]; models: unknown[] };
+  expect(Array.isArray(providersBody.providers)).toBe(true);
+  expect(Array.isArray(providersBody.models)).toBe(true);
+
+  const routes = await fetch(`http://localhost:${port}/api/router/routes`, { headers: { cookie } });
+  expect(routes.status).toBe(200);
+  const routesBody = (await routes.json()) as { routes: unknown[] };
+  expect(Array.isArray(routesBody.routes)).toBe(true);
+});
+
+test("PATCH /api/router/providers/:id and PUT /api/router/routes/:alias without cookie → 401", async () => {
+  const patch = await fetch(`http://localhost:${port}/api/router/providers/1`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ status: "disabled" }),
+  });
+  expect(patch.status).toBe(401);
+  expect(await patch.json()).toEqual({ error: "unauthorized" });
+
+  const put = await fetch(`http://localhost:${port}/api/router/routes/fast`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ fallback_chain: [{ provider: "mock-local", model: "test-model" }] }),
+  });
+  expect(put.status).toBe(401);
+  expect(await put.json()).toEqual({ error: "unauthorized" });
+});
+
+test("PATCH provider and PUT route with session cookie mutate router config", async () => {
+  upsertProvider(db, { name: "mock-local", baseUrl: "http://localhost:18999/v1" });
+  const provider = getProviderByName(db, "mock-local")!;
+  addProviderModel(db, {
+    providerId: provider.id,
+    modelId: "test-model",
+    capabilities: JSON.stringify(["chat"]),
+    contextWindow: 4096,
+  });
+  upsertModelRoute(db, "fast", [{ provider: "mock-local", model: "test-model" }]);
+
+  const cookie = await login();
+  const patch = await fetch(`http://localhost:${port}/api/router/providers/${provider.id}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ status: "disabled" }),
+  });
+  expect(patch.status).toBe(200);
+  const patchBody = (await patch.json()) as { provider: { status: string; name: string } };
+  expect(patchBody.provider.status).toBe("disabled");
+  expect(patchBody.provider.name).toBe("mock-local");
+
+  const put = await fetch(`http://localhost:${port}/api/router/routes/fast`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ fallback_chain: [{ provider: "mock-local", model: "test-model" }] }),
+  });
+  expect(put.status).toBe(200);
+  const putBody = (await put.json()) as {
+    route: { alias: string; fallback_chain: Array<{ provider: string; model: string }> };
+  };
+  expect(putBody.route.alias).toBe("fast");
+  expect(putBody.route.fallback_chain).toEqual([{ provider: "mock-local", model: "test-model" }]);
+});
+
 test("POST /api/tasks accepts JWT session or agent Bearer key", async () => {
   const anon = await fetch(`http://localhost:${port}/api/tasks`, {
     method: "POST",
@@ -374,4 +482,115 @@ test("POST /api/tasks accepts JWT session or agent Bearer key", async () => {
     status: "done",
     summary: "done via key",
   });
+});
+
+test("GET/POST /api/messages accepts JWT session or agent Bearer key", async () => {
+  const anonPost = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ from_agent: "shinon", to_agent: "localbot", type: "handoff" }),
+  });
+  expect(anonPost.status).toBe(401);
+
+  const anonGet = await fetch(`http://localhost:${port}/api/messages?to_agent=shinon`);
+  expect(anonGet.status).toBe(401);
+
+  const cookie = await login();
+  const viaJwt = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ from_agent: "shinon", to_agent: "localbot", type: "handoff" }),
+  });
+  expect(viaJwt.status).toBe(200);
+  const jwtBody = (await viaJwt.json()) as { message: { id: string; to_agent: string } };
+  expect(jwtBody.message.to_agent).toBe("localbot");
+
+  const inboxJwt = await fetch(`http://localhost:${port}/api/messages?to_agent=localbot`, {
+    headers: { cookie },
+  });
+  expect(inboxJwt.status).toBe(200);
+  const jwtListed = (await inboxJwt.json()) as { messages: Array<{ id: string }> };
+  expect(jwtListed.messages.some((m) => m.id === jwtBody.message.id)).toBe(true);
+
+  const viaKey = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ from_agent: "shinon", to_agent: "shinon", type: "ping" }),
+  });
+  expect(viaKey.status).toBe(200);
+  const keyBody = (await viaKey.json()) as { message: { id: string; type: string } };
+
+  const inboxKey = await fetch(`http://localhost:${port}/api/messages?to_agent=shinon`, {
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(inboxKey.status).toBe(200);
+  const keyListed = (await inboxKey.json()) as { messages: Array<{ id: string; type: string }> };
+  expect(keyListed.messages.some((m) => m.id === keyBody.message.id && m.type === "ping")).toBe(true);
+
+  const markRead = await fetch(`http://localhost:${port}/api/messages/${keyBody.message.id}/read`, {
+    method: "PUT",
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(markRead.status).toBe(200);
+  expect(((await markRead.json()) as { message: { read: number } }).message.read).toBe(1);
+
+  const anonRead = await fetch(`http://localhost:${port}/api/messages/${keyBody.message.id}/read`, {
+    method: "PUT",
+  });
+  expect(anonRead.status).toBe(401);
+});
+
+test("agent key cannot spoof sender or read another agent's mailbox", async () => {
+  const cookie = await login();
+  const secret = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ from_agent: "localbot", to_agent: "localbot", type: "secret" }),
+  });
+  expect(secret.status).toBe(200);
+  const secretBody = (await secret.json()) as { message: { id: string; type: string } };
+  const secretId = secretBody.message.id;
+
+  const spoof = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ from_agent: "localbot", to_agent: "shinon", type: "spoof" }),
+  });
+  expect(spoof.status).toBe(200);
+  const spoofBody = (await spoof.json()) as { message: { from_agent: string; to_agent: string } };
+  expect(spoofBody.message.from_agent).toBe("shinon");
+
+  const inboxKey = await fetch(`http://localhost:${port}/api/messages?to_agent=localbot`, {
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(inboxKey.status).toBe(200);
+  const keyListed = (await inboxKey.json()) as { messages: Array<{ id: string; type: string }> };
+  expect(keyListed.messages.some((m) => m.id === secretId || m.type === "secret")).toBe(false);
+
+  const stealRead = await fetch(`http://localhost:${port}/api/messages/${secretId}/read`, {
+    method: "PUT",
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(stealRead.status).toBe(403);
+  expect(await stealRead.json()).toEqual({ error: "forbidden" });
+
+  const localInbox = await fetch(`http://localhost:${port}/api/messages?to_agent=shinon`, {
+    headers: { authorization: `Bearer ${LOCAL_KEY}` },
+  });
+  expect(localInbox.status).toBe(200);
+  const localListed = (await localInbox.json()) as { messages: Array<{ id: string; type: string; to_agent: string }> };
+  expect(localListed.messages.some((m) => m.type === "ping" || m.type === "spoof")).toBe(false);
+
+  const adminInbox = await fetch(`http://localhost:${port}/api/messages?to_agent=localbot`, {
+    headers: { cookie },
+  });
+  expect(adminInbox.status).toBe(200);
+  const adminListed = (await adminInbox.json()) as { messages: Array<{ id: string; type: string }> };
+  expect(adminListed.messages.some((m) => m.id === secretId && m.type === "secret")).toBe(true);
 });

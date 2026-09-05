@@ -1,13 +1,15 @@
 # Cardinal System — Roadmap
 
-> Actualizado: 2026-08-31. Single source of truth de prioridades.
+> Actualizado: 2026-09-03. Single source of truth de prioridades.
 
 ---
 
-## Ahora: Fase 2 — Cardinal v2 (🚧 en curso — v0.2.3)
+## Ahora: Fase 2 — Cardinal v2 (🚧 en curso — v0.2.5)
 
 Fase 1 (Context Store) completa en `dev` desde v0.2.0. Fase 2 en progreso:
-blackboard + MCP hub + router/keys. Ver [`roadmap/fase-2.md`](roadmap/fase-2.md).
+blackboard + MCP hub + router/keys (`/router`, create keys, fusion). Ver
+[`roadmap/fase-2.md`](roadmap/fase-2.md). Sprint:
+[`sprints/2026-09-03-router-surface.md`](sprints/2026-09-03-router-surface.md).
 
 Pendiente de estabilización: PR `dev → main` cuando se decida freeze (Fase 1 + 2
 parciales acumuladas en `dev`).
@@ -24,13 +26,13 @@ parciales acumuladas en `dev`).
 | 3 | Grafo de Conocimiento | 🔮 Futuro | — |
 | 4 | Automations | 🔮 Futuro | — |
 
-### Fase 2 — estado (2026-08-31)
+### Fase 2 — estado (2026-09-03)
 
 | Pilar | Hecho | Falta |
 |-------|-------|-------|
-| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools | mailbox MCP tools |
-| 1 MCP hub | `packages/mcp` memory + board, compose `:8789` | — |
-| 2 Pool/router | router, key factory, `/keys` UI | spike-003 pool opencode-go (opcional) |
+| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools, mailbox MCP | — |
+| 1 MCP hub | `packages/mcp` memory + board + mailbox, compose `:8789` | — |
+| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | spike-003 opencode-go (opcional); e2e zen free (#5); UI mutar cadenas / mostrar Fusion |
 
 Tesis: orquestación es commodity; Cardinal es cerebro (identidad + contexto +
 blackboard); herdr/Hermes/CLIs son las manos.

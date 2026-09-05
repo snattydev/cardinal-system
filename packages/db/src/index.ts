@@ -55,6 +55,7 @@ export {
   getModelRoute,
   listModelRoutes,
   consumeBudget,
+  consumeBudgetUsd,
   logUsage,
   listUsage,
 } from "./repos";

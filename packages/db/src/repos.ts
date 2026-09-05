@@ -327,10 +327,12 @@ export function createAgentKey(
     createdBy?: "human" | "system";
     scopes?: string[];
     budgetLimit?: number;
+    expiresAt?: string | null;
+    budgetUsdLimit?: number | null;
   },
 ): void {
   db.run(
-    "INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by, scopes, budget_limit) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by, scopes, budget_limit, expires_at, budget_usd_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [
       args.keyHash,
       args.agentName,
@@ -338,16 +340,20 @@ export function createAgentKey(
       args.createdBy ?? "human",
       JSON.stringify(args.scopes ?? ["*"]),
       args.budgetLimit ?? null,
+      args.expiresAt ?? null,
+      args.budgetUsdLimit ?? null,
     ],
   );
 }
 
 export function findActiveKeyByHash(db: Database, keyHash: string): AgentKeyRow | null {
-  return (
+  const row =
     (db
       .query("SELECT * FROM agent_keys WHERE key_hash = ? AND revoked_at IS NULL")
-      .get(keyHash) as AgentKeyRow | null) ?? null
-  );
+      .get(keyHash) as AgentKeyRow | null) ?? null;
+  if (row === null) return null;
+  if (row.expires_at !== null && Date.parse(row.expires_at) <= Date.now()) return null;
+  return row;
 }
 
 export function touchKey(db: Database, id: number): void {
@@ -363,6 +369,22 @@ export function consumeBudget(db: Database, keyHash: string, tokens: number): bo
          AND (budget_limit IS NULL OR budget_used + ? <= budget_limit)`,
     )
     .run(tokens, keyHash, tokens);
+  return result.changes > 0;
+}
+
+export function consumeBudgetUsd(db: Database, keyHash: string, usd: number): boolean {
+  const key = findActiveKeyByHash(db, keyHash);
+  if (key === null) return false;
+  if (key.budget_usd_limit === null) return true;
+  const result = db
+    .query(
+      `UPDATE agent_keys
+       SET budget_usd_used = budget_usd_used + ?
+       WHERE key_hash = ? AND revoked_at IS NULL
+         AND budget_usd_limit IS NOT NULL
+         AND budget_usd_used + ? <= budget_usd_limit`,
+    )
+    .run(usd, keyHash, usd);
   return result.changes > 0;
 }
 

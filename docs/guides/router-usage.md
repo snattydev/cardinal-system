@@ -4,7 +4,8 @@ Router interno de LLM del Cardinal: pool de providers configurables + endpoints
 OpenAI-compatible con failover transparente, scopes por key y metering.
 
 > Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (sección 6).
-> Estado: v0.2.1+, implementado 2026-08-20. 269 tests.
+> Estado: v0.2.5 (2026-09-03). Índice:
+> [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
 
 ---
 
@@ -19,6 +20,9 @@ OpenAI-compatible con failover transparente, scopes por key y metering.
 - **Autorouter**: pedís un modelo por nombre real y el router arma el pool de
   providers que lo sirven; si uno falla (429/5xx/timeout), pasa al siguiente sin
   que el cliente se entere. El failover es transparente.
+- **Fusion / MoA**: alias cuyo `fallback_chain` es un objeto JSON
+  (`"mode":"fusion"`), no un array. Fan-out paralelo + judge; no es failover.
+  Ver [`docs/features/2026-09-03-router-fusion.md`](../features/2026-09-03-router-fusion.md).
 
 ```
 Cliente (cualquier SDK OpenAI-compatible)
@@ -39,11 +43,17 @@ POST http://127.0.0.1:8787/v1/chat/completions
 
 | Endpoint | Auth | Descripción |
 |----------|------|-------------|
-| `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | Completion OpenAI-compatible (streaming y no-streaming) |
+| `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | Completion OpenAI-compatible (streaming, no-streaming, Fusion) |
 | `GET /v1/models` | — | Lista de modelos y aliases disponibles (formato OpenAI) |
+| `GET /api/router/providers` | cookie JWT | Dashboard: providers + modelos (sin `api_key_enc`) |
+| `GET /api/router/routes` | cookie JWT | Dashboard: aliases y `fallback_chain` (arrays; Fusion se ve vacío) |
+| `PATCH /api/router/providers/:id` | cookie JWT | `active` \| `disabled` |
+| `PUT /api/router/routes/:alias` | cookie JWT | Upsert de cadena de hops (solo arrays) |
+| `POST /api/keys` | cookie JWT | Crear key (plaintext una vez). Ver `/keys` |
 | `GET /api/health` | — | Health check del backend |
 
-Base URL: `http://127.0.0.1:8787/v1` (backend del Cardinal).
+Dashboard: `http://127.0.0.1:5173/router` y `/keys` (login JWT).
+Base URL API: `http://127.0.0.1:8787/v1` (completions) y `http://127.0.0.1:8787/api` (admin).
 
 ---
 
@@ -52,7 +62,7 @@ Base URL: `http://127.0.0.1:8787/v1` (backend del Cardinal).
 ```bash
 cd ~/Data/Projects/ai-agents/cardinal-system
 podman-compose up -d        # backend :8787 + frontend :5173
-curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.1"}
+curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.5"}
 ```
 
 Requisitos en `.env` (crear desde `deploy/env.example` si no existe):
@@ -126,9 +136,38 @@ setProviderStatus(db, \"mock-local\", \"disabled\");
 
 Los providers `disabled` se filtran del autorouter y de los aliases.
 
+### 4.5 Fusion / MoA
+
+No es failover: N proposers en paralelo y un judge sintetiza **una** respuesta.
+El JSON de `model_routes.fallback_chain` es un **objeto**, no un array.
+`upsertModelRoute` / `PUT /api/router/routes/:alias` no lo aceptan (solo hops);
+seed con SQL. Detalle:
+[`docs/features/2026-09-03-router-fusion.md`](../features/2026-09-03-router-fusion.md).
+
+```json
+{
+  "mode": "fusion",
+  "panel": [
+    { "provider": "p1", "model": "m1" },
+    { "provider": "p2", "model": "m2" }
+  ],
+  "judge": { "provider": "judge-p", "model": "judge-m" },
+  "strategy": "synthesize"
+}
+```
+
+Cliente: `model: "fusion"` (o el alias de esa fila) + Bearer `sk-cardinal-*`
+con scope `fusion` o `*`. `stream: true` → 400. `best_of` → 501.
+
+En `/router` esa fila se ve con hops `—` (el GET parsea solo arrays). Follow-up.
+
 ---
 
 ## 5. Gestión de keys (identidad del cliente)
+
+Desde el dashboard (`/keys`, cookie JWT) se crea una key con scopes, budget de
+tokens, expiración y tope USD. El plaintext se muestra **una sola vez**. CLI
+sigue existiendo:
 
 ```bash
 # Key con autorouter libre (scope "*")
@@ -153,6 +192,9 @@ podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --revoke <nombr
 ### Semántica de budget
 
 - `budget_limit` en **tokens** acumulados (`budget_used` suma en cada llamada).
+- `budget_usd_limit` opcional: `(tokens/1e6)*cost_per_mtok` del hop. Costo 0 no
+  mueve USD. Overshoot → auto-revoke (igual que tokens).
+- `expires_at` pasado → la key no es activa (`unauthorized`).
 - Si una llamada excede el budget restante, el router revoca la key automáticamente
   (auto-revoke) — el agente público no puede seguir consumiendo.
 - `created_by=system` → one-shot/agentes públicos, auto-revocables.
@@ -284,7 +326,9 @@ metering (budget_used + usage_log), scope.
 | `Cannot find module '@cardinal/db' from '/app/[eval]'` | `bun -e` desde `/app` no resuelve workspaces. Correr desde `/app/backend` o usar un script en `backend/src/` |
 | 502 `all_providers_failed` | Todos los providers del chain están caídos o en cooldown (60s tras 429/5xx). Revisar `details.attempts` y `setProviderStatus` |
 | 404 `model_not_found` | Ningún provider activo sirve ese modelo. Chequear `provider_models` y status de providers |
-| La key revocada sola | Excedió `budget_limit` → auto-revoke por diseño |
+| La key revocada sola | Excedió `budget_limit` o `budget_usd_limit` → auto-revoke por diseño |
+| 401 con key que existía | `expires_at` pasado, o revoked |
+| 400 `fusion_not_configured` | Pediste `fusion` sin ruta objeto en `model_routes` |
 | Frontend no levanta (dev) | Blocker de entorno: rolldown native binding + noexec en `~/Data` (ERR_DLOPEN_FAILED). No afecta al router (backend puro) |
 
 ---
@@ -310,4 +354,8 @@ metering (budget_used + usage_log), scope.
 
 - Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`
 - Backlog: `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`
-- Código: `packages/router/` (core), `backend/src/api/router.ts` (HTTP), `backend/src/seed-router.ts` (seed), `backend/src/e2e-router.ts` (e2e), `scripts/mock-upstream.py` (mock)
+- Índice v0.2.5: `docs/features/2026-09-03-router-surface.md`
+- Sprint: `docs/sprints/2026-09-03-router-surface.md`
+- Código: `packages/router/` (core + `fusion.ts`), `backend/src/api/router.ts` (`/v1`),
+  `backend/src/api/router-dashboard.ts` (JWT), `backend/src/seed-router.ts`,
+  `backend/src/e2e-router.ts`, `scripts/mock-upstream.py`
