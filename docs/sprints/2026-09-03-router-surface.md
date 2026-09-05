@@ -66,6 +66,12 @@ pre-loop auth/budget; Fusion en `fusion.ts` + ~10 líneas de dispatch.
   USD hop-level en Fusion; backlog #5 (e2e zen), #11 (bootstrap password),
   #10 (PR `dev→main`), #13 (one-shot keys).
 
+## Verificación posterior
+
+Verificación independiente en VM limpia (2026-09-05): coherente con este sprint;
+hallazgos y follow-ups en
+[`2026-09-05-router-surface-verification.md`](./2026-09-05-router-surface-verification.md).
+
 ## Lecciones
 
 1. Tres features en el mismo tree funcionan si el ownership de archivos es

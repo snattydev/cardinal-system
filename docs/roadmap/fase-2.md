@@ -4,6 +4,7 @@
 > Plan de ejecución: [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md)
 > Estado: En curso (v0.2.5, actualizado 2026-09-03).
 > Sprint superficie router: [`../sprints/2026-09-03-router-surface.md`](../sprints/2026-09-03-router-surface.md)
+> Verificación v0.2.5 (2026-09-05): [`../sprints/2026-09-05-router-surface-verification.md`](../sprints/2026-09-05-router-surface-verification.md)
 > Índice: [`../features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md)
 
 ---
