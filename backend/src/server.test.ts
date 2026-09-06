@@ -483,8 +483,7 @@ test("POST /api/tasks accepts JWT session or agent Bearer key", async () => {
   expect(viaKey.status).toBe(200);
   const keyBody = (await viaKey.json()) as { task: { id: string; goal: string; created_by: string } };
   expect(keyBody.task.goal).toBe("from agent key");
-  // Agent callers may omit created_by; backend defaults to "system" unless body sets it.
-  expect(typeof keyBody.task.created_by).toBe("string");
+  expect(keyBody.task.created_by).toBe("shinon");
 
   const listViaKey = await fetch(`http://localhost:${port}/api/tasks`, {
     headers: { authorization: `Bearer ${TEST_KEY}` },
@@ -631,4 +630,88 @@ test("agent key cannot spoof sender or read another agent's mailbox", async () =
   expect(adminInbox.status).toBe(200);
   const adminListed = (await adminInbox.json()) as { messages: Array<{ id: string; type: string }> };
   expect(adminListed.messages.some((m) => m.id === secretId && m.type === "secret")).toBe(true);
+});
+
+test("agent key cannot spoof task created_by, claim as another agent, or complete another's task", async () => {
+  const cookie = await login();
+
+  const spoofCreate = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ goal: "spoof creator", created_by: "localbot" }),
+  });
+  expect(spoofCreate.status).toBe(200);
+  const spoofCreateBody = (await spoofCreate.json()) as { task: { id: string; created_by: string } };
+  expect(spoofCreateBody.task.created_by).toBe("shinon");
+
+  const spoofClaim = await fetch(`http://localhost:${port}/api/tasks/${spoofCreateBody.task.id}/claim`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ by: "localbot" }),
+  });
+  expect(spoofClaim.status).toBe(200);
+  const spoofClaimBody = (await spoofClaim.json()) as { task: { assigned_to: string } };
+  expect(spoofClaimBody.task.assigned_to).toBe("shinon");
+
+  const jwtTask = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ goal: "dashboard task for localbot" }),
+  });
+  expect(jwtTask.status).toBe(200);
+  const jwtTaskBody = (await jwtTask.json()) as { task: { id: string } };
+
+  const localClaim = await fetch(`http://localhost:${port}/api/tasks/${jwtTaskBody.task.id}/claim`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${LOCAL_KEY}`,
+    },
+    body: JSON.stringify({ by: "localbot" }),
+  });
+  expect(localClaim.status).toBe(200);
+
+  const stealComplete = await fetch(`http://localhost:${port}/api/tasks/${jwtTaskBody.task.id}/complete`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${TEST_KEY}`,
+    },
+    body: JSON.stringify({ summary: "stolen" }),
+  });
+  expect(stealComplete.status).toBe(403);
+  expect(await stealComplete.json()).toEqual({ error: "forbidden" });
+
+  const ownerComplete = await fetch(`http://localhost:${port}/api/tasks/${jwtTaskBody.task.id}/complete`, {
+    method: "PUT",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${LOCAL_KEY}`,
+    },
+    body: JSON.stringify({ summary: "mine" }),
+  });
+  expect(ownerComplete.status).toBe(200);
+  expect(((await ownerComplete.json()) as { task: { status: string } }).task.status).toBe("done");
+
+  const unclaimed = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ goal: "dashboard completes unclaimed" }),
+  });
+  expect(unclaimed.status).toBe(200);
+  const unclaimedBody = (await unclaimed.json()) as { task: { id: string } };
+
+  const dashComplete = await fetch(`http://localhost:${port}/api/tasks/${unclaimedBody.task.id}/complete`, {
+    method: "PUT",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ summary: "admin done" }),
+  });
+  expect(dashComplete.status).toBe(200);
+  expect(((await dashComplete.json()) as { task: { status: string } }).task.status).toBe("done");
 });

@@ -45,7 +45,7 @@ que las keys **son** identidad.
   mailbox. Distingue “no está” de “no es tuyo” sin filtrar IDs inexistentes.
 - No hay tool MCP de mark-read: la spec v2 solo pide send/inbox.
 - Dual-auth de `/api/tasks` no cambia su modelo de identidad en este slice (fuera
-  de scope).
+  de scope). Binding de identidad del board: [`2026-09-06-task-identity-rag-vault-scope.md`](./2026-09-06-task-identity-rag-vault-scope.md).
 
 ## Alternativas consideradas
 

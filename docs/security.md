@@ -40,11 +40,11 @@
 
 | Nivel | Scope |
 |-------|-------|
-| Admin (humano) | Todo: dashboard, keygen, config |
-| Agent key | Conexión WS + consultas RAG + uso del router |
+| Admin (humano) | Todo: dashboard, keygen, config. RAG sin filtrar. Tasks/mailbox con identidad del body. |
+| Agent key | Conexión WS + uso del router. RAG filtrado por scopes JSON de la key (`*` o `vault:<name>`). En `/api/tasks` y `/api/messages` la key **es** identidad (`agent_name`). |
 | Subagent key | Solo ejecución de una tarea (efímera, scoped) |
 
-El sistema de scopes fino (lectura/escritura por servicio) se implementa en Fase 2.
+Vault scopes en `POST /api/rag/search` se enforcean server-side para agent keys. Scopes más finos (lectura/escritura por servicio, p.ej. `board`) siguen pendientes.
 
 ---
 
@@ -104,4 +104,4 @@ Antes de cada push a `dev`:
 
 ---
 
-*Actualizado: 2026-08-20.*
+*Actualizado: 2026-09-06.*

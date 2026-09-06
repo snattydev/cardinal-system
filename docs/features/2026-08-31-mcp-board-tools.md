@@ -6,7 +6,7 @@ Agents can drive the blackboard through the MCP server without a dashboard JWT.
 
 - MCP tools: `cardinal_task_create`, `cardinal_task_list`, `cardinal_task_claim`, `cardinal_task_complete`
 - Backend `/api/tasks*` accepts either a session cookie (dashboard) or an active `sk-cardinal-*` Bearer key
-- Claim uses the key's agent name as `assigned_to`; create sets `created_by` to that agent
+- Claim uses the key's agent name as `assigned_to`; create sets `created_by` to that agent. The backend now enforces this for Bearer keys (body ignored); complete is 403 unless `assigned_to` matches. See [`2026-09-06-task-identity-rag-vault-scope.md`](./2026-09-06-task-identity-rag-vault-scope.md).
 
 ## Why
 

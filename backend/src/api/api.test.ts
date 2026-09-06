@@ -604,6 +604,100 @@ describe("handleRagSearch", () => {
     expect(typeof body.detail).toBe("string");
     db.close();
   });
+
+  const twoVaultHits = [
+    { file_path: "/data/vaults/the portal/index.md", content: "portal", heading: "", rrf_score: 0.9 },
+    { file_path: "/data/vaults/for-my-agents/tasks.md", content: "agents", heading: "", rrf_score: 0.8 },
+  ];
+
+  test("vaultScopes vault:the portal filtra y descarta for-my-agents", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+    db.close();
+  });
+
+  test("vaultScopes * no filtra", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["*"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("sin vaultScopes no filtra (dashboard)", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("vaultScopes sin vault: ni * → results vacíos", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["fast"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: unknown[] };
+    expect(body.results).toEqual([]);
+    db.close();
+  });
+
+  test("filtra también respuestas cacheadas", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const first = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    const firstBody = (await first.json()) as { results: Array<{ path: string }>; cached: boolean };
+    expect(firstBody.cached).toBe(false);
+    expect(firstBody.results).toHaveLength(2);
+
+    const second = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    const secondBody = (await second.json()) as { results: Array<{ path: string }>; cached: boolean };
+    expect(secondBody.cached).toBe(true);
+    expect(secondBody.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+    expect(calls).toHaveLength(1);
+    db.close();
+  });
 });
 
 describe("handleGetConfig", () => {

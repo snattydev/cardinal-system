@@ -38,7 +38,19 @@ import { getSessionUser } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
 import { serveStatic } from "./static";
 
-type DashboardOrAgent = { kind: "dashboard" } | { kind: "agent"; agent: string };
+type DashboardOrAgent = { kind: "dashboard" } | { kind: "agent"; agent: string; scopes: string[] };
+
+function parseScopes(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((s) => typeof s === "string")) {
+      return parsed;
+    }
+  } catch {
+    // fall through
+  }
+  return [];
+}
 
 /** Dashboard JWT or active agent key. Used by board endpoints agents call via MCP. */
 async function requireDashboardOrAgentKey(
@@ -52,7 +64,7 @@ async function requireDashboardOrAgentKey(
   if (svcKey === null) return null;
   const keyRow = findActiveKeyByHash(db, hashKey(svcKey));
   if (keyRow === null) return null;
-  return { kind: "agent", agent: keyRow.agent_name };
+  return { kind: "agent", agent: keyRow.agent_name, scopes: parseScopes(keyRow.scopes) };
 }
 
 export function createServer(config: Config, db: Database): Server<ConnData> {
@@ -209,15 +221,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/rag/search" && method === "POST") {
-        // Dashboard (JWT) o servicio interno con agent key (cardinal-mcp).
-        const user = await getSessionUser(req, config.jwtSecret);
-        if (!user) {
-          const svcKey = extractBearerKey(req);
-          const keyRow =
-            svcKey !== null ? findActiveKeyByHash(db, hashKey(svcKey)) : null;
-          if (!keyRow) return json({ error: "unauthorized" }, 401);
-        }
-        return handleRagSearch(db, req);
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        return handleRagSearch(db, req, auth.kind === "agent" ? { vaultScopes: auth.scopes } : {});
       }
 
       if (pathname === "/api/tasks" && method === "GET") {
@@ -228,26 +234,32 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/tasks" && method === "POST") {
-        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
-          return json({ error: "unauthorized" }, 401);
-        }
-        return handleCreateTask(db, req, (t) => hub.broadcastTask(t));
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        const agent = auth.kind === "agent" ? auth.agent : undefined;
+        return handleCreateTask(db, req, (t) => hub.broadcastTask(t), agent);
       }
 
       const taskClaimMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
       if (taskClaimMatch && method === "PUT") {
-        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
-          return json({ error: "unauthorized" }, 401);
-        }
-        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t));
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        const agent = auth.kind === "agent" ? auth.agent : undefined;
+        return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t), agent);
       }
 
       const taskCompleteMatch = pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
       if (taskCompleteMatch && method === "PUT") {
-        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
-          return json({ error: "unauthorized" }, 401);
-        }
-        return handleCompleteTask(db, decodeURIComponent(taskCompleteMatch[1]!), req, (t) => hub.broadcastTask(t));
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        const agent = auth.kind === "agent" ? auth.agent : undefined;
+        return handleCompleteTask(
+          db,
+          decodeURIComponent(taskCompleteMatch[1]!),
+          req,
+          (t) => hub.broadcastTask(t),
+          agent,
+        );
       }
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);

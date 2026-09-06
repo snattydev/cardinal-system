@@ -7,6 +7,18 @@ interface RagHandlerOpts {
   baseUrl?: string;
   token?: string;
   fetchImpl?: RagFetch;
+  vaultScopes?: string[];
+}
+
+function filterResultsByVaultScopes(results: RagResult[], vaultScopes?: string[]): RagResult[] {
+  if (vaultScopes === undefined) return results;
+  if (vaultScopes.includes("*")) return results;
+  const vaults: string[] = [];
+  for (const scope of vaultScopes) {
+    if (scope.startsWith("vault:")) vaults.push(scope.slice("vault:".length));
+  }
+  if (vaults.length === 0) return [];
+  return results.filter((r) => vaults.some((vault) => r.path.includes(`/${vault}/`)));
 }
 
 export async function handleRagSearch(
@@ -54,7 +66,7 @@ export async function handleRagSearch(
       fetchImpl: opts.fetchImpl,
     });
     const payload: { results: RagResult[]; cached: boolean; cached_at?: string } = {
-      results: result.results,
+      results: filterResultsByVaultScopes(result.results, opts.vaultScopes),
       cached: result.cached,
     };
     if (result.cached_at) payload.cached_at = result.cached_at;
