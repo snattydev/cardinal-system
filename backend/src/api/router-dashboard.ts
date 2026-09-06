@@ -1,15 +1,19 @@
 import type { Database } from "bun:sqlite";
-import type { ModelRouteRow, ProviderModelRow, ProviderRow, ProviderStatus } from "@cardinal/core";
+import type { ModelRouteRow, ProviderModelRow, ProviderRow, ProviderStatus, WireFormat } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import type { ModelRouteHop } from "@cardinal/db";
 import {
+  addProviderModel,
   getModelRoute,
+  getProviderByName,
   listModelRoutes,
   listProviderModels,
   listProviders,
   setProviderStatus,
   upsertModelRoute,
+  upsertProvider,
 } from "@cardinal/db";
+import { encryptSecret } from "@cardinal/keys";
 
 type Hop = { provider: string; model: string };
 
@@ -91,6 +95,77 @@ export function handleListRouterProviders(db: Database): Response {
 
 export function handleListRouterRoutes(db: Database): Response {
   return json({ routes: listModelRoutes(db).map(toPublicRoute) });
+}
+
+const WIRE_FORMATS: WireFormat[] = ["openai", "anthropic", "gemini"];
+
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function isNonNegativeFinite(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+export async function handleCreateRouterProvider(
+  db: Database,
+  req: Request,
+  poolSecret: string,
+): Promise<Response> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  if (body === null || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  const payload = body as Record<string, unknown>;
+
+  if (!isNonEmptyString(payload.name) || !isNonEmptyString(payload.base_url) || !isNonEmptyString(payload.api_key)) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+  if (!Array.isArray(payload.models) || payload.models.length === 0 || !payload.models.every(isNonEmptyString)) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+
+  let wireFormat: WireFormat = "openai";
+  if (payload.wire_format !== undefined) {
+    if (typeof payload.wire_format !== "string" || !WIRE_FORMATS.includes(payload.wire_format as WireFormat)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    wireFormat = payload.wire_format as WireFormat;
+  }
+
+  let costPerMtok = 0;
+  if (payload.cost_per_mtok !== undefined) {
+    if (!isNonNegativeFinite(payload.cost_per_mtok)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    costPerMtok = payload.cost_per_mtok;
+  }
+
+  const name = payload.name.trim();
+  const baseUrl = payload.base_url.trim();
+  upsertProvider(db, {
+    name,
+    baseUrl,
+    apiKeyEnc: encryptSecret(payload.api_key, poolSecret),
+    wireFormat,
+    costPerMtok,
+  });
+  const provider = getProviderByName(db, name);
+  if (!provider) return json({ error: "not_found" }, 500);
+
+  for (const modelId of payload.models) {
+    addProviderModel(db, { providerId: provider.id, modelId: modelId.trim() });
+  }
+
+  return json({
+    provider: toPublicProvider(provider),
+    models: listProviderModels(db, provider.id).map(toPublicModel),
+  });
 }
 
 export async function handlePatchRouterProvider(

@@ -1,6 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { api } from "../lib/api";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { api, ApiError } from "../lib/api";
 import type { RouterHop, RouterModel, RouterProvider, RouterRoute } from "../lib/types";
+
+const inputClass =
+  "rounded border border-sao-accent/20 bg-sao-bg px-3 py-2 font-mono text-sm outline-none focus:border-sao-accent";
+
+const WIRE_FORMATS = ["openai", "anthropic", "gemini"] as const;
 
 function statusClass(status: RouterProvider["status"]): string {
   return status === "active" ? "text-sao-mint" : "text-slate-500";
@@ -22,6 +27,13 @@ function includesQuery(q: string, ...parts: string[]): boolean {
   return parts.some((p) => p.toLowerCase().includes(q));
 }
 
+function parseModels(raw: string): string[] {
+  return raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
+}
+
 export default function Router() {
   const [providers, setProviders] = useState<RouterProvider[]>([]);
   const [models, setModels] = useState<RouterModel[]>([]);
@@ -30,20 +42,29 @@ export default function Router() {
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([
+  const [name, setName] = useState("");
+  const [baseUrl, setBaseUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [modelIds, setModelIds] = useState("");
+  const [wireFormat, setWireFormat] = useState<(typeof WIRE_FORMATS)[number]>("openai");
+  const [costPerMtok, setCostPerMtok] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createdName, setCreatedName] = useState<string | null>(null);
+
+  async function reloadCatalog(): Promise<void> {
+    const [providersRes, routesRes] = await Promise.all([
       api<{ providers: RouterProvider[]; models: RouterModel[] }>("/api/router/providers"),
       api<{ routes: RouterRoute[] }>("/api/router/routes"),
-    ])
-      .then(([providersRes, routesRes]) => {
-        if (!cancelled) {
-          setProviders(providersRes.providers);
-          setModels(providersRes.models);
-          setRoutes(routesRes.routes);
-          setLoadStatus("ready");
-        }
-      })
+    ]);
+    setProviders(providersRes.providers);
+    setModels(providersRes.models);
+    setRoutes(routesRes.routes);
+    setLoadStatus("ready");
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    reloadCatalog()
       .catch(() => {
         if (!cancelled) {
           setError("failed to load router");
@@ -54,6 +75,49 @@ export default function Router() {
       cancelled = true;
     };
   }, []);
+
+  async function onCreate(e: FormEvent): Promise<void> {
+    e.preventDefault();
+    const parsedModels = parseModels(modelIds);
+    if (parsedModels.length === 0) {
+      setError("models required");
+      return;
+    }
+    setError(null);
+    setCreatedName(null);
+    const costRaw = costPerMtok.trim();
+    let cost: number | undefined;
+    if (costRaw !== "") {
+      const n = Number(costRaw);
+      if (!Number.isFinite(n) || n < 0) {
+        setError("invalid cost_per_mtok");
+        return;
+      }
+      cost = n;
+    }
+    setCreating(true);
+    try {
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        base_url: baseUrl.trim(),
+        api_key: apiKey,
+        models: parsedModels,
+        wire_format: wireFormat,
+      };
+      if (cost !== undefined) body.cost_per_mtok = cost;
+      const res = await api<{ provider: RouterProvider }>("/api/router/providers", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+      setCreatedName(res.provider.name);
+      setApiKey("");
+      await reloadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "failed to add provider");
+    } finally {
+      setCreating(false);
+    }
+  }
 
   const q = query.trim().toLowerCase();
 
@@ -79,6 +143,96 @@ export default function Router() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-mono text-lg tracking-widest text-sao-accent">ROUTER</h1>
+
+      <form
+        onSubmit={(e) => void onCreate(e)}
+        className="flex flex-col gap-3 rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-4"
+      >
+        <h2 className="font-mono text-xs tracking-widest text-slate-500">ADD PROVIDER KEY</h2>
+        <div className="flex flex-wrap gap-3">
+          <label className="flex min-w-40 flex-1 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">name</span>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="openrouter"
+              required
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-56 flex-[2] flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">base url</span>
+            <input
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              placeholder="https://openrouter.ai/api/v1"
+              required
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-48 flex-1 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">api key</span>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder="sk-…"
+              required
+              autoComplete="off"
+              className={inputClass}
+            />
+          </label>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <label className="flex min-w-56 flex-[2] flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">models</span>
+            <input
+              value={modelIds}
+              onChange={(e) => setModelIds(e.target.value)}
+              placeholder="model-a, model-b"
+              required
+              className={inputClass}
+            />
+          </label>
+          <label className="flex min-w-36 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">wire format</span>
+            <select
+              value={wireFormat}
+              onChange={(e) => setWireFormat(e.target.value as (typeof WIRE_FORMATS)[number])}
+              className={inputClass}
+            >
+              {WIRE_FORMATS.map((fmt) => (
+                <option key={fmt} value={fmt}>
+                  {fmt}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex min-w-32 flex-col gap-1">
+            <span className="font-mono text-xs tracking-widest text-slate-500">cost / mtok</span>
+            <input
+              type="number"
+              value={costPerMtok}
+              onChange={(e) => setCostPerMtok(e.target.value)}
+              step="any"
+              placeholder="0"
+              className={inputClass}
+            />
+          </label>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="submit"
+            disabled={creating}
+            className="rounded border border-sao-accent/60 px-3 py-2 font-mono text-sm text-sao-accent transition-colors hover:bg-sao-accent/10 disabled:opacity-50"
+          >
+            {creating ? "saving" : "add key"}
+          </button>
+          {createdName && (
+            <p className="font-mono text-xs text-sao-mint">saved {createdName} — key encrypted, never shown</p>
+          )}
+        </div>
+      </form>
 
       <input
         value={query}
@@ -146,6 +300,7 @@ export default function Router() {
                   <thead>
                     <tr className="border-b border-sao-accent/20 tracking-widest text-slate-500">
                       <th className="px-3 py-2 text-left font-normal">name</th>
+                      <th className="px-3 py-2 text-left font-normal">base_url</th>
                       <th className="px-3 py-2 text-left font-normal">models</th>
                       <th className="px-3 py-2 text-left font-normal">status</th>
                       <th className="px-3 py-2 text-left font-normal">cost_per_mtok</th>
@@ -223,9 +378,19 @@ function ProviderRow({
 }) {
   const modelList = models.map((m) => m.model_id).join(", ");
   return (
-    <tr>
+    <tr className="align-top">
       <td className="px-3 py-2 text-sao-accent">{provider.name}</td>
-      <td className="px-3 py-2 text-slate-300">{modelList.length > 0 ? modelList : "—"}</td>
+      <td className="max-w-xs break-all px-3 py-2 text-slate-400">{provider.base_url}</td>
+      <td className="max-w-xl break-all px-3 py-2 text-slate-300">
+        {models.length > 0 ? (
+          <>
+            <span className="text-slate-500">{models.length} · </span>
+            {modelList}
+          </>
+        ) : (
+          "—"
+        )}
+      </td>
       <td className={`px-3 py-2 ${statusClass(provider.status)}`}>{provider.status}</td>
       <td className="px-3 py-2 text-slate-300">{provider.cost_per_mtok}</td>
       <td className="px-3 py-2 text-sao-violet">{provider.wire_format}</td>

@@ -46,6 +46,7 @@ POST http://127.0.0.1:8787/v1/chat/completions
 | `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | Completion OpenAI-compatible (streaming, no-streaming, Fusion) |
 | `GET /v1/models` | — | Lista de modelos y aliases disponibles (formato OpenAI) |
 | `GET /api/router/providers` | cookie JWT | Dashboard: providers + modelos (sin `api_key_enc`) |
+| `POST /api/router/providers` | cookie JWT | Alta/rotación de provider: `name`, `base_url`, `api_key`, `models[]`. La key se cifra (AES-256-GCM) y **nunca** vuelve en la respuesta |
 | `GET /api/router/routes` | cookie JWT | Dashboard: aliases y `fallback_chain` (arrays; Fusion se ve vacío) |
 | `PATCH /api/router/providers/:id` | cookie JWT | `active` \| `disabled` |
 | `PUT /api/router/routes/:alias` | cookie JWT | Upsert de cadena de hops (solo arrays) |
@@ -86,12 +87,24 @@ El router es **agnóstico**: cualquier upstream OpenAI-compatible sirve.
 
 ### 4.1 Agregar un provider real
 
+Desde el dashboard: **Router → Catalog** (`/router`), formulario ADD PROVIDER KEY
+(name, base url, api key, models, wire format, cost/mtok). `POST /api/router/providers`
+cifra la key y no la devuelve.
+
+Sigue existiendo el camino CLI para e2e/scripts:
+
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun backend/src/seed-provider.ts --name deepseek-direct --base-url https://api.deepseek.com/v1 --api-key <KEY> --model deepseek-v4-flash --model deepseek-v4-pro'
 ```
 
 > (Si el script `seed-provider.ts` todavía no existe, el patrón está en
 > `backend/src/seed-router.ts` — es el mismo: `upsertProvider` + `addProviderModel`.)
+
+One-shot de referencia (2026-09-05): se importó el catálogo **mensual público** de
+FreeLLMAPI (`GET https://api.freellmapi.co/v1/latest`, tier `monthly` v2026.09.04)
+como filas `disabled` (sin key). Los keyless (`kilo`, `ovh`, `aihorde`) quedaron
+`active`. No es el feed live de pago; el siguiente paso personal es un catálogo
+propio, no suscribirse.
 
 La api_key se encripta con AES-256-GCM usando `POOL_SECRET` — **nunca se guarda en
 claro y nunca sale del Cardinal**. Para listar providers sin exponer keys:

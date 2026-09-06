@@ -27,6 +27,7 @@ import { findActiveKeyByHash } from "@cardinal/db";
 import { hashKey } from "@cardinal/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
 import {
+  handleCreateRouterProvider,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
@@ -304,6 +305,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleListRouterProviders(db);
+      }
+
+      if (pathname === "/api/router/providers" && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleCreateRouterProvider(db, req, config.poolSecret);
       }
 
       if (pathname === "/api/router/routes" && method === "GET") {

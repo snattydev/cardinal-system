@@ -7,8 +7,8 @@ export default function Layout() {
   const { logout } = useAuth();
   const [version, setVersion] = useState<string>("");
   const location = useLocation();
-  const [agentsOpen, setAgentsOpen] = useState(
-    () => location.pathname.startsWith("/agents") || location.pathname.startsWith("/keys"),
+  const [routerOpen, setRouterOpen] = useState(
+    () => location.pathname.startsWith("/router") || location.pathname.startsWith("/keys"),
   );
 
   useEffect(() => {
@@ -17,12 +17,19 @@ export default function Layout() {
       .catch(() => setVersion(""));
   }, []);
 
-  const isAgentsActive =
-    location.pathname.startsWith("/agents") || location.pathname.startsWith("/keys");
+  const isRouterActive =
+    location.pathname.startsWith("/router") || location.pathname.startsWith("/keys");
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `block rounded border px-3 py-2 font-mono text-sm transition-colors ${
       isActive
+        ? "border-sao-accent/60 bg-sao-panel text-sao-accent"
+        : "border-transparent text-slate-400 hover:text-sao-accent hover:border-sao-accent/30"
+    }`;
+
+  const sectionClass = (active: boolean) =>
+    `flex w-full items-center gap-2 rounded border px-3 py-2 font-mono text-sm transition-colors ${
+      active
         ? "border-sao-accent/60 bg-sao-panel text-sao-accent"
         : "border-transparent text-slate-400 hover:text-sao-accent hover:border-sao-accent/30"
     }`;
@@ -39,23 +46,26 @@ export default function Layout() {
             Overview
           </NavLink>
 
-          {/* Agents dropdown */}
+          <NavLink to="/agents" className={linkClass}>
+            Agents
+          </NavLink>
+
+          <NavLink to="/tasks" className={linkClass}>
+            Tasks
+          </NavLink>
+
           <div className="flex flex-col">
             <button
-              onClick={() => setAgentsOpen((v) => !v)}
-              className={`flex w-full items-center gap-2 rounded border px-3 py-2 font-mono text-sm transition-colors ${
-                isAgentsActive
-                  ? "border-sao-accent/60 bg-sao-panel text-sao-accent"
-                  : "border-transparent text-slate-400 hover:text-sao-accent hover:border-sao-accent/30"
-              }`}
+              onClick={() => setRouterOpen((v) => !v)}
+              className={sectionClass(isRouterActive)}
             >
-              <span className="w-3 text-xs">{agentsOpen ? "▾" : "▸"}</span>
-              Agents
+              <span className="w-3 text-xs">{routerOpen ? "▾" : "▸"}</span>
+              Router
             </button>
-            {agentsOpen && (
+            {routerOpen && (
               <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-sao-accent/20 pl-3">
-                <NavLink to="/agents" end className={linkClass}>
-                  Hub
+                <NavLink to="/router" end className={linkClass}>
+                  Catalog
                 </NavLink>
                 <NavLink to="/keys" className={linkClass}>
                   Keys
@@ -63,14 +73,6 @@ export default function Layout() {
               </div>
             )}
           </div>
-
-          <NavLink to="/tasks" className={linkClass}>
-            Tasks
-          </NavLink>
-
-          <NavLink to="/router" className={linkClass}>
-            Router
-          </NavLink>
 
           <NavLink to="/settings" className={linkClass}>
             Settings

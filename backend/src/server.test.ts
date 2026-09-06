@@ -362,6 +362,44 @@ test("GET /api/router/providers and GET /api/router/routes with session cookie �
   expect(Array.isArray(routesBody.routes)).toBe(true);
 });
 
+test("POST /api/router/providers without cookie → 401", async () => {
+  const res = await fetch(`http://localhost:${port}/api/router/providers`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      name: "openrouter",
+      base_url: "https://openrouter.ai/api/v1",
+      api_key: "sk-or-live-secret-xyz",
+      models: ["moonshotai/kimi-k2.5"],
+    }),
+  });
+  expect(res.status).toBe(401);
+  expect(await res.json()).toEqual({ error: "unauthorized" });
+});
+
+test("POST /api/router/providers with session cookie creates provider", async () => {
+  const cookie = await login();
+  const res = await fetch(`http://localhost:${port}/api/router/providers`, {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({
+      name: "openrouter",
+      base_url: "https://openrouter.ai/api/v1",
+      api_key: "sk-or-live-secret-xyz",
+      models: ["moonshotai/kimi-k2.5"],
+    }),
+  });
+  expect(res.status).toBe(200);
+  const body = (await res.json()) as {
+    provider: { name: string; base_url: string };
+    models: Array<{ model_id: string }>;
+  };
+  expect(body.provider.name).toBe("openrouter");
+  expect(body.provider.base_url).toBe("https://openrouter.ai/api/v1");
+  expect(JSON.stringify(body)).not.toContain("sk-or-live-secret-xyz");
+  expect(body.models.map((m) => m.model_id)).toEqual(["moonshotai/kimi-k2.5"]);
+});
+
 test("PATCH /api/router/providers/:id and PUT /api/router/routes/:alias without cookie → 401", async () => {
   const patch = await fetch(`http://localhost:${port}/api/router/providers/1`, {
     method: "PATCH",

@@ -7,7 +7,9 @@ import {
   upsertModelRoute,
   upsertProvider,
 } from "@cardinal/db";
+import { decryptSecret } from "@cardinal/keys";
 import {
+  handleCreateRouterProvider,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
@@ -40,6 +42,8 @@ type RoutePublic = {
   fallback_chain: Hop[];
   created_at: string;
 };
+
+const POOL = "test-pool-secret";
 
 function jsonReq(url: string, method: string, body: string): Request {
   return new Request(url, {
@@ -401,6 +405,123 @@ describe("handleListRouterRoutes malformed chain", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { routes: RoutePublic[] };
     expect(body.routes[0]!.fallback_chain).toEqual([{ provider: "mock-local", model: "test-model" }]);
+    db.close();
+  });
+});
+
+function createProviderBody(overrides: Record<string, unknown> = {}): string {
+  return JSON.stringify({
+    name: "openrouter",
+    base_url: "https://openrouter.ai/api/v1",
+    api_key: "sk-or-live-secret-xyz",
+    models: ["moonshotai/kimi-k2.5"],
+    ...overrides,
+  });
+}
+
+describe("handleCreateRouterProvider", () => {
+  test("creates provider, encrypts api_key, never returns the secret", async () => {
+    const db = createDb(":memory:");
+    const plaintext = "sk-or-live-secret-xyz";
+    const res = await handleCreateRouterProvider(
+      db,
+      jsonReq("http://localhost/api/router/providers", "POST", createProviderBody()),
+      POOL,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      provider: ProviderPublic;
+      models: ModelPublic[];
+    };
+    expect(body.provider.name).toBe("openrouter");
+    expect(body.provider.base_url).toBe("https://openrouter.ai/api/v1");
+    expect(body.provider.wire_format).toBe("openai");
+    expect(body.provider.status).toBe("active");
+    expect(body.provider).not.toHaveProperty("api_key_enc");
+    expect(body.provider).not.toHaveProperty("api_key");
+    expect(JSON.stringify(body)).not.toContain(plaintext);
+    expect(body.models).toEqual([
+      expect.objectContaining({
+        provider_id: body.provider.id,
+        model_id: "moonshotai/kimi-k2.5",
+      }),
+    ]);
+
+    const row = getProviderByName(db, "openrouter")!;
+    expect(row.api_key_enc).not.toBe(plaintext);
+    expect(row.api_key_enc).not.toBeNull();
+    expect(decryptSecret(row.api_key_enc!, POOL)).toBe(plaintext);
+    db.close();
+  });
+
+  test("rejects missing or empty required fields", async () => {
+    const db = createDb(":memory:");
+    const payloads = [
+      createProviderBody({ name: "" }),
+      createProviderBody({ base_url: "" }),
+      createProviderBody({ api_key: "" }),
+      createProviderBody({ models: [] }),
+      JSON.stringify({ name: "x", base_url: "http://x", api_key: "k" }),
+      "not-json",
+    ];
+    for (const body of payloads) {
+      const res = await handleCreateRouterProvider(
+        db,
+        jsonReq("http://localhost/api/router/providers", "POST", body),
+        POOL,
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_payload" });
+    }
+    db.close();
+  });
+
+  test("rejects invalid wire_format", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCreateRouterProvider(
+      db,
+      jsonReq(
+        "http://localhost/api/router/providers",
+        "POST",
+        createProviderBody({ wire_format: "raw" }),
+      ),
+      POOL,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_payload" });
+    db.close();
+  });
+
+  test("upserts by name and rotates the encrypted key", async () => {
+    const db = createDb(":memory:");
+    const first = await handleCreateRouterProvider(
+      db,
+      jsonReq(
+        "http://localhost/api/router/providers",
+        "POST",
+        createProviderBody({ api_key: "key-one" }),
+      ),
+      POOL,
+    );
+    expect(first.status).toBe(200);
+    const second = await handleCreateRouterProvider(
+      db,
+      jsonReq(
+        "http://localhost/api/router/providers",
+        "POST",
+        createProviderBody({ api_key: "key-two", models: ["other"] }),
+      ),
+      POOL,
+    );
+    expect(second.status).toBe(200);
+    const row = getProviderByName(db, "openrouter")!;
+    expect(decryptSecret(row.api_key_enc!, POOL)).toBe("key-two");
+    const listed = (await handleListRouterProviders(db).json()) as { models: ModelPublic[] };
+    const ids = listed.models
+      .filter((m) => m.provider_id === row.id)
+      .map((m) => m.model_id)
+      .sort();
+    expect(ids).toEqual(["moonshotai/kimi-k2.5", "other"]);
     db.close();
   });
 });
