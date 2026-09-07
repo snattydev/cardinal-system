@@ -20,7 +20,7 @@
 |---|------|------|-----|------------|
 | 6 | [done] Provider-agnostic LLM Router | feature | Yes | — |
 | 7 | [done] Key Factory scopes + budget + encryption | feature | Yes | — |
-| 5 | Seed providers/routes + real zen free e2e | spike/e2e | — | 6, 7 |
+| 5 | [done] Seed providers/routes (`scripts/seed-router.py`) | spike/e2e | — | 6, 7 |
 | 1 | [done] Mailbox `messages` API (agent<->agent handoff) | feature | Yes | — |
 | 2 | [done] Board UI — `/tasks` page | frontend | No | — |
 | 3 | [done] MCP board tools + dual-auth `/api/tasks` (2026-08-31) | feature | Yes | MCP hub |
@@ -28,7 +28,7 @@
 | 8 | [done] Fix typecheck `maxPayloadLength` | fix | — | — |
 | 9 | [done] Stale docs — refresh (2026-08-31 + 2026-09-03 router surface) | docs | — | — |
 | 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | release | — | all |
-| 11 | Bootstrap admin password **without the model** (TTY `read -s` -> hash only in env/secret) | security / deploy | — | **cloud blocker** |
+| 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | security / deploy | — | **cloud blocker** |
 | 12 | [done] Keys dashboard: list + revoke persistent (`/keys`) | feature | Yes | — |
 | 13 | One-shot keys: compact block bottom-left in `/keys` + hard-delete upon completion | feature | Yes | one-shot pipeline (v3 N1) |
 | 14 | [done] MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` (2026-08-31) | feature | Yes | 1, 3 |

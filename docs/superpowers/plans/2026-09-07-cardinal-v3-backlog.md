@@ -61,9 +61,9 @@ with a JSON stdin/stdout contract and bounded scope**.
 
 | # | Item | Type | Fase | Priority | TDD | Depends on |
 |---|------|------|------|----------|-----|------------|
-| 5 | Seed providers/routes + real zen free e2e | spike/e2e | F2 | P0 | — | 6, 7 (v2) |
+| 5 | [done] Seed providers/routes (`scripts/seed-router.py`) | spike/e2e | F2 | P0 | — | 6, 7 (v2) |
 | 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | release | F2 | P1 | — | all |
-| 11 | Bootstrap admin password **without the model** (TTY `read -s`) | security/deploy | F2 | P0 | — | cloud blocker |
+| 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | security/deploy | F2 | P0 | — | cloud blocker |
 | 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | feature | F2 | P1 | Yes | N1 |
 | **N1** | **Containerized agentic backend** (podman quadlet, base image, JSON stdin/stdout contract, lifecycle, TTL, cleanup) | infra | F2 | **P0** | Yes | router closed ([done]) |
 | **N2** | **Tasks v2: no claim/complete, assign triggers one-shot, auto-fire toggle** (clean migration: `pending | running | done | failed | cancelled`) | feature | F2 | **P1** | Yes | N1 |
