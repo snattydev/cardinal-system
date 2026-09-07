@@ -28,10 +28,12 @@ import { hashKey } from "@cardinal/keys";
 import { handleChatCompletions, handleListModels } from "./api/router";
 import {
   handleCreateRouterProvider,
+  handleDeleteRouterProvider,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
   handlePutRouterRoute,
+  handleSyncRouterProviderModels,
 } from "./api/router-dashboard";
 import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
 import { getSessionUser } from "@cardinal/auth";
@@ -335,7 +337,29 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (routerProviderMatch && method === "PATCH") {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
-        return handlePatchRouterProvider(db, decodeURIComponent(routerProviderMatch[1]!), req);
+        return handlePatchRouterProvider(
+          db,
+          decodeURIComponent(routerProviderMatch[1]!),
+          req,
+          config.poolSecret,
+        );
+      }
+
+      if (routerProviderMatch && method === "DELETE") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleDeleteRouterProvider(db, decodeURIComponent(routerProviderMatch[1]!));
+      }
+
+      const routerProviderSyncMatch = pathname.match(/^\/api\/router\/providers\/([^/]+)\/sync-models$/);
+      if (routerProviderSyncMatch && method === "POST") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleSyncRouterProviderModels(
+          db,
+          decodeURIComponent(routerProviderSyncMatch[1]!),
+          config.poolSecret,
+        );
       }
 
       const routerRouteMatch = pathname.match(/^\/api\/router\/routes\/([^/]+)$/);

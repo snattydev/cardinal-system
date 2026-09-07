@@ -27,13 +27,6 @@ function includesQuery(q: string, ...parts: string[]): boolean {
   return parts.some((p) => p.toLowerCase().includes(q));
 }
 
-function parseModels(raw: string): string[] {
-  return raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
-}
-
 export default function Router() {
   const [providers, setProviders] = useState<RouterProvider[]>([]);
   const [models, setModels] = useState<RouterModel[]>([]);
@@ -45,11 +38,13 @@ export default function Router() {
   const [name, setName] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [apiKey, setApiKey] = useState("");
-  const [modelIds, setModelIds] = useState("");
   const [wireFormat, setWireFormat] = useState<(typeof WIRE_FORMATS)[number]>("openai");
   const [costPerMtok, setCostPerMtok] = useState("");
   const [creating, setCreating] = useState(false);
   const [createdName, setCreatedName] = useState<string | null>(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [savingId, setSavingId] = useState<number | null>(null);
 
   async function reloadCatalog(): Promise<void> {
     const [providersRes, routesRes] = await Promise.all([
@@ -78,11 +73,6 @@ export default function Router() {
 
   async function onCreate(e: FormEvent): Promise<void> {
     e.preventDefault();
-    const parsedModels = parseModels(modelIds);
-    if (parsedModels.length === 0) {
-      setError("models required");
-      return;
-    }
     setError(null);
     setCreatedName(null);
     const costRaw = costPerMtok.trim();
@@ -101,14 +91,16 @@ export default function Router() {
         name: name.trim(),
         base_url: baseUrl.trim(),
         api_key: apiKey,
-        models: parsedModels,
         wire_format: wireFormat,
       };
       if (cost !== undefined) body.cost_per_mtok = cost;
-      const res = await api<{ provider: RouterProvider }>("/api/router/providers", {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
+      const res = await api<{ provider: RouterProvider; models: RouterModel[] }>(
+        "/api/router/providers",
+        {
+          method: "POST",
+          body: JSON.stringify(body),
+        },
+      );
       setCreatedName(res.provider.name);
       setApiKey("");
       await reloadCatalog();
@@ -117,6 +109,57 @@ export default function Router() {
     } finally {
       setCreating(false);
     }
+  }
+
+  async function syncProviderModels(id: number): Promise<void> {
+    setError(null);
+    setSavingId(id);
+    try {
+      await api<{ provider: RouterProvider; models: RouterModel[] }>(
+        `/api/router/providers/${id}/sync-models`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      await reloadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "failed to sync models");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function deleteProvider(id: number): Promise<void> {
+    setError(null);
+    try {
+      await api<{ ok: true }>(`/api/router/providers/${id}`, { method: "DELETE" });
+      setPendingDeleteId(null);
+      if (editingId === id) setEditingId(null);
+      await reloadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "failed to delete provider");
+      setPendingDeleteId(null);
+    }
+  }
+
+  async function patchProvider(id: number, body: Record<string, unknown>): Promise<void> {
+    setError(null);
+    setSavingId(id);
+    try {
+      await api<{ provider: RouterProvider; models: RouterModel[] }>(
+        `/api/router/providers/${id}`,
+        { method: "PATCH", body: JSON.stringify(body) },
+      );
+      setEditingId(null);
+      await reloadCatalog();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "failed to update provider");
+    } finally {
+      setSavingId(null);
+    }
+  }
+
+  async function toggleProviderStatus(provider: RouterProvider): Promise<void> {
+    const next = provider.status === "active" ? "disabled" : "active";
+    await patchProvider(provider.id, { status: next });
   }
 
   const q = query.trim().toLowerCase();
@@ -184,16 +227,6 @@ export default function Router() {
           </label>
         </div>
         <div className="flex flex-wrap gap-3">
-          <label className="flex min-w-56 flex-[2] flex-col gap-1">
-            <span className="font-mono text-xs tracking-widest text-slate-500">models</span>
-            <input
-              value={modelIds}
-              onChange={(e) => setModelIds(e.target.value)}
-              placeholder="model-a, model-b"
-              required
-              className={inputClass}
-            />
-          </label>
           <label className="flex min-w-36 flex-col gap-1">
             <span className="font-mono text-xs tracking-widest text-slate-500">wire format</span>
             <select
@@ -220,6 +253,7 @@ export default function Router() {
             />
           </label>
         </div>
+        <p className="font-mono text-xs text-slate-500">models fetched from provider on save</p>
         <div className="flex items-center gap-3">
           <button
             type="submit"
@@ -241,7 +275,7 @@ export default function Router() {
         className="max-w-md rounded border border-sao-accent/20 bg-sao-bg px-3 py-2 font-mono text-sm outline-none focus:border-sao-accent"
       />
 
-      <p className="font-mono text-xs text-slate-500">no live probe — stored provider status</p>
+      <p className="font-mono text-xs text-slate-500">no live probe — models synced from provider API</p>
 
       {error && <p className="font-mono text-sm text-red-400">{error}</p>}
 
@@ -305,16 +339,37 @@ export default function Router() {
                       <th className="px-3 py-2 text-left font-normal">status</th>
                       <th className="px-3 py-2 text-left font-normal">cost_per_mtok</th>
                       <th className="px-3 py-2 text-left font-normal">wire_format</th>
+                      <th className="px-3 py-2 text-left font-normal">actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-sao-accent/10">
-                    {filteredProviders.map((provider) => (
-                      <ProviderRow
-                        key={provider.id}
-                        provider={provider}
-                        models={models.filter((m) => m.provider_id === provider.id)}
-                      />
-                    ))}
+                    {filteredProviders.map((provider) => {
+                      const owned = models.filter((m) => m.provider_id === provider.id);
+                      return (
+                        <ProviderRow
+                          key={provider.id}
+                          provider={provider}
+                          models={owned}
+                          pendingDelete={pendingDeleteId === provider.id}
+                          editing={editingId === provider.id}
+                          saving={savingId === provider.id}
+                          onEdit={() => {
+                            setPendingDeleteId(null);
+                            setEditingId(provider.id);
+                          }}
+                          onCancelEdit={() => setEditingId(null)}
+                          onAskDelete={() => {
+                            setEditingId(null);
+                            setPendingDeleteId(provider.id);
+                          }}
+                          onCancelDelete={() => setPendingDeleteId(null)}
+                          onConfirmDelete={() => void deleteProvider(provider.id)}
+                          onToggleStatus={() => void toggleProviderStatus(provider)}
+                          onSave={(body) => void patchProvider(provider.id, body)}
+                          onSyncModels={() => void syncProviderModels(provider.id)}
+                        />
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -372,28 +427,223 @@ function RouteRow({
 function ProviderRow({
   provider,
   models,
+  pendingDelete,
+  editing,
+  saving,
+  onEdit,
+  onCancelEdit,
+  onAskDelete,
+  onCancelDelete,
+  onConfirmDelete,
+  onToggleStatus,
+  onSave,
+  onSyncModels,
 }: {
   provider: RouterProvider;
   models: RouterModel[];
+  pendingDelete: boolean;
+  editing: boolean;
+  saving: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onAskDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+  onToggleStatus: () => void;
+  onSave: (body: Record<string, unknown>) => void;
+  onSyncModels: () => void;
 }) {
   const modelList = models.map((m) => m.model_id).join(", ");
   return (
-    <tr className="align-top">
-      <td className="px-3 py-2 text-sao-accent">{provider.name}</td>
-      <td className="max-w-xs break-all px-3 py-2 text-slate-400">{provider.base_url}</td>
-      <td className="max-w-xl break-all px-3 py-2 text-slate-300">
-        {models.length > 0 ? (
-          <>
-            <span className="text-slate-500">{models.length} · </span>
-            {modelList}
-          </>
-        ) : (
-          "—"
-        )}
-      </td>
-      <td className={`px-3 py-2 ${statusClass(provider.status)}`}>{provider.status}</td>
-      <td className="px-3 py-2 text-slate-300">{provider.cost_per_mtok}</td>
-      <td className="px-3 py-2 text-sao-violet">{provider.wire_format}</td>
-    </tr>
+    <>
+      <tr className="align-top">
+        <td className="px-3 py-2 text-sao-accent">{provider.name}</td>
+        <td className="max-w-xs break-all px-3 py-2 text-slate-400">{provider.base_url}</td>
+        <td className="max-w-xl break-all px-3 py-2 text-slate-300">
+          {models.length > 0 ? (
+            <>
+              <span className="text-slate-500">{models.length} · </span>
+              {modelList}
+            </>
+          ) : (
+            "—"
+          )}
+        </td>
+        <td className={`px-3 py-2 ${statusClass(provider.status)}`}>{provider.status}</td>
+        <td className="px-3 py-2 text-slate-300">{provider.cost_per_mtok}</td>
+        <td className="px-3 py-2 text-sao-violet">{provider.wire_format}</td>
+        <td className="px-3 py-2">
+          {pendingDelete ? (
+            <span className="flex gap-2">
+              <button type="button" onClick={onConfirmDelete} className="text-red-400 hover:text-red-300">
+                sí
+              </button>
+              <button type="button" onClick={onCancelDelete} className="text-slate-500 hover:text-sao-accent">
+                no
+              </button>
+            </span>
+          ) : (
+            <span className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={onEdit}
+                disabled={saving}
+                className="text-sao-violet hover:text-sao-accent disabled:opacity-50"
+              >
+                configurar
+              </button>
+              <button
+                type="button"
+                onClick={onToggleStatus}
+                disabled={saving}
+                className="text-slate-500 hover:text-sao-accent disabled:opacity-50"
+              >
+                {provider.status === "active" ? "disable" : "enable"}
+              </button>
+              <button
+                type="button"
+                onClick={onSyncModels}
+                disabled={saving}
+                className="text-slate-500 hover:text-sao-accent disabled:opacity-50"
+              >
+                sync models
+              </button>
+              <button
+                type="button"
+                onClick={onAskDelete}
+                disabled={saving}
+                className="text-red-400 hover:text-red-300 disabled:opacity-50"
+              >
+                eliminar
+              </button>
+            </span>
+          )}
+        </td>
+      </tr>
+      {editing && (
+        <tr>
+          <td colSpan={7} className="border-t border-sao-accent/10 bg-sao-bg/40 px-3 py-3">
+            <ProviderEditForm
+              provider={provider}
+              saving={saving}
+              onCancel={onCancelEdit}
+              onSave={onSave}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+function ProviderEditForm({
+  provider,
+  saving,
+  onCancel,
+  onSave,
+}: {
+  provider: RouterProvider;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (body: Record<string, unknown>) => void;
+}) {
+  const [baseUrl, setBaseUrl] = useState(provider.base_url);
+  const [wireFormat, setWireFormat] = useState(provider.wire_format);
+  const [costPerMtok, setCostPerMtok] = useState(String(provider.cost_per_mtok));
+  const [apiKey, setApiKey] = useState("");
+  const [status, setStatus] = useState(provider.status);
+
+  function onSubmit(e: FormEvent): void {
+    e.preventDefault();
+    const costRaw = costPerMtok.trim();
+    const n = Number(costRaw);
+    if (costRaw !== "" && (!Number.isFinite(n) || n < 0)) return;
+
+    const body: Record<string, unknown> = {
+      base_url: baseUrl.trim(),
+      wire_format: wireFormat,
+      status,
+    };
+    if (costRaw !== "") body.cost_per_mtok = n;
+    if (apiKey.trim().length > 0) body.api_key = apiKey;
+    onSave(body);
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+      <p className="font-mono text-xs tracking-widest text-slate-500">EDIT {provider.name}</p>
+      <div className="flex flex-wrap gap-3">
+        <label className="flex min-w-56 flex-[2] flex-col gap-1">
+          <span className="font-mono text-xs tracking-widest text-slate-500">base url</span>
+          <input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} required className={inputClass} />
+        </label>
+        <label className="flex min-w-48 flex-1 flex-col gap-1">
+          <span className="font-mono text-xs tracking-widest text-slate-500">api key</span>
+          <input
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="blank = keep current"
+            autoComplete="off"
+            className={inputClass}
+          />
+        </label>
+        <label className="flex min-w-36 flex-col gap-1">
+          <span className="font-mono text-xs tracking-widest text-slate-500">status</span>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value as RouterProvider["status"])}
+            className={inputClass}
+          >
+            <option value="active">active</option>
+            <option value="disabled">disabled</option>
+          </select>
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <label className="flex min-w-36 flex-col gap-1">
+          <span className="font-mono text-xs tracking-widest text-slate-500">wire format</span>
+          <select
+            value={wireFormat}
+            onChange={(e) => setWireFormat(e.target.value as (typeof WIRE_FORMATS)[number])}
+            className={inputClass}
+          >
+            {WIRE_FORMATS.map((fmt) => (
+              <option key={fmt} value={fmt}>
+                {fmt}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex min-w-32 flex-col gap-1">
+          <span className="font-mono text-xs tracking-widest text-slate-500">cost / mtok</span>
+          <input
+            type="number"
+            value={costPerMtok}
+            onChange={(e) => setCostPerMtok(e.target.value)}
+            step="any"
+            className={inputClass}
+          />
+        </label>
+      </div>
+      <p className="font-mono text-xs text-slate-500">models re-fetched when base url, wire format, or api key change</p>
+      <div className="flex gap-3">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded border border-sao-accent/60 px-3 py-2 font-mono text-sm text-sao-accent transition-colors hover:bg-sao-accent/10 disabled:opacity-50"
+        >
+          {saving ? "saving" : "save"}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          disabled={saving}
+          className="rounded border border-sao-accent/20 px-3 py-2 font-mono text-sm text-slate-500 transition-colors hover:text-sao-accent disabled:opacity-50"
+        >
+          cancel
+        </button>
+      </div>
+    </form>
   );
 }

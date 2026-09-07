@@ -464,8 +464,70 @@ export function getProviderByName(db: Database, name: string): ProviderRow | nul
   return (db.query("SELECT * FROM providers WHERE name = ?").get(name) as ProviderRow | null) ?? null;
 }
 
+export function getProviderById(db: Database, id: number): ProviderRow | null {
+  return (db.query("SELECT * FROM providers WHERE id = ?").get(id) as ProviderRow | null) ?? null;
+}
+
 export function setProviderStatus(db: Database, name: string, status: ProviderStatus): void {
   db.run("UPDATE providers SET status = ? WHERE name = ?", [status, name]);
+}
+
+export interface ProviderConfigUpdate {
+  baseUrl?: string;
+  wireFormat?: WireFormat;
+  status?: ProviderStatus;
+  costPerMtok?: number;
+  apiKeyEnc?: string;
+}
+
+export function updateProviderConfig(db: Database, id: number, args: ProviderConfigUpdate): boolean {
+  const existing = getProviderById(db, id);
+  if (!existing) return false;
+
+  const sets: string[] = [];
+  const values: unknown[] = [];
+
+  if (args.baseUrl !== undefined) {
+    sets.push("base_url = ?");
+    values.push(args.baseUrl);
+  }
+  if (args.wireFormat !== undefined) {
+    sets.push("wire_format = ?");
+    values.push(args.wireFormat);
+  }
+  if (args.status !== undefined) {
+    sets.push("status = ?");
+    values.push(args.status);
+  }
+  if (args.costPerMtok !== undefined) {
+    sets.push("cost_per_mtok = ?");
+    values.push(args.costPerMtok);
+  }
+  if (args.apiKeyEnc !== undefined) {
+    sets.push("api_key_enc = ?");
+    values.push(args.apiKeyEnc);
+  }
+
+  if (sets.length === 0) return true;
+
+  values.push(id);
+  db.run(`UPDATE providers SET ${sets.join(", ")} WHERE id = ?`, values);
+  return true;
+}
+
+export function replaceProviderModels(db: Database, providerId: number, modelIds: string[]): void {
+  db.run("DELETE FROM provider_models WHERE provider_id = ?", [providerId]);
+  for (const modelId of modelIds) {
+    addProviderModel(db, { providerId, modelId });
+  }
+}
+
+export function deleteProvider(db: Database, id: number): boolean {
+  const existing = getProviderById(db, id);
+  if (!existing) return false;
+  db.run("DELETE FROM provider_models WHERE provider_id = ?", [id]);
+  db.run("DELETE FROM providers WHERE id = ?", [id]);
+  return true;
 }
 
 export interface ProviderModelFields {
