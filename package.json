@@ -12,7 +12,8 @@
     "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
     "keygen": "bun packages/keys/src/cli.ts",
     "cloud-agent": "bun scripts/cloud-agent.ts",
-    "bootstrap:password": "bash scripts/bootstrap-admin-password.sh"
+    "bootstrap:password": "bash scripts/bootstrap-admin-password.sh",
+    "seed:router": "python3 scripts/seed-router.py"
   },
   "devDependencies": {
     "@cursor/sdk": "1.0.31"
