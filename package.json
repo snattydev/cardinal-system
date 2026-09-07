@@ -10,6 +10,10 @@
     "start": "bun backend/src/index.ts",
     "test": "bun test --timeout 30000 packages/*/src backend/src",
     "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
-    "keygen": "bun packages/keys/src/cli.ts"
+    "keygen": "bun packages/keys/src/cli.ts",
+    "cloud-agent": "bun scripts/cloud-agent.ts"
+  },
+  "devDependencies": {
+    "@cursor/sdk": "1.0.31"
   }
 }

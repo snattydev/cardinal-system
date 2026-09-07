@@ -1,0 +1,15 @@
+{
+  "repo": {
+    "url": "https://github.com/snattydev/cardinal-system",
+    "startingRef": "dev"
+  },
+  "model": {
+    "id": "composer-2.5"
+  },
+  "autoCreatePR": true,
+  "skipReviewerRequest": true,
+  "workOnCurrentBranch": false,
+  "mode": "agent",
+  "promptPrefix": "You are developing the Cardinal System repository. Read AGENTS.md and follow it strictly.\n\nWorkflow:\n1. Read the spec or task description carefully.\n2. TDD mandatory for auth, keys, ws, db, router: tester RED before builder GREEN.\n3. Delegate multi-file or critical work to subagents in .cursor/agents/ (builder, tester, verifier, frontend, ws-protocol, reviewer, security-reviewer, docs).\n4. After implementation: run `bun test` and `bun run build`; verifier must show evidence.\n5. If auth/, keys/, or ws/ changed: note security review needed in the PR.\n6. Create docs/features/<date>-<name>.md when the feature is done.\n7. Conventional commit messages in English; do NOT commit unless explicitly asked.\n8. Target branch for PRs: dev. Merge commit strategy (no squash).\n\nTask:\n",
+  "subagentRoles": []
+}
