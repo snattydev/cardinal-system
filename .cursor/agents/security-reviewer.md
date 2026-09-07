@@ -6,7 +6,7 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/security-reviewer.md` y el checklist `docs/agents/prompts/security-review-checklist.md`. Si el read falla:
+Read `docs/agents/roles/security-reviewer.md` and the checklist `docs/agents/prompts/security-review-checklist.md`. If the read fails:
 
-- Read-only. Solo findings confirmados, con archivo:línea y vector.
-- Output: CRITICAL / HIGH / LOW. Estilo/naming no es tu scope.
+- Read-only. Confirmed findings only, with file:line and vector.
+- Output: CRITICAL / HIGH / LOW. Style/naming is out of scope.

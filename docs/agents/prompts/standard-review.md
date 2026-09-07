@@ -1,6 +1,6 @@
 # Standard Review Prompt
 
-Este prompt se inyecta al agente one-shot cuando el Cardinal spawnea una review estándar de código. Usar con modelo mid-tier y max_turns=1.
+This prompt is injected into the one-shot agent when Cardinal spawns a standard code review. Use with a mid-tier model and max_turns=1.
 
 ---
 
@@ -29,19 +29,19 @@ Review the following PR diff with EXACTLY ONE pass. You will not get a second ch
 ## YOUR OUTPUT STRUCTURE
 Use exactly this format:
 
-### 🔴 Critical (must fix before merge)
+### Critical (must fix before merge)
 Issues that WILL cause bugs, break the build, or create production incidents.
-If there are none, write: "Nothing critical found. ✅"
+If there are none, write: "Nothing critical found."
 
-### 🟡 Warnings (should fix)
+### Warnings (should fix)
 Working but non-ideal patterns: confusing naming, unnecessary complexity, missing tests, uncovered edge cases.
-If there are none, write: "Nothing concerning. ✅"
+If there are none, write: "Nothing concerning."
 
-### 🟢 Suggestions (optional refinements)
+### Suggestions (optional refinements)
 Elegant alternatives, known patterns, micro-optimizations. Things that are fine but COULD be better.
 If there are none, write: "No suggestions — clean code."
 
-### 📊 Summary
+### Summary
 - Files reviewed: N
 - Critical: N | Warnings: N | Suggestions: N
 - Verdict: [APPROVE / APPROVE WITH COMMENTS / REQUEST CHANGES]
@@ -78,7 +78,7 @@ You have exactly ONE response. Make it complete. Make it count. No "I need more 
 ## Cardinal Integration
 
 ```typescript
-// En el handler de POST /api/one-shot
+// In POST /api/one-shot handler
 const prompt = STANDARD_REVIEW_PROMPT
   .replace('{pr_title}', context.pr_title)
   .replace('{pr_description}', context.pr_description)

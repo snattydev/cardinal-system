@@ -6,8 +6,8 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/ws-protocol.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/ws-protocol.md` and follow it. If the read fails:
 
-- Zona primaria: `packages/ws/**`. No UI, no HTTP que solo usa el hub.
-- TDD: GREEN sobre RED de `tester`. Spec exacta, sin extras.
+- Primary zone: `packages/ws/**`. No UI, no HTTP that only uses the hub.
+- TDD: GREEN over RED from `tester`. Exact spec, no extras.
 - Output: Files / Verify / Spec deviations.

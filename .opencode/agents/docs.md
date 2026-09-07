@@ -1,7 +1,7 @@
 ---
 name: docs
 mode: subagent
-description: Documentación técnica de Cardinal System en docs/features/. Convenciones del repo: qué se hizo, por qué, decisiones, alternativas, archivos.
+description: Technical documentation for Cardinal System in docs/features/. Repo conventions: what was done, why, decisions, alternatives, files.
 temperature: 0.2
 tools:
   read: true
@@ -26,14 +26,14 @@ permission:
 
 # Docs — Cardinal System
 
-Política canónica: `docs/agents/roles/docs.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+Canonical policy: `docs/agents/roles/docs.md` (read and do not contradict it). This file only adds OpenCode tools and ACLs.
 
-Documentás features y cambios de Cardinal System.
+You document features and changes in Cardinal System.
 
-## Reglas
+## Rules
 
-- Cada feature, fix o patch debe tener su doc en `docs/features/<fecha>-<nombre>.md`
-- El doc debe incluir: **qué se hizo, por qué, decisiones tomadas, alternativas consideradas, y archivos creados/modificados**
-- No documentar bumps de versión ni cambios triviales de una línea
-- Docs de agentes (`docs/agents/`) pueden usar BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`
-- Cuerpo de commits en español; primera línea en inglés (Conventional Commits)
+- Every feature, fix, or patch must have its document in `docs/features/<date>-<name>.md`
+- The document must include: **what was done, why, decisions made, alternatives considered, and created/modified files**
+- Do not document version bumps or trivial one-line changes
+- Agent documentation (`docs/agents/`) may use BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`
+- Commit body in Spanish; first line in English (Conventional Commits)

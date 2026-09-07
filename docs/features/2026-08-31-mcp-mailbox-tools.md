@@ -1,63 +1,62 @@
 # MCP mailbox tools + dual-auth on `/api/messages` (2026-08-31)
 
-Item 14 del backlog Cardinal v2. Agentes autenticados con `sk-cardinal-*` pueden
-enviar y leer mail del blackboard vía MCP, sin JWT de dashboard.
+Item 14 of the Cardinal v2 backlog. Agents authenticated with `sk-cardinal-*`
+can send and read blackboard mail via MCP, without a dashboard JWT.
 
-## Qué se hizo
+## What was done
 
-- MCP tools `cardinal_agent_send` y `cardinal_agent_inbox` (siempre listadas, no
-  vault-scoped). El server MCP las proxea al backend con el Bearer de la key del
-  caller.
-- Dual-auth JWT cookie **o** agent key en `GET`/`POST /api/messages` y
-  `PUT /api/messages/:id/read`, reusando el mismo helper que `/api/tasks`.
-- Binding de identidad para agent keys (fail-closed):
-  - **No spoofea `from_agent`:** el backend sobreescribe con `agent_name` de la
-    key.
-  - **No lee inbox ajeno:** `GET` fuerza `to_agent` al agente de la key (ignora
-    query spoofeado).
-  - **No marca leído mail de otro:** `PUT .../read` responde 403 `forbidden` si el
-    mensaje existe pero el mailbox no es del agente de la key; 404 si no existe.
-- JWT de dashboard (admin) sigue con acceso total: inbox de cualquiera, send con
-  `from_agent` libre, mark-read de cualquier mensaje.
-- README raíz actualizado a **v0.2.4** / Fase 2. Version bump a **0.2.4** en `package.json`.
+- MCP tools `cardinal_agent_send` and `cardinal_agent_inbox` (always listed, not
+  vault-scoped). The MCP server proxies them to the backend using the caller's
+  Bearer key.
+- Dual-auth JWT cookie **or** agent key on `GET`/`POST /api/messages` and
+  `PUT /api/messages/:id/read`, reusing the shared helper from `/api/tasks`.
+- Identity binding for agent keys (fail-closed):
+  - **No `from_agent` spoofing:** backend overwrites with the key's `agent_name`.
+  - **No reading other agents' inboxes:** `GET` forces `to_agent` to the key's agent
+    (ignores spoofed query parameter).
+  - **No marking other agents' mail as read:** `PUT .../read` returns 403 `forbidden`
+    if the message exists but the mailbox does not belong to the key's agent; 404
+    if it does not exist.
+- Dashboard JWT (admin) retains full access: any agent's inbox, unrestricted `from_agent`
+  on send, mark-read on any message.
+- Root README updated to **v0.2.4** / Fase 2. Version bump to **0.2.4** in `package.json`.
 
-## Por qué
+## Why
 
-El board MCP ya existía (`cardinal_task_*` + dual-auth en `/api/tasks`). El
-mailbox API (`messages`) seguía JWT-only, así que agentes (herdr / Hermes / CLIs)
-que auth con keys no podían hacer handoff directo.
+The MCP board already existed (`cardinal_task_*` + dual-auth on `/api/tasks`). The
+mailbox API (`messages`) remained JWT-only, preventing agents (herdr / Hermes / CLIs)
+authenticating with keys from executing direct handoffs.
 
-Security review del patrón dual-auth: autenticar la key **sin atar identidad** es
-IDOR (un agente lee o escribe el mailbox de otro). `docs/security.md` establece
-que las keys **son** identidad.
+Security review of the dual-auth pattern: authenticating a key **without binding identity**
+is an IDOR vulnerability (one agent reads or writes another's mailbox). `docs/security.md`
+establishes that keys **are** identity.
 
-## Decisiones
+## Decisions
 
-- Nombrar las tools `cardinal_agent_send` / `cardinal_agent_inbox` (prefijo
-  `cardinal_` como board y memory). La spec v2 lista `agent_send` / `agent_inbox`
-  sin prefijo; el wire name alineado al resto del MCP surface gana.
-- Overwrite de `from_agent` (no 403) para que un cliente MCP que ya manda
-  `from_agent=identity.agent` siga recibiendo 200. La identidad efectiva es
-  siempre la de la key.
-- Forzar inbox al agente de la key (ignorar query spoofeado) en vez de 403. El
-  agente ve su correo; no hay señal de “intentaste el de otro”.
-- Mark-read: 404 si el mensaje no existe; 403 si existe pero pertenece a otro
-  mailbox. Distingue “no está” de “no es tuyo” sin filtrar IDs inexistentes.
-- No hay tool MCP de mark-read: la spec v2 solo pide send/inbox.
-- Dual-auth de `/api/tasks` no cambia su modelo de identidad en este slice (fuera
-  de scope). Binding de identidad del board: [`2026-09-06-task-identity-rag-vault-scope.md`](./2026-09-06-task-identity-rag-vault-scope.md).
+- Named tools `cardinal_agent_send` / `cardinal_agent_inbox` (`cardinal_` prefix,
+  matching board and memory). The v2 spec lists `agent_send` / `agent_inbox` without
+  a prefix; aligning wire names with the rest of the MCP surface took precedence.
+- Overwriting `from_agent` (instead of 403) so MCP clients already sending
+  `from_agent=identity.agent` continue to receive 200. Effective identity is always
+  derived from the key.
+- Enforcing inbox to key's agent (ignoring spoofed queries) rather than returning 403.
+  The agent sees its mail without leakage about unauthorized queries.
+- Mark-read: 404 if message does not exist; 403 if it exists but belongs to another
+  mailbox. Distinguishes "does not exist" from "not yours" without leaking non-existent IDs.
+- No MCP tool for mark-read: the v2 spec only requests send/inbox.
+- Dual-auth in `/api/tasks` did not change its identity model in this slice (out of
+  scope). Board identity binding: [`2026-09-06-task-identity-rag-vault-scope.md`](./2026-09-06-task-identity-rag-vault-scope.md).
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Solo dual-auth sin binding de identidad:** rechazado. Cualquier key activa
-  leería o escribiría mailboxes ajenos (IDOR). Contradice “keys son identidad”.
-- **403 cuando `from_agent` no coincide con la key:** peor UX. Clientes MCP que
-  reenvían `identity.agent` fallarían; overwrite es fail-closed en identidad y
-  sigue siendo 200.
+- **Dual-auth without identity binding:** rejected. Any active key could read or
+  write another's mailbox (IDOR). Violates "keys are identity".
+- **403 when `from_agent` does not match key:** worse UX. MCP clients forwarding
+  `identity.agent` would fail; overwrite is fail-closed on identity and remains 200.
 
-## Archivos
+## Files
 
-- Modificados: `backend/src/server.ts`, `backend/src/api/messages.ts`,
+- Modified: `backend/src/server.ts`, `backend/src/api/messages.ts`,
   `backend/src/server.test.ts`, `packages/mcp/src/server.ts`,
   `packages/mcp/src/server.test.ts`, `README.md`, `package.json` (0.2.4).
 - Docs: `docs/features/2026-08-31-mcp-mailbox-tools.md`,
@@ -65,7 +64,7 @@ que las keys **son** identidad.
   `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`,
   `docs/roadmap.md`, `docs/roadmap/fase-2.md`, `AGENTS.md`.
 
-## Verificación
+## Verification
 
-- Padre: `bun test --timeout 30000 packages/mcp/src backend/src` → **185 pass /
+- Parent: `bun test --timeout 30000 packages/mcp/src backend/src` -> **185 pass /
   0 fail**.

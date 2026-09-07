@@ -1,230 +1,246 @@
-# Cardinal v2 — Arquitectura (MCP Hub + Blackboard + Key Pool)
+# Cardinal v2 — Architecture (MCP Hub + Blackboard + Key Pool)
 
-> Fecha: 2026-08-12
-> Estado: Diseño vivo (captura decisiones de brainstorm 2026-08-12). Los puntos abiertos se validan con spikes antes de implementar.
-> Relación con roadmap: re-scopea Fase 2 (ver sección final).
-
----
-
-## 1. Contexto y por qué v2
-
-El ecosistema cambió desde que se diseñó Fase 2 (julio 2026). Lo que antes el Cardinal tenía que resolver solo —orquestar agentes one-shot en contenedores— hoy lo hacen herramientas que ya existen y que conviene usar en vez de reinventar:
-
-- **herdr.dev** — multiplexer local que reconoce 16 kinds de agentes (opencode, claude, codex, cursor, gemini, grok, hermes, etc.), maneja panes/tabs y lifecycle (idle/working/blocked/done). Integra por hooks `*-agent-state` en el config dir de cada agente.
-- **MCP** — estándar maduro agente↔herramienta (Linux Foundation). Lo habla todo: Hermes (cliente nativo), Claude, Cursor, Codex.
-- **A2A (Google)** — estándar emergente agente↔agente (Agent Cards, delegación). Complementa a MCP, no compite.
-
-La conclusión: **orquestación es commodity**. Lo que sigue siendo exclusivo del Cardinal es el cerebro global: identidad, contexto, y la coordinación cross-provider.
-
-**Tesis:** Cardinal = cerebro/memoria/identidad. herdr/Hermes/CLIs = manos.
+> Date: 2026-08-12
+> Status: Living design (captures 2026-08-12 brainstorm decisions). Open items are validated via spikes before implementation.
+> Roadmap relationship: re-scopes Phase 2 (see final section).
 
 ---
 
-## 2. Los cuatro pilares
+## 1. Context and Why v2
 
-| # | Pilar | Qué es | Estado |
-|---|-------|--------|--------|
-| 1 | MCP context hub multi-vault | Server MCP que sirve contexto desde varias vaults de Obsidian indexadas | Diseño (spike-002) |
-| 2 | Key pool + router interno | Pool de API keys del proveedor; Cardinal acuña `sk-cardinal-*` derivadas con scopes/budgets y rutea `/v1/chat/completions` al upstream correcto con fallback automático | Diseño (spike-003) |
-| 3 | Blackboard + mailbox | Coordinación agente↔agente cross-provider por tablero de tareas compartido | Diseño (spike-001) |
-| 4 | Identidad | `sk-cardinal-*`, "la key ES la identidad", cross-device | ✅ Ya existe (Fase 0) |
+The ecosystem evolved significantly since Phase 2 was originally designed (July 2026). Responsibilities that Cardinal previously had to handle alone—orchestrating one-shot agents in containers—are now addressed by existing tools that should be leveraged rather than reinvented:
 
----
+- **herdr.dev** — local multiplexer recognizing 16 agent kinds (opencode, claude, codex, cursor, gemini, grok, hermes, etc.), managing panes/tabs and lifecycle (idle/working/blocked/done). Integrates via `*-agent-state` hooks in each agent's config directory.
+- **MCP** — mature agent↔tool standard (Linux Foundation). Supported everywhere: Hermes (native client), Claude, Cursor, Codex.
+- **A2A (Google)** — emerging agent↔agent standard (Agent Cards, delegation). Complements MCP rather than competing with it.
 
-## 3. División de responsabilidades: herdr ↔ Cardinal
+Conclusion: **orchestration is a commodity**. What remains exclusive to Cardinal is the global brain: identity, context, and cross-provider coordination.
 
-No se pisan. Son capas complementarias.
-
-| Capa | herdr | Cardinal |
-|------|-------|----------|
-| Alcance | Local (una máquina) | Global (cross-device) |
-| Qué maneja | Panes, tabs, lifecycle local, TUI del humano, levantar/leer agentes | Identidad, contexto multi-vault, blackboard, pool/router |
-| Estado | Efímero (proceso local) | Persistente (DB) |
-| Quién ve | Humano en la TUI | Agentes + dashboard |
-
-### Integración (no reimplementar)
-
-1. **Roster bridge (pasivo, barato):** Cardinal lee `herdr agent list` (JSON) y el dashboard muestra la verdad — qué está corriendo de verdad con su lifecycle. Cero cambios en los agentes.
-2. **Blackboard vía MCP:** los agentes MCP-capables consumen las tools del Cardinal. Sin cliente custom.
-3. **Plugin `cardinal-agent-state` por agente** (copiando el patrón de hooks de herdr): solo si hace falta, para agentes sin MCP o status más rico. No es el camino inicial.
-
-**Regla dura:** Cardinal NUNCA le dice a herdr "levantá un agente". Spawnear es orquestación y rompe el agent-less core. El trigger para levantar un agente vive afuera (humano, hook de herdr, cron). El agente, al arrancar, PULLEA su próxima tarea del board.
+**Thesis:** Cardinal = brain/memory/identity. herdr/Hermes/CLIs = hands.
 
 ---
 
-## 4. Blackboard (coordinación agente↔agente)
+## 2. The Four Pillars
 
-Modelo tipo Linear / equipo real: tasks con status, assignee, árbol padre/hijo, comments acotados, refs a artifacts. El "objetivo en común" es un árbol de tasks; los agentes agarran hojas, dejan el resultado, otro retoma.
+| # | Pillar | Description | Status |
+|---|--------|-------------|--------|
+| 1 | Multi-vault MCP context hub | MCP server serving context from multiple indexed Obsidian vaults | Design (spike-002) |
+| 2 | Key pool + internal router | Provider API key pool; Cardinal mints derived `sk-cardinal-*` keys with scopes/budgets and routes `/v1/chat/completions` to the correct upstream with automatic fallback | Design (spike-003) |
+| 3 | Blackboard + mailbox | Cross-provider agent↔agent coordination via a shared task board | Design (spike-001) |
+| 4 | Identity | `sk-cardinal-*`, "the key IS the identity", cross-device | [done] Already exists (Phase 0) |
 
-### Data model (diseño, validar con spike)
+---
+
+## 3. Division of Responsibilities: herdr ↔ Cardinal
+
+No overlap. They are complementary layers.
+
+| Layer | herdr | Cardinal |
+|-------|-------|----------|
+| Scope | Local (single machine) | Global (cross-device) |
+| Responsibilities | Panes, tabs, local lifecycle, human TUI, spawning/reading agents | Identity, multi-vault context, blackboard, pool/router |
+| State | Ephemeral (local process) | Persistent (DB) |
+| Visibility | Human in the TUI | Agents + dashboard |
+
+### Integration (do not reimplement)
+
+1. **Roster bridge (passive, lightweight):** Cardinal reads `herdr agent list` (JSON) and the dashboard reflects reality—what is genuinely running along with its lifecycle. Zero modifications to agents.
+2. **Blackboard via MCP:** MCP-capable agents consume Cardinal tools directly. No custom client required.
+3. **Per-agent `cardinal-agent-state` plugin** (mirroring herdr's hook pattern): only if necessary, for agents lacking MCP or needing richer status. Not the initial path.
+
+**Spawn rule (v2 → v3):** Cardinal is the system, not a passive component.
+
+- **CLI agents** (opencode, claude, cursor, codex): Cardinal NEVER tells
+  herdr to "spawn an agent". Triggers for these reside externally (human,
+  herdr hook, cron). The agent, upon starting, PULLS its next task
+  from the board. This rule is maintained from v2.
+- **Cardinal internal workers** (image `cardinal-worker`): Cardinal can
+  create and terminate ephemeral containers to execute one-shot tasks
+  (tasks v2, chatbot, automations). The backend owns the
+  lifecycle (quadlet + TTL + cleanup). The container runs a Cardinal
+  worker with a JSON stdin/stdout contract, without DB access or real
+  keys, and with no open network access except what the orchestrator declares.
+- Cardinal NEVER invokes an external CLI from inside its own container.
+  If a task requires a CLI agent, it is delegated to herdr as before.
+
+Rationale: "agent" ≠ "worker". A CLI agent possesses judgment and is
+interactive; a worker is a scoped, disposable executor. The original v2
+rule ("agent-less core") guards against Cardinal duplicating CLI
+orchestration; allowing internal workers extends the core rather than
+breaking the rule.
+
+Implementation spec: `docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md`
+item **N1**.
+
+---
+
+## 4. Blackboard (Agent↔Agent Coordination)
+
+Linear / real-team style model: tasks with status, assignee, parent/child tree, bounded comments, references to artifacts. The "shared objective" is a task tree; agents claim leaf tasks, record outputs, and other agents follow up.
+
+### Data Model (design, validate via spike)
 
 ```
 tasks
 ├── id            (uuid)
-├── goal          (texto corto)
+├── goal          (short text)
 ├── status        open | claimed | done | blocked
 ├── assigned_to   (agent name, nullable)
 ├── created_by    (agent name)
-├── parent_id     (nullable — árbol del objetivo)
-├── context_refs  (JSON — refs a vault notes / sessions / memories)
-├── artifact_ref  (puntero al resultado, NO el contenido)
-├── summary       (resumen acotado, token budget)
+├── parent_id     (nullable — goal tree)
+├── context_refs  (JSON — refs to vault notes / sessions / memories)
+├── artifact_ref  (pointer to result, NOT the content)
+├── summary       (bounded summary, token budget)
 └── created_at / updated_at
 
-messages  (mailbox para handoffs puntuales)
+messages  (mailbox for targeted handoffs)
 ├── id, from_agent, to_agent, type, payload_ref, read, created_at
 ```
 
 ### Lifecycle
 
 ```
-open → claimed (un agente la agarra)
-     → blocked (necesita input/desbloqueo)
-     → done   (con artifact_ref + summary)
+open → claimed (claimed by an agent)
+     → blocked (requires input/unblocking)
+     → done    (with artifact_ref + summary)
 ```
 
-Cada task `done` es un nodo del grafo en Fase 3.
+Each `done` task constitutes a graph node in Phase 3.
 
-### Reglas anti-inflación (GOLDEN — nacen del incidente Hermes-chat)
+### Anti-Inflation Rules (GOLDEN — originating from the Hermes-chat incident)
 
-1. **Out-of-band:** el tráfico agente↔agente NUNCA va por el canal del humano. Son filas de DB (tasks/messages), no mensajes de conversación.
-2. **Pull, no push:** nada se vuelca al contexto de nadie automáticamente. Un agente consulta el board (`task_list`, `task_get`) cuando LO necesita, con token budget.
-3. **Memoria aislada:** el tráfico agente↔agente NUNCA toca el memory mirror ni el perfil de user. Memoria solo se escribe por acción explícita (humano, o agente llamando `memory_set` con resumen acotado). Cero auto-ingest.
-4. **Resultados como refs:** el board guarda `artifact_ref` + `summary` acotado, no la prosa completa. El transcript completo del trabajo vive en la sesión del propio agente.
-5. **Efímero por default:** estado en DB, nunca en el proceso.
+1. **Out-of-band:** agent↔agent traffic NEVER travels through the human channel. It consists of DB rows (tasks/messages), not conversation messages.
+2. **Pull, not push:** nothing is dumped into anyone's context automatically. An agent queries the board (`task_list`, `task_get`) when NEEDED, within a token budget.
+3. **Isolated memory:** agent↔agent traffic NEVER touches the memory mirror or the user profile. Memory is written only via explicit action (human, or an agent calling `memory_set` with a bounded summary). Zero auto-ingest.
+4. **Results as references:** the board stores `artifact_ref` + bounded `summary`, not full prose. The full transcript of the work resides in the agent's own session.
+5. **Ephemeral by default:** state in DB, never in-process.
 
-> Por qué se rompió antes: se mandó tráfico agente↔agente por el chat de Hermes, que lo trata como conversación del humano → infla transcript Y dispara escrituras de memoria al perfil. El bug fue el canal, no el hablar.
+> Why it broke previously: agent↔agent traffic was routed through Hermes chat, which treated it as human conversation → inflated transcript AND triggered memory writes to the profile. The bug was the channel, not the communication itself.
 
 ---
 
-## 5. MCP surface (tools del Cardinal)
+## 5. MCP Surface (Cardinal Tools)
 
 ```
-Contexto      search_vaults(query, vault?) · list_vaults · get_note(path)
-Memoria       memory_get(target) · memory_set(target, summary)   # set = explícito, nunca auto
-Sesiones      session_search(query)
+Context       search_vaults(query, vault?) · list_vaults · get_note(path)
+Memory        memory_get(target) · memory_set(target, summary)   # set = explicit, never auto
+Sessions      session_search(query)
 Board         task_create · task_list · task_claim · task_complete · task_comment
 Mailbox       agent_send · agent_inbox
 Roster        who_is_online
 ```
 
-Multi-vault: hoy hay un índice (the portal). El objetivo es N vaults indexadas, cada chunk etiquetado con su vault de origen, consultable todas juntas o filtradas por vault.
+Multi-vault: currently there is a single index (the portal). The target architecture supports N indexed vaults, with each chunk tagged by origin vault, queryable across all vaults or filtered by vault.
 
 ---
 
-## 6. Key pool + router interno (arquitectura cerrada 2026-08-20)
+## 6. Key Pool + Internal Router (Architecture Finalized 2026-08-20)
 
-Router provider-agnostic, inspirado en FreeLLMAPI pero con identidad de cliente. La key derivada (`sk-cardinal-*`) ES la identidad: define scopes (qué modelos puede pedir), budget y metering por agente.
+Provider-agnostic router inspired by FreeLLMAPI, but with client identity. The derived key (`sk-cardinal-*`) IS the identity: it defines scopes (which models can be requested), budget, and metering per agent.
 
-### Modelo de datos (todo en DB, nada hardcodeado)
+### Data Model (all in DB, nothing hardcoded)
 
 ```
-providers                      — lo que Santi agrega/quita sin tocar código
-├── id, name, base_url, api_key (AES-256-GCM, nunca sale del Cardinal)
+providers                      — configured dynamically by the admin without code changes
+├── id, name, base_url, api_key (AES-256-GCM, never leaves Cardinal)
 ├── wire_format: openai | anthropic | gemini
 ├── status: active | disabled
-├── rate_limits opcionales (rpm, tpm)
+├── optional rate_limits (rpm, tpm)
 └── cost_per_mtok (metering)
 
-provider_models                — modelos físicos por provider
-├── provider_id, model_id (ej "deepseek-v4-flash-free")
+provider_models                — physical models per provider
+├── provider_id, model_id (e.g., "deepseek-v4-flash-free")
 ├── capabilities (tools/vision/streaming), context_window
 
-model_routes                   — los alias lógicos (lo único que ve el consumidor)
-├── alias (ej "pro", "fast") O nombre de modelo real ("deepseek-v4-flash")
-└── fallback_chain JSON ordenado: [{provider, model_id}, ...]
+model_routes                   — logical aliases (the only thing consumers see)
+├── alias (e.g., "pro", "fast") OR real model name ("deepseek-v4-flash")
+└── fallback_chain ordered JSON: [{provider, model_id}, ...]
 
-agent_keys (extendido)         — identidad del cliente
-├── scopes JSON (lista de alias/modelos permitidos; "*" = autorouter libre)
-├── budget_limit (tokens), budget_used (acumulado)
-└── created_by=system → auto-revocable (one-shot); created_by=human → jamás se toca
+agent_keys (extended)          — client identity
+├── scopes JSON (list of allowed aliases/models; "*" = unrestricted autorouter)
+├── budget_limit (tokens), budget_used (accumulated)
+└── created_by=system → auto-revocable (one-shot); created_by=human → never touched automatically
 ```
 
-Dashboard `/keys` (spec `2026-08-20-keys-dashboard-design.md`): lista grande =
-human activas; historial (icono log) = human revocadas. **Futuro (no ahora):**
-one-shot vivas en un bloque compacto **abajo a la izquierda**; al terminar el
-one-shot la fila se **borra** (no va al historial; el rastro queda en el log
-de ese agente).
+Dashboard `/keys` (spec `2026-08-20-keys-dashboard-design.md`): main list =
+active human keys; history (log icon) = revoked human keys. **Future (not now):**
+active one-shot keys in a compact block **bottom-left**; upon one-shot completion,
+the row is **deleted** (does not go to history; the trace remains in that agent's log).
 
-### Resolución (autorouter + alias)
+### Resolution (autorouter + aliases)
 
-- `model="deepseek-v4-flash"` (nombre real) → AUTOROUTER: el router arma el pool de
-  providers que sirven ese modelo, usa el primero sano, y si falla salta al siguiente.
-- `model="pro"` (alias lógico) → CADENA FIJA definida por Santi en model_routes.
-- La key decide quién puede pedir qué: scope ["fast"] = solo ese alias;
-  scope ["*"] = autorouter libre; scope ["deepseek-v4-pro"] = solo ese modelo.
+- `model="deepseek-v4-flash"` (real name) → AUTOROUTER: the router builds the pool of
+  providers serving that model, uses the first healthy one, and on failure jumps to the next.
+- `model="pro"` (logical alias) → FIXED CHAIN defined by the admin in model_routes.
+- The key determines access: scope ["fast"] = only that alias;
+  scope ["*"] = unrestricted autorouter; scope ["deepseek-v4-pro"] = only that model.
 
-### Flujo POST /v1/chat/completions (Bearer sk-cardinal-*)
+### Flow POST /v1/chat/completions (Bearer sk-cardinal-*)
 
-1. Auth: hash SHA-256 de la key → validar + scope (¿puede pedir este modelo?) + budget (¿le queda?)
-2. Resolver modelo → fallback_chain
-3. Por cada eslabón: health check + cooldown (429/5xx) → decrypt api_key → llamar upstream
-4. Éxito: streamear SSE o completion normal (no romper el stream al rutear)
-5. Metering: registrar tokens por key derivada + por provider (dashboard de consumo)
-6. Si todo falla: error con attempt trail
+1. Auth: SHA-256 hash of key → validate + scope (allowed to request this model?) + budget (remaining balance?)
+2. Resolve model → fallback_chain
+3. For each link: health check + cooldown (429/5xx) → decrypt api_key → call upstream
+4. Success: stream SSE or return standard completion (do not break stream while routing)
+5. Metering: record tokens per derived key + per provider (usage dashboard)
+6. If all fail: return error with attempt trail
 
-### Failover transparente (la clave del diseño)
+### Transparent Failover (Core Design Principle)
 
-"Si pido deepseek-v4-flash y hay 4 providers free, uso 1, se corta, el router pasa
-al otro SIN interrumpir al usuario final." El cliente nunca ve el failover — solo ve
-el modelo que pidió. Igual que FreeLLMAPI unified models, con identidad de cliente
-sumada: la key sabe quién es, qué puede pedir y cuánto consumió.
+"If deepseek-v4-flash is requested and 4 free providers exist, provider 1 is used; if interrupted, the router fails over to the next WITHOUT interrupting the end user." The client never observes the failover—they only see the requested model. Similar to FreeLLMAPI unified models, with client identity added: the key knows who it is, what it can request, and its consumption to date.
 
-**Estado de implementación (2026-09-03, v0.2.5):** motor `/v1` ✅; dashboard
-JWT `/router` ✅ (UI read-only); create de keys con tokens/expiry/USD ✅;
-Fusion/MoA (`mode:fusion` + judge synthesize) ✅. Índice:
+**Implementation status (2026-09-03, v0.2.5):** `/v1` engine [done]; dashboard
+JWT `/router` [done] (read-only UI); key creation with tokens/expiry/USD [done];
+Fusion/MoA (`mode:fusion` + judge synthesize) [done]. Index:
 [`docs/features/2026-09-03-router-surface.md`](../../features/2026-09-03-router-surface.md).
-Follow-ups: mutar cadenas desde la UI, mostrar Fusion en `/router`, USD
-hop-level en Fusion, e2e zen free.
+Follow-ups: mutate chains from UI, display Fusion on `/router`, hop-level USD
+in Fusion, free zen e2e.
 
-### Upstreams (estado real 2026-08-20)
+### Upstreams (Real Status 2026-08-20)
 
-| Upstream | Qué es | Estado |
-|----------|--------|--------|
-| opencode-zen | Tier free vía opencode CLI (`opencode/*-free`) | ✅ Funciona (validado: deepseek-v4-flash-free responde) |
-| opencode-llm-proxy | Plugin KochC en :4010 — adapta opencode a OpenAI wire | ✅ Validado que el concepto existe; usar como adapter |
-| opencode-go | Suscripción GO | ❌ CAÍDO (suscripción vencida 2026-08) — no usar como upstream primario |
-| deepseek-direct | API directa DeepSeek | ⏸️ Cuando Santi tenga key |
-| futuros | OpenRouter, Groq, etc. | — (provider agnóstico: se agregan como filas) |
+| Upstream | Description | Status |
+|----------|-------------|--------|
+| opencode-zen | Free tier via opencode CLI (`opencode/*-free`) | [done] Functional (validated: deepseek-v4-flash-free responds) |
+| opencode-llm-proxy | KochC plugin on :4010 — adapts opencode to OpenAI wire | [done] Concept validated; use as adapter |
+| opencode-go | GO subscription | [failed] DOWN (subscription expired 2026-08) — do not use as primary upstream |
+| deepseek-direct | Direct DeepSeek API | [pending] Pending key acquisition |
+| Future | OpenRouter, Groq, etc. | --- (provider-agnostic: added as rows) |
 
-Nota spike-003 (2026-08-20): `opencode serve` NO expone `/v1/chat/completions`
-(devuelve SPA para rutas desconocidas; su API nativa es session/prompt/event). Para
-usar opencode como upstream OpenAI-compatible, va `opencode-llm-proxy` (plugin que
-levanta :4010 con wire OpenAI/Anthropic/Gemini, streaming + tool calling).
+Note spike-003 (2026-08-20): `opencode serve` DOES NOT expose `/v1/chat/completions`
+(returns SPA for unknown routes; native API is session/prompt/event). To use opencode as an OpenAI-compatible upstream, `opencode-llm-proxy` is required (plugin listening on :4010 exposing OpenAI/Anthropic/Gemini wire formats, streaming + tool calling).
 
-### Security boundary (la joya del pool)
+### Security Boundary (Key Pool Core Guarantee)
 
-"Prestar" keys a agentes one-shot o públicos (chatbot del portfolio) NO presta las
-keys reales: acuña derivadas con scope y budget. El agente público JAMÁS ve la key
-del proveedor. Si se pasa del budget, el Cardinal corta solo. **La key real nunca
-sale del Cardinal.**
+"Lending" keys to one-shot or public agents (portfolio chatbot) DOES NOT lend
+real keys: it mints derived keys with scope and budget limits. The public agent NEVER
+sees the provider key. If budget is exceeded, Cardinal terminates access automatically.
+**The real key never leaves Cardinal.**
 
 ---
 
-## 7. Decisiones abiertas / spikes
+## 7. Open Decisions / Spikes
 
-| Spike | Valida (Given/When/Then) | Riesgo |
-|-------|---------------------------|--------|
-| 001 blackboard-no-inflación | Dado el board, cuando A postea y B retoma, entonces ninguno infla contexto ni escribe memoria | Alto (mata la idea si falla) |
-| 002 mcp-multivault | Dado el RAG proxy + server MCP fino, cuando un agente llama search_vaults, entonces recibe chunks con origen de vault y token budget | Medio |
-| 003 pool-opencode-go | Dado opencode serve (GO), cuando el router manda un completion, entonces devuelve tokens reales y el metering anda | Medio |
+| Spike | Validates (Given/When/Then) | Risk |
+|-------|------------------------------|------|
+| 001 blackboard-no-inflation | Given the board, when A posts and B resumes, neither inflates context nor writes memory | High (invalidates concept if failed) |
+| 002 mcp-multivault | Given RAG proxy + thin MCP server, when an agent calls search_vaults, it receives chunks with vault origin and token budget | Medium |
+| 003 pool-opencode-go | Given opencode serve (GO), when the router sends a completion, it returns real tokens and metering functions | Medium |
 
-Orden: 001 primero.
-
----
-
-## 8. Relación con el roadmap (re-scope Fase 2)
-
-| Item Fase 2 original | Destino |
-|----------------------|---------|
-| 2.1 LLM Router (`/v1/chat/completions`) | ✅ Se mantiene — corazón del pilar 2 |
-| 2.2 API Key Factory (scopes + budgets) | ✅ Se mantiene — pilar 2 |
-| 2.3 One-Shot Agents (Podman API) | ❌ Reemplazado por blackboard + herdr/MCP (no reimplementar orquestación) |
-| 2.4 PR Review Pipeline (webhook GitHub) | ⏸️ Posponer — se resuelve por blackboard + trigger externo cuando duela |
-| 2.5 @mention trigger | ⏸️ Posponer — igual |
-
-El desbloqueo por polling local de la API de GitHub (decisión 2026-08-10) sigue válido como alternativa si algún trigger externo lo necesita, pero deja de ser el cuello de botella de Fase 2: el cuello ahora es validar los pilares con spikes.
+Order: 001 first.
 
 ---
 
-*Documento vivo. Se actualiza cuando los spikes emiten veredicto o cambian prioridades.*
+## 8. Roadmap Relationship (Phase 2 Re-scope)
+
+| Original Phase 2 Item | Destination |
+|-----------------------|-------------|
+| 2.1 LLM Router (`/v1/chat/completions`) | [done] Retained — core of pillar 2 |
+| 2.2 API Key Factory (scopes + budgets) | [done] Retained — pillar 2 |
+| 2.3 One-Shot Agents (Podman API) | [superseded] Replaced by blackboard + herdr/MCP (do not reimplement orchestration) |
+| 2.4 PR Review Pipeline (GitHub webhook) | [deferred] Postponed — handled via blackboard + external trigger when needed |
+| 2.5 @mention trigger | [deferred] Postponed — same |
+
+The local GitHub API polling workaround (decision 2026-08-10) remains valid as an alternative if needed by an external trigger, but ceases to be the Phase 2 bottleneck: the bottleneck is now validating pillars via spikes.
+
+---
+
+*Living document. Updated when spikes yield verdicts or priorities shift.*

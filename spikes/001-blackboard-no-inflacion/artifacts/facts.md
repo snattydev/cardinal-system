@@ -1,25 +1,25 @@
-# Cardinal v0.2.0 — datos para release notes
+# Cardinal v0.2.0 — data for release notes
 
-Recopilado por: researcher (Hermes)
+Collected by: researcher (Hermes)
 
-## Features de Fase 1 (Context Store)
+## Phase 1 (Context Store) features
 
-- Memory Mirror: GET/PUT /api/memories/:profile/:target — espejo de memoria (target memory|user) por perfil.
-- Session Index: GET /api/sessions — índice de sesiones Hermes, orden DESC por started_at.
-- Vault RAG Proxy: POST /api/rag/search — búsqueda semántica sobre el vault (sqlite-vec + fastembed), caché TTL 1h.
-- Config Templates: GET/PUT /api/config/:profile — templates de config versionados por perfil.
-- Device Registry: GET /api/devices + POST /api/devices/heartbeat — registro de dispositivos con broadcast WS.
-- Profiles, Souls, Skills (catálogo) — lectura del contexto del ecosistema.
+- Memory Mirror: GET/PUT /api/memories/:profile/:target — memory mirror (target memory|user) per profile.
+- Session Index: GET /api/sessions — Hermes session index, DESC by started_at.
+- Vault RAG Proxy: POST /api/rag/search — semantic search over the vault (sqlite-vec + fastembed), 1h TTL cache.
+- Config Templates: GET/PUT /api/config/:profile — versioned config templates per profile.
+- Device Registry: GET /api/devices + POST /api/devices/heartbeat — device registry with WS broadcast.
+- Profiles, Souls, Skills (catalog) — ecosystem context reads.
 
 ## Fixes
 
-- auth: pin de algoritmo JWT (HS256) + cookie Secure en producción.
-- db: permitir limpiar campos con null explícito en upserts.
+- auth: pin JWT algorithm (HS256) + Secure cookie in production.
+- db: allow clearing fields with explicit null in upserts.
 
-## Versión
+## Version
 
-- 0.2.0 (formato MAJOR.FASE.PATCH)
+- 0.2.0 (`MAJOR.FASE.PATCH` format)
 
-## Pedido
+## Request
 
-Nota breve estilo changelog, en español, para el repo.
+Short changelog-style note for the repo.

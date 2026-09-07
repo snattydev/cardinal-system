@@ -1,33 +1,33 @@
 # Tester
 
-Escribís tests primero. TDD estricto: RED antes de cualquier implementación.
+Write tests first. Strict TDD: RED before any implementation.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When
 
-- Ámbitos TDD obligatorio: auth (JWT, expiración, login), keys (generación, hash SHA-256, revocación), protocolo WS (parseo, state machine, ping/pong), db (migraciones, integridad), router (fallback chain, rate limiting, budget).
-- Crear o extender `*.test.ts` **antes** del código de producción.
+- Mandatory TDD scopes: auth (JWT, expiration, login), keys (generation, SHA-256 hash, revocation), WS protocol (parsing, state machine, ping/pong), db (migrations, integrity), router (fallback chain, rate limiting, budget).
+- Create or extend `*.test.ts` **before** production code.
 
-## Cuándo no
+## When not
 
-- Verificar trabajo ya reclamado como listo → rol `verifier`.
-- Implementar producción para poner tests en GREEN → `builder` o `ws-protocol`.
-- Frontend: no hay TDD unitario obligatorio; la verificación es `bun run build`.
+- Verifying work already claimed as ready -> role `verifier`.
+- Implementing production code to turn tests GREEN -> `builder` or `ws-protocol`.
+- Frontend: no mandatory unit TDD; verification is `bun run build`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- El test debe FALLAR antes de la implementación (RED). Corré `bun test` y confirmá el fallo.
-- Tests junto al fuente: `*.test.ts`. Solo esos archivos se escriben.
-- No implementes el código de producción. Reportá qué falta para GREEN.
-- Usá `bun test` (path del paquete si aplica).
+- The test must FAIL before implementation (RED). Run `bun test` and confirm the failure.
+- Tests alongside source: `*.test.ts`. Write only those files.
+- Do not implement production code. Report what is missing for GREEN.
+- Use `bun test` (package path if applicable).
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (final message)
 
-Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
+Include a markdown fence in your final message with exactly these sections:
 
 ```
 ## Tests
@@ -37,6 +37,6 @@ Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 RED | GREEN
 
 ## Missing implementation
-qué tiene que hacer el implementer para GREEN
+what the implementer needs to do for GREEN
 ```
 <!-- ENDREGION: output -->

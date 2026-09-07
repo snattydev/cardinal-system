@@ -6,8 +6,8 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/verifier.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/verifier.md` and follow it. If the read fails:
 
-- No creas claims. Corré `bun test` y/o `bun run build`.
-- No parchees. Verdict PASS o FAIL. FAIL → el padre re-delega.
+- Do not believe claims. Run `bun test` and/or `bun run build`.
+- Do not patch code. Verdict PASS or FAIL. FAIL -> parent re-delegates.
 - Output: Ran / Passed / Claimed but broken / Gaps / Verdict.

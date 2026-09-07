@@ -117,7 +117,9 @@ The container publishes on `127.0.0.1:8787` and persists the DB on the `cardinal
 | [`docs/roadmap.md`](docs/roadmap.md) | Phase priorities and status |
 | [`docs/stack.md`](docs/stack.md) | Stack and technical decisions |
 | [`docs/security.md`](docs/security.md) | Security model |
-| [`AGENTS.md`](AGENTS.md) | Development rules (branching, TDD, roles) |
+| [`docs/api.md`](docs/api.md) | REST, WebSocket, JWT recipe |
+| [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md) | Operational gotchas |
+| [`AGENTS.md`](AGENTS.md) | Development rules (language: English only, branching, TDD, roles) |
 | [`docs/features/`](docs/features/) | What was done, why, decisions per feature |
 | [`docs/features/2026-09-03-router-surface.md`](docs/features/2026-09-03-router-surface.md) | Router v0.2.5 index (dashboard + keys + fusion) |
 | [`docs/guides/router-usage.md`](docs/guides/router-usage.md) | LLM router manual |

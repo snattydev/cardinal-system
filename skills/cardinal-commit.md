@@ -1,6 +1,6 @@
 ---
 name: cardinal-commit
-description: Commit format and flow for Cardinal System — conventional commits, language, scope, examples, pre-commit verification.
+description: Commit format for Cardinal System — conventional commits, English subject and body, scope, examples, pre-commit checks.
 category: development
 ---
 
@@ -11,7 +11,7 @@ category: development
 ```
 <type>(<scope>): <short description in English>
 
-<Body in Spanish: what and why, not how>
+<Body in English: what and why, not how>
 ```
 
 ## Types
@@ -40,11 +40,12 @@ docs(agents): add review workflow
 ## Rules
 
 1. First line ≤ 72 chars, in English.
-2. Body in Spanish — explain *what* and *why*.
-3. Separate subject from body with a blank line.
+2. Body in English — explain *what* and *why*. Code comments and identifiers in the same change are English too (`AGENTS/docs.md`).
+3. Blank line between subject and body.
 4. If it closes an issue: `Closes #N` at the end of the body.
 5. One commit = one logical change. Do not mix feat with fix.
-6. **Authorship:** the commit must use the name and email of the GitHub user (`git config user.name` / `user.email`), not the agent's. All agents inherit the owner's identity.
+6. Authorship is the GitHub user (`git config user.name` / `user.email`), never the agent.
+7. No `Generated with` / coding-agent `Co-authored-by` trailers.
 
 ## Examples
 
@@ -53,17 +54,16 @@ Good:
 ```
 feat(ws): add agent heartbeat with ping/pong protocol
 
-Implementación del keep-alive sobre WebSocket. El Cardinal
-envía ping cada 30s y espera pong. Si fallan 2 pings
-consecutivos, el agente se marca offline en el dashboard
-y se emite evento agent_update a los suscriptores.
+Keep-alive over WebSocket. Cardinal sends ping every 30s and
+expects pong. Two consecutive misses mark the agent offline
+and emit agent_update to subscribers.
 ```
 
 ```
 fix(auth): return 401 instead of 500 on expired JWT
 
-El middleware tiraba 500 genérico. Ahora verifica exp
-explícitamente y responde 401 con mensaje descriptivo.
+The middleware returned a generic 500. It now checks exp
+explicitly and responds 401 with a descriptive error.
 ```
 
 Bad:
@@ -73,15 +73,15 @@ fix stuff
 ```
 
 ```
-feat(ws): add agent heartbeat with ping/pong protocol. Implementación del keep-alive...
+feat(ws): add agent heartbeat with ping/pong protocol. Keep-alive over WebSocket...
 ```
 
 ## Pre-commit verification
 
 ```bash
-# Audit leaks
 git diff --cached | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'
 
-# Verify format
 git log -1 --pretty=format:"%s" | grep -E '^(feat|fix|chore|docs|refactor|test|style)(\(.+\))?: .{1,72}'
+
+git log origin/dev..HEAD --format='%B' | grep -iE 'generated with|co-authored-by.*(cursor|copilot|claude|openai|anthropic|aider)|cursor\.com' || true
 ```

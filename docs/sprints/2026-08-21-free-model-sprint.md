@@ -1,72 +1,72 @@
-# Sprint Log — Modelo Gratis (Router + Keys), 20–21/08/2026
+# Sprint Log — Free Model (Router + Keys), 20–21/08/2026
 
-> Registro del sprint de desarrollo con modelos gratis (OpenCode Zen / Ox Alpha).
-> Datos reales extraídos del historial de git de `dev` (no pushed aún: dev está ahead 8).
+> Sprint log with free models (OpenCode Zen / Ox Alpha).
+> Real data extracted from `dev` git history (not pushed yet: dev is ahead 8).
 
-## Resumen ejecutivo
+## Executive Summary
 
-Sprint de ~17h reloj (20/08 07:09 → 21/08 00:49) que llevó el LLM Router de
-Cardinal v2 de arquitectura cerrada a sistema funcionando con dashboard:
+Sprint of ~17h wall time (20/08 07:09 → 21/08 00:49) that took the Cardinal v2 LLM Router
+from closed architecture to a working system with dashboard:
 
-- **Router provider-agnostic** con fallback chain, SSE streaming y metering
-- **Key Factory**: scopes, budget enforcement, encriptación de providers
-- **Dashboard /keys**: listar + revocar keys persistentes (API + UI)
-- **Docs**: manual de uso del router, feature docs, version bump 0.2.2
+- **Provider-agnostic Router** with fallback chain, SSE streaming, and metering
+- **Key Factory**: scopes, budget enforcement, provider encryption
+- **Dashboard /keys**: list + revoke persistent keys (API + UI)
+- **Docs**: router usage manual, feature docs, version bump 0.2.2
 
-Todo el código fue escrito por workers de coding con modelos gratis
-(Ox Alpha / DeepSeek V4 free tier), orquestados vía herdr.
+All code was written by coding workers with free models
+(Ox Alpha / DeepSeek V4 free tier), orchestrated via herdr.
 
-## Timeline (commits reales en dev)
+## Timeline (real commits in dev)
 
-| Hora | Commit | Qué |
+| Time | Commit | What |
 |------|--------|-----|
-| 20/08 07:09 | e060df5 | docs(roadmap): cerrar arquitectura del router provider-agnostic |
-| 20/08 07:09 | 6b8bf61 | feat(keys): key factory con scopes, budget y encriptación de providers |
-| 20/08 07:09 | e8ad0b8 | feat(router): LLM router provider-agnostic con failover transparente |
-| 20/08 07:13 | 076cf02 | docs(router): manual de uso del LLM router |
-| 20/08 13:48 | 643adf0 | chore(dev): roles OpenCode apuntan a docs canónicos |
+| 20/08 07:09 | e060df5 | docs(roadmap): close provider-agnostic router architecture |
+| 20/08 07:09 | 6b8bf61 | feat(keys): key factory with scopes, budget, and provider encryption |
+| 20/08 07:09 | e8ad0b8 | feat(router): provider-agnostic LLM router with transparent failover |
+| 20/08 07:13 | 076cf02 | docs(router): LLM router usage manual |
+| 20/08 13:48 | 643adf0 | chore(dev): OpenCode roles point to canonical docs |
 | 20/08 13:50 | 1b5c404 | docs: feature doc Cursor subagents |
 | 20/08 13:51 | 21a2154 | docs: plan Cursor subagents |
-| 20/08 13:58 | ddbf208 | fix(agents): role output en último mensaje, no en el doc |
-| 21/08 00:27 | 68de60e | feat(db): list y revoke human keys por id |
-| 21/08 00:29 | a3ec86e | feat(api): handlers JWT keys list + revoke-by-id |
-| 21/08 00:32 | 38b85a6 | feat(api): /api/keys detrás de cookie de sesión JWT |
-| 21/08 00:35 | 3107931 | feat(ui): página /keys para listar y revocar |
-| 21/08 00:38 | 515e85d | fix(ui): key recién revocada queda en historial abierto |
-| 21/08 00:40 | c00214a | fix(ui): usar estado actual de history-open en revoke |
-| 21/08 00:43 | 36d1969 | docs(keys): doc /keys dashboard + bump 0.2.2 |
-| 21/08 00:49 | e003aae | fix(ui): no mostrar estado vacío de keys en load/error |
+| 20/08 13:58 | ddbf208 | fix(agents): role output in last message, not in the doc |
+| 21/08 00:27 | 68de60e | feat(db): list and revoke human keys by id |
+| 21/08 00:29 | a3ec86e | feat(api): JWT keys list + revoke-by-id handlers |
+| 21/08 00:32 | 38b85a6 | feat(api): /api/keys behind JWT session cookie |
+| 21/08 00:35 | 3107931 | feat(ui): /keys page to list and revoke |
+| 21/08 00:38 | 515e85d | fix(ui): freshly revoked key stays in open history |
+| 21/08 00:40 | c00214a | fix(ui): use current history-open state on revoke |
+| 21/08 00:43 | 36d1969 | docs(keys): /keys dashboard doc + bump 0.2.2 |
+| 21/08 00:49 | e003aae | fix(ui): do not show empty keys state on load/error |
 
-## Números del sprint
+## Sprint Numbers
 
-- **16 commits** en dev (8 sin push — ahead de origin/dev)
-- **~3.900 líneas** agregadas netas (1622 en la ventana origin/dev..dev +
-  ~2.000 del bloque router/keys del 20/08)
-- **3 features mayores**: router, key factory, keys dashboard
-- **TDD respetado**: cada capa con su suite (router.test 205 líneas,
+- **16 commits** in dev (8 not pushed — ahead of origin/dev)
+- **~3,900 net lines** added (1622 in the origin/dev..dev window +
+  ~2,000 from the 20/08 router/keys block)
+- **3 major features**: router, key factory, keys dashboard
+- **TDD respected**: each layer with its suite (router.test 205 lines,
   router API test 254, db.test +297, keys.test 122, server.test +15)
 - **Version**: 0.2.1 → 0.2.2
 
-## Stack de modelos usado
+## Model Stack Used
 
-| Rol | Modelo | Proveedor |
+| Role | Model | Provider |
 |-----|--------|-----------|
-| Implementación | Ox Alpha Free / DeepSeek V4 Flash (free tier) | OpenCode Zen / Go |
-| Orquestación | Hermes (sesión engineer) | Nous Research |
-| Revisión | Fresh-context review por item | — |
+| Implementation | Ox Alpha Free / DeepSeek V4 Flash (free tier) | OpenCode Zen / Go |
+| Orchestration | Hermes (engineer session) | Nous Research |
+| Review | Fresh-context review per item | — |
 
-## Estado al cierre
+## State at Close
 
-- `dev` estable, ahead 8 de origin/dev — pendiente push por Santi
-- Item #13 (one-shot keys) diferido: depende de pipeline one-shot
-- Item #5 (seed + e2e zen free real) en curso al cierre del log
-- Próximo PR dev→main cuando Santi valide
+- `dev` stable, ahead 8 of origin/dev — push pending by the owner
+- Item #13 (one-shot keys) deferred: depends on one-shot pipeline
+- Item #5 (seed + e2e zen free real) in progress at log close
+- Next PR dev→main when the owner validates
 
-## Lecciones del sprint
+## Sprint Lessons
 
-1. **Modelos gratis alcanzan para backend TDD-able**: router y keys pasaron
-   gates de verificación real sin necesidad de modelos pagos.
-2. **Failover transparente funciona en diseño**: el router resuelve por nombre
-   de modelo o alias y degrada entre providers sin exponer el corte.
-3. **El cuello de botella no fue el modelo**: fue la infraestructura de
-   verificación (podman, mock upstream, proxy :4010 pendiente).
+1. **Free models are sufficient for TDD-able backend**: router and keys passed
+   real verification gates without paid models.
+2. **Transparent failover works in design**: the router resolves by model
+   name or alias and degrades between providers without exposing the cut.
+3. **The bottleneck was not the model**: it was the verification infrastructure
+   (podman, mock upstream, proxy :4010 pending).

@@ -10,6 +10,7 @@
 
 - Connects agents regardless of where they live (PC, laptop, phone)
 - Provides centralized context (memory, RAG, history)
+- Routes models (`POST /v1/chat/completions`) as a Phase 2 capability in service of the brain
 - Issues API keys with scopes, budgets, and failsafes
 - Handles human authentication and access
 - Exposes a web dashboard with Sword Art Online aesthetic
@@ -46,7 +47,7 @@ Without configuring anything by hand. Cardinal is the source of truth.
 
 ## Non-goals (what it is NOT)
 
-- A model router (although it includes one)
+- A generic commercial model router (Cardinal provides `POST /v1/chat/completions` as a Phase 2 capability in service of the brain)
 - A monitoring dashboard (although it has one)
 - A task orchestrator (agents self-manage)
 - A replacement for Hermes Agent
@@ -67,4 +68,4 @@ Without configuring anything by hand. Cardinal is the source of truth.
 
 ---
 
-*Updated: 2026-07-28.*
+*Updated: 2026-09-07.*

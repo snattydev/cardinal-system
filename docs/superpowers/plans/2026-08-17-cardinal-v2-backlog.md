@@ -1,166 +1,166 @@
-# Cardinal v2 — Backlog & Plan de Ejecución
+# Cardinal v2 — Backlog & Execution Plan
 
-> Complementa la spec viva `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
-> Estado al momento: v0.2.5 (2026-09-03). Fase 1 completa. Fase 2 avanzada en `dev`.
-> Re-priorizado 2026-08-20: router + key pool primero; luego blackboard/MCP.
-> Superficie router 2026-09-03: dashboard `/router` + key create/limits + fusion.
+> Complements the living spec `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
+> Current status: v0.2.5 (2026-09-03). Fase 1 complete. Fase 2 advanced in `dev`.
+> Reprioritized 2026-08-20: router + key pool first; then blackboard/MCP.
+> Router surface 2026-09-03: `/router` dashboard + key create/limits + fusion.
 
-## Estado actual
+## Current Status
 
-| Pilar | Estado |
-|-------|--------|
-| 4 — Identidad (`sk-cardinal-*`) | ✅ Fase 0 |
-| 2 — Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA (v0.2.5) |
-| 3 — Blackboard | ✅ tasks CRUD + WS + mailbox API + UI `/tasks` + MCP board + MCP mailbox |
-| 1 — MCP multi-vault | ✅ memory + board + mailbox tools (`packages/mcp`, compose `:8789`) |
+| Pillar | Status |
+|---|---|
+| 4 — Identity (`sk-cardinal-*`) | [done] Fase 0 |
+| 2 — Key pool + router | [done] router + key factory + `/keys` create/expiry/USD + JWT `/router` dashboard + fusion/MoA (v0.2.5) |
+| 3 — Blackboard | [done] tasks CRUD + WS + mailbox API + `/tasks` UI + MCP board + MCP mailbox |
+| 1 — MCP multi-vault | [done] memory + board + mailbox tools (`packages/mcp`, compose `:8789`) |
 
-## Backlog (orden nuevo)
+## Backlog (New Order)
 
-| # | Item | Tipo | TDD | Depende de |
-|---|------|------|-----|-----------|
-| 6 | ✅ LLM Router provider-agnostic | feature | Sí | — |
-| 7 | ✅ Key Factory scopes + budget + encryption | feature | Sí | — |
-| 5 | Seed providers/routes + e2e con zen free real | spike/e2e | — | 6, 7 |
-| 1 | ✅ Mailbox `messages` API (handoff agente↔agente) | feature | Sí | — |
-| 2 | ✅ UI del board — página `/tasks` | frontend | No | — |
-| 3 | ✅ MCP board tools + dual-auth `/api/tasks` (2026-08-31) | feature | Sí | MCP hub |
-| 4 | ✅ MCP multi-vault memory tools (`packages/mcp`) | feature | Sí | — |
-| 8 | ✅ Fix typecheck `maxPayloadLength` | fix | — | — |
-| 9 | ✅ Docs stale — refresh (2026-08-31 + 2026-09-03 superficie router) | docs | — | — |
-| 10 | PR `dev→main` — estabilizar Fase 1 + blackboard + router + MCP | release | — | todos |
-| 11 | Bootstrap admin password **sin el modelo** (TTY `read -s` → solo hash en env/secret) | security / deploy | — | **blocker cloud** |
-| 12 | ✅ Keys dashboard: listar + revocar persistentes (`/keys`) | feature | Sí | — |
-| 13 | One-shot keys: bloque compacto abajo-izq en `/keys` + hard-delete al terminar | feature | Sí | pipeline one-shot |
-| 14 | ✅ MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` (2026-08-31) | feature | Sí | 1, 3 |
-| 15 | ✅ Dashboard JWT `/router` + API providers/routes (2026-09-03) | feature | Sí | 6 |
-| 16 | ✅ `POST /api/keys` create + expiry + tope USD (2026-09-03) | feature | Sí | 7, 12 |
-| 17 | ✅ Fusion / MoA (`model=fusion`, judge synthesize) (2026-09-03) | feature | Sí | 6 |
+| # | Item | Type | TDD | Depends on |
+|---|------|------|-----|------------|
+| 6 | [done] Provider-agnostic LLM Router | feature | Yes | — |
+| 7 | [done] Key Factory scopes + budget + encryption | feature | Yes | — |
+| 5 | Seed providers/routes + real zen free e2e | spike/e2e | — | 6, 7 |
+| 1 | [done] Mailbox `messages` API (agent<->agent handoff) | feature | Yes | — |
+| 2 | [done] Board UI — `/tasks` page | frontend | No | — |
+| 3 | [done] MCP board tools + dual-auth `/api/tasks` (2026-08-31) | feature | Yes | MCP hub |
+| 4 | [done] MCP multi-vault memory tools (`packages/mcp`) | feature | Yes | — |
+| 8 | [done] Fix typecheck `maxPayloadLength` | fix | — | — |
+| 9 | [done] Stale docs — refresh (2026-08-31 + 2026-09-03 router surface) | docs | — | — |
+| 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | release | — | all |
+| 11 | Bootstrap admin password **without the model** (TTY `read -s` -> hash only in env/secret) | security / deploy | — | **cloud blocker** |
+| 12 | [done] Keys dashboard: list + revoke persistent (`/keys`) | feature | Yes | — |
+| 13 | One-shot keys: compact block bottom-left in `/keys` + hard-delete upon completion | feature | Yes | one-shot pipeline (v3 N1) |
+| 14 | [done] MCP mailbox tools (`agent_send` / `agent_inbox`) + dual-auth `/api/messages` (2026-08-31) | feature | Yes | 1, 3 |
+| 15 | [done] JWT `/router` dashboard + providers/routes API (2026-09-03) | feature | Yes | 6 |
+| 16 | [done] `POST /api/keys` create + expiry + USD limit (2026-09-03) | feature | Yes | 7, 12 |
+| 17 | [done] Fusion / MoA (`model=fusion`, synthesize judge) (2026-09-03) | feature | Yes | 6 |
 
-## Decisiones
+## Decisions
 
-- **Router + Key Factory primero (6, 7).** Santi priorizó tener el sistema en testing
-  y semi-funcionamiento local: pool + router deployados en los containers de podman.
-  Blackboard queda ~60% (CRUD + broadcast) pero NO bloquea — se retoma después.
-- **Router provider-agnostic (decisión 2026-08-20).** NO es un registry de alias fijo
-  (spec vieja). Es el modelo FreeLLMAPI: `providers` como entidades configurables,
-  cada uno con sus `provider_models`, y `model_routes` que resuelven por nombre de
-  modelo (autorouter) O por alias explícito. La key derivada define scopes + budget.
-  Detalle completo en spec sección 6.
-- **Failover transparente.** "Pido deepseek-v4-flash, hay 4 providers free, uso 1,
-  se corta → el router pasa al otro sin interrumpir." El cliente nunca ve el failover.
-- **GO caído.** `opencode-go/*` no responde (suscripción vencida 2026-08). Upstream
-  real disponible: zen free (`opencode/*-free`, validado). `opencode serve` NO expone
-  `/v1/chat/completions` (spike-003) — para opencode como upstream va
-  `opencode-llm-proxy` (:4010, adapta a OpenAI wire).
-- **CLI:** features delegadas → **cursor-agent** (Santi: "usá solo cursor para
-  desarrollar en estos momentos"). Spikes e higiene trivial van directo.
-- **El MCP surface del blackboard (3) se expone SOLO tras validar MCP en spike-002.**
+- **Router + Key Factory first (6, 7).** Santi prioritized having the system in testing
+  and semi-operational locally: pool + router deployed in podman containers.
+  Blackboard remains at ~60% (CRUD + broadcast) but does NOT block — it resumes afterward.
+- **Provider-agnostic router (decision 2026-08-20).** It is NOT a fixed alias registry
+  (old spec). It follows the FreeLLMAPI model: `providers` as configurable entities,
+  each with its `provider_models`, and `model_routes` that resolve by model name
+  (autorouter) OR by explicit alias. The derived key defines scopes + budget.
+  Full detail in spec section 6.
+- **Transparent failover.** "I request deepseek-v4-flash, there are 4 free providers, I use 1,
+  it drops -> router fails over to another without interruption." The client never sees the failover.
+- **GO is down.** `opencode-go/*` is unresponsive (subscription expired 2026-08). Real
+  available upstream: zen free (`opencode/*-free`, validated). `opencode serve` does NOT expose
+  `/v1/chat/completions` (spike-003) — for opencode as upstream,
+  `opencode-llm-proxy` (:4010, adapts to OpenAI wire) is used.
+- **CLI:** delegated features -> **cursor-agent** (Santi: "use only cursor to
+  develop right now"). Spikes and trivial hygiene go direct.
+- **Blackboard MCP surface (3) is exposed ONLY after validating MCP in spike-002.**
 
-## Detalle por item (alcance mínimo)
+## Item Details (Minimum Scope)
 
-### 6 — LLM Router (provider-agnostic)
-- Migración: `providers`, `provider_models`, `model_routes` (ver spec sección 6).
-- `packages/router/` (nuevo workspace): resolución (autorouter por nombre de modelo
-  + alias por `model_routes`), fallback chain con health/cooldown, upstream calls
-  OpenAI-compat (streaming SSE sin romper), metering por key + por provider.
-- Endpoint `POST /v1/chat/completions` + `GET /v1/models` en `backend/src/server.ts`,
+### 6 — LLM Router (Provider-Agnostic)
+- Migration: `providers`, `provider_models`, `model_routes` (see spec section 6).
+- `packages/router/` (new workspace): resolution (autorouter by model name
+  + alias via `model_routes`), fallback chain with health/cooldown, upstream calls
+  OpenAI-compat (streaming SSE without breakage), metering per key + per provider.
+- Endpoints `POST /v1/chat/completions` + `GET /v1/models` in `backend/src/server.ts`,
   auth Bearer `sk-cardinal-*`.
-- TDD obligatorio (router = ámbito crítico).
+- Mandatory TDD (router = critical scope).
 
 ### 7 — Key Factory
-- Extender `agent_keys` con `scopes` (JSON), `budget_limit`, `budget_used`;
-  enforcement de budget en el router; keys `created_by=system` auto-revocables;
-  dashboard de consumo. TDD obligatorio (keys).
+- Extend `agent_keys` with `scopes` (JSON), `budget_limit`, `budget_used`;
+  budget enforcement in the router; auto-revocable `created_by=system` keys;
+  consumption dashboard. Mandatory TDD (keys).
 
 ### 5 — Seed + e2e
-- Seed: provider zen free (opencode) + alias de ejemplo ("fast" → deepseek-v4-flash-free).
-- e2e: completion real vía key derivada + verificación de metering.
+- Seed: zen free provider (opencode) + example alias ("fast" -> deepseek-v4-flash-free).
+- e2e: real completion via derived key + metering verification.
 
 ### 8 — Fix typecheck (`maxPayloadLength`)
-- Investigar si `bun-types` reconoce `maxPayloadLength` en la versión instalada;
-  si no, alinear la opción de `Bun.serve` con la API tipada (sin debilitar el
-  hardening de Fase 1). Archivos: `backend/src/server.ts`, posible `bun.lock`.
-- Verificación: `bun run typecheck` verde (backend + frontend).
+- Investigate whether `bun-types` recognizes `maxPayloadLength` in the installed version;
+  if not, align the `Bun.serve` option with the typed API (without weakening the
+  Fase 1 hardening). Files: `backend/src/server.ts`, possible `bun.lock`.
+- Verification: `bun run typecheck` passing (backend + frontend).
 
-### 9 — Docs stale
-- ✅ Refresh 2026-08-31 (Fase 2 re-scope) y 2026-09-03 (superficie router:
+### 9 — Stale docs
+- [done] Refresh 2026-08-31 (Fase 2 re-scope) and 2026-09-03 (router surface:
   [`2026-09-03-router-surface.md`](../../features/2026-09-03-router-surface.md)).
 - `docs/roadmap.md`, `fase-2.md`, `AGENTS.md`, README, backlog, manual
   `docs/guides/router-usage.md`.
 
 ### 1 — Mailbox `messages`
-- Tabla `messages` (id, from_agent, to_agent, type, payload_ref, read, created_at)
-  + repos + endpoints JWT (`agent_send`, `agent_inbox`) + broadcast `message_update`.
-- Espeja el patrón de `tasks` (migration append, handlers puros con `onChange`,
-  `broadcastMessage` en el Hub). TDD RED→GREEN en `packages/db` + `backend/src/api`.
-- Archivos: `packages/db/src/schema.ts` + `repos.ts`, `packages/core/src/types.ts`,
+- `messages` table (id, from_agent, to_agent, type, payload_ref, read, created_at)
+  + repos + JWT endpoints (`agent_send`, `agent_inbox`) + `message_update` broadcast.
+- Mirrors the `tasks` pattern (append migration, pure handlers with `onChange`,
+  `broadcastMessage` in the Hub). RED->GREEN TDD in `packages/db` + `backend/src/api`.
+- Files: `packages/db/src/schema.ts` + `repos.ts`, `packages/core/src/types.ts`,
   `packages/ws/src/hub.ts`, `backend/src/api/messages.ts` (+ test), `backend/src/server.ts`.
 
-### 2 — UI del board (frontend)
-- Página `Tasks.tsx` + ruta + entrada en sidebar. Listar tasks (GET `/api/tasks`),
-  crear/claimar/completar, y suscribirse a `task_update` vía `connectRoster`
-  (extender `ServerEvent` en `frontend/src/lib/types.ts`).
-- Verificación: `bun run build` + smoke visual.
-- ⚠️ Blocker entorno 2026-08: frontend no levanta en dev (rolldown native binding
-  EACCES/ERR_DLOPEN_FAILED por noexec en ~/Data). Mismo issue que el portfolio.
+### 2 — Board UI (frontend)
+- Page `Tasks.tsx` + route + sidebar entry. List tasks (GET `/api/tasks`),
+  create/claim/complete, and subscribe to `task_update` via `connectRoster`
+  (extend `ServerEvent` in `frontend/src/lib/types.ts`).
+- Verification: `bun run build` + visual smoke test.
+- [blocked] Environment blocker 2026-08: frontend does not run in dev (rolldown native binding
+  EACCES/ERR_DLOPEN_FAILED due to noexec on ~/Data). Same issue as the portfolio.
 
 ### 4 — Spike-002 (MCP multi-vault)
-- Dado el RAG proxy (host :8788) + un server MCP fino, cuando un agente llama
-  `search_vaults(query)`, entonces recibe chunks con origen de vault y token
-  budget. Validar con un agente MCP-capable (Hermes tiene cliente nativo).
+- Given the RAG proxy (host :8788) + a thin MCP server, when an agent calls
+  `search_vaults(query)`, it receives chunks with vault origin and token
+  budget. Validate with an MCP-capable agent (Hermes has a native client).
 
-### 10 — PR dev→main
-- Pre-merge checklist de AGENTS.md completo (tests, build, leak audit, Security
-  Review si se tocó auth/keys/ws, Standard Review, version bump, docs).
-  Nunca auto-merge.
+### 10 — PR dev->main
+- Complete pre-merge checklist from AGENTS.md (tests, build, leak audit, Security
+  Review if auth/keys/ws touched, Standard Review, version bump, docs).
+  Never auto-merge.
 
-### 11 — Bootstrap admin password sin el modelo (blocker cloud)
-- En local/testing cualquier password sirve. En nube, no.
-- Script TTY: el humano tipea la password (`read -s`); se hashea en esa
-  máquina; solo el hash llega a `~/.config/cardinal/env` o Podman secret.
-- El modelo **nunca** genera, recibe, imprime ni rota el plaintext. Aplica
-  aunque Santi sea el único usuario.
-- Ver `docs/security.md` § "Bootstrap de password admin".
+### 11 — Bootstrap admin password without the model (cloud blocker)
+- In local/testing any password works. In the cloud, no.
+- TTY script: the human types the password (`read -s`); it is hashed on that
+  machine; only the hash reaches `~/.config/cardinal/env` or Podman secret.
+- The model **never** generates, receives, prints, or rotates the plaintext. Applies
+  even though the owner is the sole user.
+- See `docs/security.md` § "Admin password bootstrap".
 
-### 12 — Keys dashboard (listar + revocar persistentes)
-- ✅ Implementado el 2026-08-21. Create + expiry + USD: item **16** (2026-09-03).
-- Spec original: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md)
-  (create era CLI-only; eso quedó obsoleto).
-- Página `/keys`, JWT. Historial human-revoked detrás de icono log.
+### 12 — Keys dashboard (list + revoke persistent)
+- [done] Implemented on 2026-08-21. Create + expiry + USD: item **16** (2026-09-03).
+- Original spec: [`2026-08-20-keys-dashboard-design.md`](../specs/2026-08-20-keys-dashboard-design.md)
+  (create was CLI-only; that is now obsolete).
+- Page `/keys`, JWT. Human-revoked history behind log icon.
 
-### 13 — One-shot keys (diferido)
-- Bloque compacto abajo a la izquierda en `/keys` para `created_by=system` vivas.
-- Al terminar el one-shot: hard-delete de `agent_keys`; rastro en el log de ese
-  agente, no en el historial de `/keys`.
-- Depende del pipeline one-shot. Detalle en spec §6.
+### 13 — One-shot keys (deferred)
+- Compact block at the bottom-left of `/keys` for live `created_by=system` keys.
+- Upon completing the one-shot: hard-delete from `agent_keys`; trace remains in that
+  agent's log, not in `/keys` history.
+- Depends on the one-shot pipeline. Detail in spec §6.
 
 ### 14 — MCP mailbox tools + dual-auth `/api/messages`
-- ✅ Implementado el 2026-08-31. Doc:
+- [done] Implemented on 2026-08-31. Doc:
   [`2026-08-31-mcp-mailbox-tools.md`](../../features/2026-08-31-mcp-mailbox-tools.md).
-- Tools `cardinal_agent_send` / `cardinal_agent_inbox` (siempre listadas). Dual-auth
-  JWT o agent key; la key no spoofea `from_agent`, no lee inbox ajeno, no mark-read
-  de otro mailbox.
+- Tools `cardinal_agent_send` / `cardinal_agent_inbox` (always listed). Dual-auth
+  JWT or agent key; key cannot spoof `from_agent`, cannot read another's inbox, cannot mark-read
+  on another mailbox.
 
-### 15 — Dashboard JWT `/router`
-- ✅ 2026-09-03. Doc: [`2026-09-03-router-dashboard.md`](../../features/2026-09-03-router-dashboard.md).
-- `GET/PATCH /api/router/providers`, `GET/PUT /api/router/routes`. UI `/router`
-  read-only (tablas SAO). No Fusion editor.
+### 15 — JWT `/router` dashboard
+- [done] 2026-09-03. Doc: [`2026-09-03-router-dashboard.md`](../../features/2026-09-03-router-dashboard.md).
+- `GET/PATCH /api/router/providers`, `GET/PUT /api/router/routes`. Read-only UI `/router`
+  (SAO tables). No Fusion editor.
 
 ### 16 — Key create + expiry + USD
-- ✅ 2026-09-03. Doc: [`2026-09-03-key-create-limits.md`](../../features/2026-09-03-key-create-limits.md).
-- `POST /api/keys` JWT; form en `/keys`; plaintext una vez. Router: expiry →
-  unauthorized; USD ≥ limit → 402.
+- [done] 2026-09-03. Doc: [`2026-09-03-key-create-limits.md`](../../features/2026-09-03-key-create-limits.md).
+- `POST /api/keys` JWT; form on `/keys`; plaintext shown once. Router: expiry ->
+  unauthorized; USD >= limit -> 402.
 
 ### 17 — Fusion / MoA
-- ✅ 2026-09-03. Doc: [`2026-09-03-router-fusion.md`](../../features/2026-09-03-router-fusion.md).
-- `fallback_chain` objeto `{mode:fusion, panel, judge}`. v1: `synthesize`, no
-  stream. Seed por SQL (`upsertModelRoute` sigue siendo arrays).
+- [done] 2026-09-03. Doc: [`2026-09-03-router-fusion.md`](../../features/2026-09-03-router-fusion.md).
+- `fallback_chain` object `{mode:fusion, panel, judge}`. v1: `synthesize`, no
+  streaming. Seed via SQL (`upsertModelRoute` remains arrays).
 
-## Próximo paso
+## Next Step
 
-Superficie router (15–17) y mailbox MCP (14) están en el working tree (`dev`).
-Siguiente: item **5** (seed providers/routes + e2e zen free), item **11**
-(bootstrap admin password TTY, blocker cloud), item **10** (PR `dev→main`
-cuando se freeze). Follow-ups de 15–17 (no ahora): UI mutar cadenas, mostrar
-Fusion en `/router`, USD hop-level en Fusion. El item 13 sigue diferido hasta
-el pipeline one-shot; **no implementarlo**.
+Router surface (15–17) and mailbox MCP (14) are in the working tree (`dev`).
+Next: item **5** (seed providers/routes + zen free e2e), item **11**
+(bootstrap admin password TTY, cloud blocker), item **10** (PR `dev->main`
+upon freeze). Follow-ups for 15–17 (not now): UI chain mutation, show
+Fusion in `/router`, USD hop-level in Fusion. Item 13 remains deferred until
+the one-shot pipeline; **do not implement it**.

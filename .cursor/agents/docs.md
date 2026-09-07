@@ -6,8 +6,8 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/docs.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/docs.md` and follow it. If the read fails:
 
-- Solo después de verificación. Path: `docs/features/<YYYY-MM-DD>-<nombre>.md`.
-- Incluí qué, por qué, decisiones, alternativas, archivos.
-- No toques SOULs ni código de aplicación. Último mensaje: path del doc.
+- Only after verification. Path: `docs/features/<YYYY-MM-DD>-<name>.md`.
+- Include what, why, decisions, alternatives, files.
+- Do not touch SOULs or application code. Final message: doc path.

@@ -1,20 +1,20 @@
 ---
-description: Workflow completo de feature multi-agente — plan → tester (RED) → builder (GREEN) → verify → reviewer → docs → commit
+description: Complete multi-agent feature workflow — plan -> tester (RED) -> builder (GREEN) -> verify -> reviewer -> docs -> commit
 ---
 
-# /feature — Feature workflow completo
+# /feature — Complete feature workflow
 
-Ejecutá el workflow completo de feature de Cardinal System:
+Execute the complete Cardinal System feature workflow:
 
-1. **Analizá** el request del usuario. Si no está claro, pedí clarificación (no asumas).
-2. **Leé** `AGENTS.md`, la spec relevante en `docs/superpowers/specs/`, y el roadmap en `docs/roadmap/`.
-3. **Descomponé** en subtareas con dependencias.
-4. **@tester** escribe los tests primero (RED) — solo para ámbitos con TDD obligatorio (auth, keys, ws, db, router).
-5. **@builder** implementa (GREEN) y refactorea si hace falta.
-6. **Verificá** corriendo `bun test` completo y `bun run build` en frontend si tocó frontend.
-7. **@reviewer** hace code review del diff.
-8. **@docs** crea `docs/features/<fecha>-<nombre>.md`.
-9. **Audit de leaks**: `git diff | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`.
-10. **Sugerí** el commit message: Conventional Commits, primera línea en inglés ≤72 chars, body en español. NO committees sin que el usuario lo apruebe — mostrá el diff primero.
+1. **Analyze** the user request. If unclear, ask for clarification (do not make assumptions).
+2. **Read** `AGENTS.md`, the relevant spec in `docs/superpowers/specs/`, and the roadmap in `docs/roadmap/`.
+3. **Decompose** into subtasks with dependencies.
+4. **@tester** writes tests first (RED) — only for mandatory TDD scopes (auth, keys, ws, db, router).
+5. **@builder** implements (GREEN) and refactors if needed.
+6. **Verify** by running full `bun test`, and `bun run build` in frontend if frontend was touched.
+7. **@reviewer** performs code review on the diff.
+8. **@docs** creates `docs/features/<date>-<name>.md`.
+9. **Secret leak audit**: `git diff | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`.
+10. **Suggest** the commit message: Conventional Commits, first line in English <=72 chars, body in Spanish. Do NOT commit without user approval — show the diff first.
 
-Reglas: features de 1-2 archivos sin lógica crítica → podés hacerlas directo con @builder sin el workflow completo. Version bump solo PATCH en dev.
+Rules: small features (1-2 files without critical logic) -> you can execute directly with @builder without the full workflow. Version bumps must only be PATCH on dev.

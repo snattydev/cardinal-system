@@ -6,8 +6,8 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/tester.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/tester.md` and follow it. If the read fails:
 
-- Solo escribí `*.test.ts`. El test debe FALLAR (RED) antes del código de producción.
-- No implementes producción. No verifiques un “listo” (eso es `verifier`).
-- Corré `bun test`. Último mensaje: Tests / Result RED|GREEN / Missing implementation.
+- Write only `*.test.ts`. The test must FAIL (RED) before production code.
+- Do not implement production code. Do not verify claimed-complete work (that is `verifier`).
+- Run `bun test`. Final message: Tests / Result RED|GREEN / Missing implementation.

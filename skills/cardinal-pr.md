@@ -1,18 +1,16 @@
 ---
 name: cardinal-pr
-description: Create a Pull Request in Cardinal System — branch, version bump, commit, push, open PR, fill template, assign reviewers.
+description: Create a Pull Request in Cardinal System — branch, version bump, commit, push, template, reviewers.
 category: development
 ---
 
 # Cardinal System — Create a Pull Request
 
-## Fundamental rule
+The orchestrator opens PRs. The human merges `dev → main`. Never auto-merge.
 
-The orchestrator opens PRs, the human merges them. Never auto-merge.
+Policy (checklist, merge strategy, reviewers): `AGENTS/prs.md`. This skill is the command sequence.
 
----
-
-## Full flow
+## Flow
 
 ### 1. Branch
 
@@ -26,41 +24,19 @@ Types: `feat/`, `fix/`, `chore/`, `docs/`.
 
 ### 2. Changes
 
-- Delegate implementation to a one-shot subagent.
-- Verify the result: files, coherence, leaks.
-- Document at `docs/features/` (create the `.md`).
+- Implement (or delegate), then verify files, coherence, leaks.
+- Document at `docs/features/<date>-<name>.md` when the change is significant.
 
 ### 3. Version bump
 
-**Only if the PR is to `main`.** For PRs to `dev`, do not touch the version.
+Format is `MAJOR.FASE.PATCH` (`package.json`). See `AGENTS/versioning.md`.
 
-```bash
-# Evaluate which bump based on accumulated changes:
-# PATCH: fixes, security, docs, chores   → 0.0.2 → 0.0.3
-# MINOR: new features                    → 0.0.3 → 0.1.0
-# MAJOR: breaking changes                → 0.1.0 → 1.0.0
-
-# Edit package.json → "version": "X.Y.Z"
-```
-
-Repo rule: the format is `MAJOR.FASE.PATCH`. FASE is bumped only in the PR `dev → main`; in `dev` only PATCH.
+- PR to `dev`: PATCH only, and only if the change warrants it. Do not bump FASE.
+- PR `dev → main`: bump FASE if the previous phase closed; otherwise leave FASE unchanged.
 
 ### 4. Commit
 
-```
-<type>(<scope>): <short in English>
-
-<Body in Spanish: what and why.>
-```
-
-Example:
-
-```
-feat(ws): add agent heartbeat with ping/pong protocol
-
-Health check sobre WebSocket con 30s de intervalo. 2 pings
-perdidos marcan al agente como offline en el dashboard.
-```
+Use `cardinal-commit`. English subject and body.
 
 ### 5. Push and PR
 
@@ -69,29 +45,26 @@ git push -u origin <branch>
 gh pr create --base dev --title "<title>" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
 ```
 
-- PR always to `dev`, **never** directly to `main`.
-- The PR to `main` happens only when `dev` is stable.
+- Feature work always targets `dev`, never `main`.
+- `dev → main` only when `dev` is stable. If a `dev → main` PR already exists, edit that PR instead of opening a second one.
 
-### 6. Template
+If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged PRs and get approval before pushing everything.
 
-Fill it with `.github/PULL_REQUEST_TEMPLATE.md`. Executive summary — the detail goes in the feature doc.
-
-### 7. Reviewers
+### 6. Reviewers
 
 | PR to | Reviewers |
 |-------|-----------|
-| `dev` | None — direct merge |
-| `main` | Standard Review (required), Security Review (if changes in `auth/`, `keys/`, `ws/`, protocol) |
+| `dev` | None — implementing agent merges after green |
+| `main` | Standard Review (required), Security Review (if `auth/`, `keys/`, `ws/`, protocol) |
 
----
+## Pre-PR checks
 
-## Pre-PR verifications
-
-- [ ] Branch created from updated `dev`.
-- [ ] No leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`.
-- [ ] Version bump if applicable (only PR to `main`).
-- [ ] Commit message in conventional commits format, body in Spanish.
-- [ ] PR template filled.
-- [ ] Doc at `docs/features/` created.
-- [ ] PR targets `dev` (not `main`).
-- [ ] Skills synced: `bash skills/sync-skills.sh`.
+- [ ] Branch created from updated `dev`
+- [ ] No leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`
+- [ ] Version bump if applicable
+- [ ] Conventional commit, English body
+- [ ] PR title and description in English (`AGENTS/docs.md`)
+- [ ] PR template filled
+- [ ] `docs/features/` updated when required
+- [ ] PR targets `dev` (unless this is the release PR to `main`)
+- [ ] Skills synced if `skills/*.md` changed: `bash skills/sync-skills.sh`

@@ -1,63 +1,61 @@
-# Alta de provider keys desde `/router` + nav Keys bajo Router (2026-09-05)
+# Register provider keys from `/router` + Keys nav under Router (2026-09-05)
 
-Follow-up del dashboard JWT de Pilar 2. El catálogo `/router` dejaba de ser
-solo lectura: se pueden cargar API keys de providers (OpenRouter, Groq, etc.)
-sin el CLI de seed. Keys de agente (`sk-cardinal-*`) se mueven al dropdown de
-Router.
+Follow-up to Pillar 2's JWT dashboard. The `/router` catalog is no longer
+read-only: upstream provider API keys (OpenRouter, Groq, etc.) can be loaded
+without the seed CLI. Agent keys (`sk-cardinal-*`) move under the Router dropdown.
 
-## Qué se hizo
+## What was done
 
-- `POST /api/router/providers` (cookie JWT, no Bearer de agente):
+- `POST /api/router/providers` (JWT cookie, not agent Bearer):
   body `{ name, base_url, api_key, models[], wire_format?, cost_per_mtok? }`.
-  Upsert por `name`. `api_key` se cifra con `encryptSecret` / `POOL_SECRET`
-  (AES-256-GCM) y se guarda en `api_key_enc`. La respuesta es
-  `{ provider, models }` vía `toPublicProvider`: **nunca** `api_key` ni
+  Upsert by `name`. `api_key` is encrypted with `encryptSecret` / `POOL_SECRET`
+  (AES-256-GCM) and stored in `api_key_enc`. The response is
+  `{ provider, models }` via `toPublicProvider`: **never** `api_key` or
   `api_key_enc`.
-- UI `/router`: formulario ADD PROVIDER KEY (name, base url, api key password,
-  models CSV, wire format, cost/mtok). Tras guardar, el input de key se limpia
-  y el catálogo se recarga.
-- Nav: dropdown **Router** → Catalog (`/router`) + Keys (`/keys`). Agents
-  vuelve a ser un link directo (Hub era el único hijo).
-- Tests TDD en `router-dashboard.test.ts` + `server.test.ts` (401 sin cookie,
-  200 con sesión, leak del plaintext, rotación por upsert).
+- UI `/router`: ADD PROVIDER KEY form (name, base url, api key password,
+  models CSV, wire format, cost/mtok). After saving, the key input is cleared
+  and the catalog reloads.
+- Nav: **Router** dropdown -> Catalog (`/router`) + Keys (`/keys`). Agents
+  returns to a direct link (Hub was the only child).
+- TDD tests in `router-dashboard.test.ts` + `server.test.ts` (401 without cookie,
+  200 with session, plaintext leak, rotation via upsert).
 
-## Por qué
+## Why
 
-En el test manual el dashboard mostraba providers pero no había forma de
-pegar una API key de upstream. El seed CLI cubría el happy path de e2e, no
-el uso diario. Keys de agente vivían bajo Agents aunque son identidad del
-router.
+During manual testing, the dashboard displayed providers but provided no way to
+paste an upstream API key. The seed CLI covered the e2e happy path, not daily
+usage. Agent keys lived under Agents even though they represent router identity.
 
-## Decisiones
+## Decisions
 
-- JWT cookie **solo**, igual que el resto del dashboard de router. Un agente
-  con `sk-cardinal-*` no debe escribir providers.
-- Upsert por `name` (mismo que el CLI): reenviar el form rota la key cifrada
-  y agrega modelos; no hay delete en este slice.
-- `models` es array de strings no vacíos, al menos uno. La UI parte CSV.
-- Input `type=password` + `autoComplete=off`; el plaintext solo viaja en el
-  POST y no se pinta de vuelta.
-- Agents sin dropdown de un solo ítem: menos clic para el roster.
+- JWT cookie **only**, matching the rest of the router dashboard. An agent with
+  `sk-cardinal-*` must not write providers.
+- Upsert by `name` (same as CLI): resubmitting the form rotates the encrypted
+  key and adds models; deletion is out of scope for this slice.
+- `models` is an array of non-empty strings, at least one required. UI parses CSV.
+- Input `type=password` + `autoComplete=off`; plaintext only travels in the POST
+  and is never rendered back.
+- Agents without single-item dropdown: fewer clicks to reach the roster.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Seguir solo con `seed-provider` / `seed-router.ts`:** rechazado. El test
-  manual pidió el alta desde la UI.
-- **Create-only (409 si el name existe):** rechazado. Rotar una key de
-  OpenRouter es el caso de uso; el CLI ya era upsert.
-- **Meter Keys en la misma página `/router`:** rechazado. Son dos recursos
-  (provider credentials vs `sk-cardinal-*`). El dropdown los agrupa.
+- **Keep using only `seed-provider` / `seed-router.ts`:** rejected. Manual testing
+  demanded creation directly from the UI.
+- **Create-only (409 if name exists):** rejected. Rotating an OpenRouter key is a
+  standard use case; CLI was already an upsert.
+- **Embed Keys directly into the `/router` page:** rejected. They represent two
+  distinct resources (provider credentials vs `sk-cardinal-*`). The dropdown groups them.
 
-## Archivos
+## Files
 
-- Modificados: `backend/src/api/router-dashboard.ts`,
+- Modified: `backend/src/api/router-dashboard.ts`,
   `backend/src/api/router-dashboard.test.ts`, `backend/src/server.ts`,
   `backend/src/server.test.ts`, `frontend/src/pages/Router.tsx`,
   `frontend/src/components/Layout.tsx`, `docs/guides/router-usage.md`.
-- Creados: `docs/features/2026-09-05-router-provider-keys.md`.
+- Created: `docs/features/2026-09-05-router-provider-keys.md`.
 
-## Verificación
+## Verification
 
-- `bun test` → **423 pass / 0 fail**.
-- `bun run build` (frontend/) → exit 0.
+- `bun test` -> **423 pass / 0 fail**.
+- `bun run build` (frontend/) -> exit 0.
 - Security review (uncommitted): CRITICAL/HIGH/LOW none.

@@ -1,64 +1,64 @@
-# Cardinal LLM Router — Manual de Uso
+# Cardinal LLM Router — User Guide
 
-Router interno de LLM del Cardinal: pool de providers configurables + endpoints
-OpenAI-compatible con failover transparente, scopes por key y metering.
+Cardinal's internal LLM router: configurable provider pool + OpenAI-compatible
+endpoints with transparent failover, per-key scopes, and metering.
 
-> Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (sección 6).
-> Estado: v0.2.5 (2026-09-03). Índice:
+> Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (section 6).
+> Status: v0.2.5 (2026-09-03). Index:
 > [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
 
 ---
 
-## 1. Conceptos en 30 segundos
+## 1. Concepts in 30 Seconds
 
-- **Provider**: un upstream de LLM (DeepSeek directo, OpenRouter, un mock local, lo
-  que sea). Se define como fila en la DB — no hay que tocar código para agregar uno.
-- **Modelo**: un modelo físico que sirve un provider (`deepseek-v4-flash-free`, ...).
-- **Alias**: nombre lógico con una cadena de fallback (`fast` → [provider A → provider B]).
-- **Key derivada**: `sk-cardinal-*` que identifica a un cliente (agente, app). Define
-  qué modelos puede pedir (scopes) y cuánto puede consumir (budget).
-- **Autorouter**: pedís un modelo por nombre real y el router arma el pool de
-  providers que lo sirven; si uno falla (429/5xx/timeout), pasa al siguiente sin
-  que el cliente se entere. El failover es transparente.
-- **Fusion / MoA**: alias cuyo `fallback_chain` es un objeto JSON
-  (`"mode":"fusion"`), no un array. Fan-out paralelo + judge; no es failover.
-  Ver [`docs/features/2026-09-03-router-fusion.md`](../features/2026-09-03-router-fusion.md).
+- **Provider**: an LLM upstream (direct DeepSeek, OpenRouter, a local mock,
+  etc.). Defined as a row in the DB — no code changes required to add one.
+- **Model**: a physical model served by a provider (`deepseek-v4-flash-free`, ...).
+- **Alias**: logical name with a fallback chain (`fast` → [provider A → provider B]).
+- **Derived key**: `sk-cardinal-*` that identifies a client (agent, app). Defines
+  which models it can request (scopes) and how much it can consume (budget).
+- **Autorouter**: request a model by its real name and the router builds the pool of
+  providers that serve it; if one fails (429/5xx/timeout), it moves to the next
+  without the client noticing. Failover is transparent.
+- **Fusion / MoA**: alias whose `fallback_chain` is a JSON object
+  (`"mode":"fusion"`), not an array. Parallel fan-out + judge; not failover.
+  See [`docs/features/2026-09-03-router-fusion.md`](../features/2026-09-03-router-fusion.md).
 
 ```
-Cliente (cualquier SDK OpenAI-compatible)
+Client (any OpenAI-compatible SDK)
         │  Bearer sk-cardinal-...
         ▼
 POST http://127.0.0.1:8787/v1/chat/completions
-        │  model: "fast" (alias)  o  "deepseek-v4-flash" (autorouter)
+        │  model: "fast" (alias)  or  "deepseek-v4-flash" (autorouter)
         ▼
-   Router Cardinal
+   Cardinal Router
         │  auth (scope + budget) → resolve chain → failover → metering
         ▼
-   Provider 1 ──► Provider 2 ──► Provider 3 (si el anterior falla)
+   Provider 1 ──► Provider 2 ──► Provider 3 (if previous fails)
 ```
 
 ---
 
 ## 2. Endpoints
 
-| Endpoint | Auth | Descripción |
+| Endpoint | Auth | Description |
 |----------|------|-------------|
-| `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | Completion OpenAI-compatible (streaming, no-streaming, Fusion) |
-| `GET /v1/models` | — | Lista de modelos y aliases disponibles (formato OpenAI) |
-| `GET /api/router/providers` | cookie JWT | Dashboard: providers + modelos (sin `api_key_enc`) |
-| `POST /api/router/providers` | cookie JWT | Alta/rotación de provider: `name`, `base_url`, `api_key`, `models[]`. La key se cifra (AES-256-GCM) y **nunca** vuelve en la respuesta |
-| `GET /api/router/routes` | cookie JWT | Dashboard: aliases y `fallback_chain` (arrays; Fusion se ve vacío) |
-| `PATCH /api/router/providers/:id` | cookie JWT | `active` \| `disabled` |
-| `PUT /api/router/routes/:alias` | cookie JWT | Upsert de cadena de hops (solo arrays) |
-| `POST /api/keys` | cookie JWT | Crear key (plaintext una vez). Ver `/keys` |
-| `GET /api/health` | — | Health check del backend |
+| `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | OpenAI-compatible completion (streaming, non-streaming, Fusion) |
+| `GET /v1/models` | — | List of available models and aliases (OpenAI format) |
+| `GET /api/router/providers` | JWT cookie | Dashboard: providers + models (without `api_key_enc`) |
+| `POST /api/router/providers` | JWT cookie | Provider registration/rotation: `name`, `base_url`, `api_key`, `models[]`. The key is encrypted (AES-256-GCM) and **never** returned in the response |
+| `GET /api/router/routes` | JWT cookie | Dashboard: aliases and `fallback_chain` (arrays; Fusion appears empty) |
+| `PATCH /api/router/providers/:id` | JWT cookie | `active` \| `disabled` |
+| `PUT /api/router/routes/:alias` | JWT cookie | Upsert hop chain (arrays only) |
+| `POST /api/keys` | JWT cookie | Create key (plaintext shown once). See `/keys` |
+| `GET /api/health` | — | Backend health check |
 
-Dashboard: `http://127.0.0.1:5173/router` y `/keys` (login JWT).
-Base URL API: `http://127.0.0.1:8787/v1` (completions) y `http://127.0.0.1:8787/api` (admin).
+Dashboard: `http://127.0.0.1:5173/router` and `/keys` (JWT login).
+API Base URL: `http://127.0.0.1:8787/v1` (completions) and `http://127.0.0.1:8787/api` (admin).
 
 ---
 
-## 3. Levantar el stack
+## 3. Starting the Stack
 
 ```bash
 cd ~/Data/Projects/ai-agents/cardinal-system
@@ -66,54 +66,54 @@ podman-compose up -d        # backend :8787 + frontend :5173
 curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.5"}
 ```
 
-Requisitos en `.env` (crear desde `deploy/env.example` si no existe):
+Requirements in `.env` (create from `deploy/env.example` if it does not exist):
 
 ```
 ADMIN_USER=
 ADMIN_PASSWORD_HASH=
 JWT_SECRET=            # openssl rand -hex 32
-POOL_SECRET=           # openssl rand -hex 32  ← CLAVE DE ENCRIPTACIÓN DE PROVIDERS
+POOL_SECRET=           # openssl rand -hex 32  <- PROVIDER ENCRYPTION KEY
 ```
 
-> Si agregás o cambiás variables en `.env` de un container ya corriendo:
+> If you add or change variables in `.env` for an already running container:
 > `podman-compose up -d --force-recreate backend`
 
 ---
 
-## 4. Gestión de providers
+## 4. Provider Management
 
-Los providers viven en la DB (tablas `providers`, `provider_models`, `model_routes`).
-El router es **agnóstico**: cualquier upstream OpenAI-compatible sirve.
+Providers live in the DB (`providers`, `provider_models`, `model_routes` tables).
+The router is **agnostic**: any OpenAI-compatible upstream works.
 
-### 4.1 Agregar un provider real
+### 4.1 Adding a Real Provider
 
-Desde el dashboard: **Router → Catalog** (`/router`), formulario ADD PROVIDER KEY
+From the dashboard: **Router → Catalog** (`/router`), ADD PROVIDER KEY form
 (name, base url, api key, models, wire format, cost/mtok). `POST /api/router/providers`
-cifra la key y no la devuelve.
+encrypts the key and does not return it.
 
-Sigue existiendo el camino CLI para e2e/scripts:
+The CLI workflow remains available for e2e/scripts:
 
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun backend/src/seed-provider.ts --name deepseek-direct --base-url https://api.deepseek.com/v1 --api-key <KEY> --model deepseek-v4-flash --model deepseek-v4-pro'
 ```
 
-> (Si el script `seed-provider.ts` todavía no existe, el patrón está en
-> `backend/src/seed-router.ts` — es el mismo: `upsertProvider` + `addProviderModel`.)
+> (If the `seed-provider.ts` script does not exist yet, the pattern is in
+> `backend/src/seed-router.ts` — it is the same: `upsertProvider` + `addProviderModel`.)
 
-One-shot de referencia (2026-09-05): se importó el catálogo **mensual público** de
+Reference one-shot (2026-09-05): the **public monthly** catalog from
 FreeLLMAPI (`GET https://api.freellmapi.co/v1/latest`, tier `monthly` v2026.09.04)
-como filas `disabled` (sin key). Los keyless (`kilo`, `ovh`, `aihorde`) quedaron
-`active`. No es el feed live de pago; el siguiente paso personal es un catálogo
-propio, no suscribirse.
+was imported as `disabled` rows (without keys). Keyless providers (`kilo`, `ovh`, `aihorde`) remained
+`active`. This is not the paid live feed; the next personal step is a custom
+catalog, not subscribing.
 
-La api_key se encripta con AES-256-GCM usando `POOL_SECRET` — **nunca se guarda en
-claro y nunca sale del Cardinal**. Para listar providers sin exponer keys:
+The `api_key` is encrypted with AES-256-GCM using `POOL_SECRET` — **it is never stored in
+plaintext and never leaves Cardinal**. To list providers without exposing keys:
 
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun -e "import { createDb, listProviders } from \"@cardinal/db\"; const db = createDb(process.env.DB_PATH); console.log(listProviders(db).map(p => ({ name: p.name, status: p.status, base_url: p.base_url })))"'
 ```
 
-### 4.2 Definir un alias con fallback
+### 4.2 Defining an Alias with Fallback
 
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun -e "
@@ -123,21 +123,21 @@ upsertModelRoute(db, \"fast\", [
   { provider: \"deepseek-direct\", model: \"deepseek-v4-flash\" },
   { provider: \"mock-local\", model: \"test-model\" },
 ]);
-console.log(\"alias fast → 2 eslabones\");
+console.log(\"alias fast → 2 hops\");
 "'
 ```
 
-Ahora `model: "fast"` prueba deepseek-direct primero y, si falla, cae al mock.
-El cliente ve siempre `model: "fast"` en la respuesta (se reescribe), nunca el
-modelo real del provider que respondió.
+Now `model: "fast"` tests deepseek-direct first and, if it fails, falls back to the mock.
+The client always sees `model: "fast"` in the response (rewritten), never the
+real model of the provider that responded.
 
-### 4.3 Autorouter (sin alias)
+### 4.3 Autorouter (without Alias)
 
-Si hay providers que sirven `deepseek-v4-flash` (varios), pedís directamente
-`model: "deepseek-v4-flash"` y el router arma el pool solo, ordenado por
-`providers.id`, con failover automático entre ellos.
+If there are providers serving `deepseek-v4-flash` (multiple), request
+`model: "deepseek-v4-flash"` directly and the router builds the pool automatically, ordered by
+`providers.id`, with automatic failover between them.
 
-### 4.4 Deshabilitar un provider
+### 4.4 Disabling a Provider
 
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun -e "
@@ -147,14 +147,14 @@ setProviderStatus(db, \"mock-local\", \"disabled\");
 "'
 ```
 
-Los providers `disabled` se filtran del autorouter y de los aliases.
+`disabled` providers are filtered out of the autorouter and aliases.
 
 ### 4.5 Fusion / MoA
 
-No es failover: N proposers en paralelo y un judge sintetiza **una** respuesta.
-El JSON de `model_routes.fallback_chain` es un **objeto**, no un array.
-`upsertModelRoute` / `PUT /api/router/routes/:alias` no lo aceptan (solo hops);
-seed con SQL. Detalle:
+This is not failover: N proposers in parallel and a judge synthesizes **one** response.
+The JSON in `model_routes.fallback_chain` is an **object**, not an array.
+`upsertModelRoute` / `PUT /api/router/routes/:alias` do not accept it (hops only);
+seed with SQL. Details:
 [`docs/features/2026-09-03-router-fusion.md`](../features/2026-09-03-router-fusion.md).
 
 ```json
@@ -169,61 +169,61 @@ seed con SQL. Detalle:
 }
 ```
 
-Cliente: `model: "fusion"` (o el alias de esa fila) + Bearer `sk-cardinal-*`
-con scope `fusion` o `*`. `stream: true` → 400. `best_of` → 501.
+Client: `model: "fusion"` (or the alias of that row) + Bearer `sk-cardinal-*`
+with scope `fusion` or `*`. `stream: true` → 400. `best_of` → 501.
 
-En `/router` esa fila se ve con hops `—` (el GET parsea solo arrays). Follow-up.
+In `/router`, that row displays hops as `—` (the GET only parses arrays). Follow-up.
 
 ---
 
-## 5. Gestión de keys (identidad del cliente)
+## 5. Key Management (Client Identity)
 
-Desde el dashboard (`/keys`, cookie JWT) se crea una key con scopes, budget de
-tokens, expiración y tope USD. El plaintext se muestra **una sola vez**. CLI
-sigue existiendo:
+From the dashboard (`/keys`, JWT cookie), create a key with scopes, token
+budget, expiration, and USD cap. Plaintext is displayed **only once**. The CLI
+remains available:
 
 ```bash
-# Key con autorouter libre (scope "*")
-podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <nombre> --kind agent'
+# Key with open autorouter (scope "*")
+podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <name> --kind agent'
 
-# Key con scope a un alias/modelo puntual + budget de 50k tokens
-podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <nombre> --kind agent --scope fast --scope pro --budget 50000'
+# Key scoped to a specific alias/model + 50k token budget
+podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <name> --kind agent --scope fast --scope pro --budget 50000'
 
-# Listar keys / revocar
+# List keys / revoke
 podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --list'
-podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --revoke <nombre>'
+podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --revoke <name>'
 ```
 
-### Semántica de scopes
+### Scope Semantics
 
-| Scope | Efecto |
+| Scope | Effect |
 |-------|--------|
-| `["*"]` (default) | Puede pedir cualquier modelo/alias (autorouter libre) |
-| `["fast"]` | Solo el alias `fast` |
-| `["deepseek-v4-pro"]` | Solo ese modelo, de cualquier provider que lo sirva |
+| `["*"]` (default) | Can request any model/alias (open autorouter) |
+| `["fast"]` | Only the `fast` alias |
+| `["deepseek-v4-pro"]` | Only that model, from any provider serving it |
 
-### Semántica de budget
+### Budget Semantics
 
-- `budget_limit` en **tokens** acumulados (`budget_used` suma en cada llamada).
-- `budget_usd_limit` opcional: `(tokens/1e6)*cost_per_mtok` del hop. Costo 0 no
-  mueve USD. Overshoot → auto-revoke (igual que tokens).
-- `expires_at` pasado → la key no es activa (`unauthorized`).
-- Si una llamada excede el budget restante, el router revoca la key automáticamente
-  (auto-revoke) — el agente público no puede seguir consumiendo.
-- `created_by=system` → one-shot/agentes públicos, auto-revocables.
-- `created_by=human` → jamás se tocan salvo acción explícita.
+- `budget_limit` in cumulative **tokens** (`budget_used` increments on each call).
+- Optional `budget_usd_limit`: `(tokens/1e6)*cost_per_mtok` for the hop. Cost 0 does
+  not increment USD. Overshoot → auto-revoke (same as tokens).
+- Expired `expires_at` → key is inactive (`unauthorized`).
+- If a call exceeds the remaining budget, the router revokes the key automatically
+  (auto-revoke) — public agents cannot continue consuming.
+- `created_by=system` → one-shot/public agents, auto-revocable.
+- `created_by=human` → never touched except via explicit action.
 
-> ⚠️ La key se imprime **una sola vez** al crear. Si la perdés, revocá y recreá.
-> ⚠️ El renderer de terminal redacta `sk-cardinal-*` en outputs — para scripts e2e
-> generá la key dentro del script sin imprimirla (ver `backend/src/e2e-router.ts`).
+> [warning] The key is printed **only once** upon creation. If lost, revoke and recreate it.
+> [warning] The terminal renderer redacts `sk-cardinal-*` in outputs — for e2e scripts,
+> generate the key inside the script without printing it (see `backend/src/e2e-router.ts`).
 
 ---
 
-## 6. Uso desde un cliente
+## 6. Client Usage
 
-Cualquier cliente OpenAI-compatible sirve (OpenAI SDK, curl, Claude Code, etc.).
+Any OpenAI-compatible client works (OpenAI SDK, curl, Claude Code, etc.).
 
-### curl (no-streaming)
+### curl (non-streaming)
 
 ```bash
 curl -s http://127.0.0.1:8787/v1/chat/completions \
@@ -266,37 +266,37 @@ const resp = await client.chat.completions.create({ model: "fast", messages: [{ 
 console.log(resp.choices[0].message.content);
 ```
 
-### Tool calling
+### Tool Calling
 
-El body se pasa tal cual al upstream: `tools`, `tool_choice`, `temperature`,
-`max_tokens` viajan. Ojo con providers que descartan tools (pitfall Nogal Hive) —
-validar passthrough por provider.
-
----
-
-## 7. Códigos de error
-
-| HTTP | `error` | Significado |
-|------|---------|-------------|
-| 400 | `invalid_json` | Body no parseable |
-| 401 | `unauthorized` | Falta Bearer o key desconocida/revocada |
-| 402 | `budget_exceeded` | La key ya consumió todo su budget |
-| 403 | `scope_denied` | La key no puede pedir ese modelo/alias |
-| 404 | `model_not_found` | No hay ningún provider que sirva ese modelo |
-| 502 | `all_providers_failed` | Todos los eslabones fallaron; `details.attempts` tiene el trail |
+The request body is passed through as-is to upstream: `tools`, `tool_choice`, `temperature`,
+and `max_tokens` are forwarded. Watch out for providers that drop tools (Nogal Hive pitfall) —
+verify passthrough per provider.
 
 ---
 
-## 8. Metering y monitoreo
+## 7. Error Codes
 
-El consumo se registra en dos lugares:
+| HTTP | `error` | Meaning |
+|------|---------|---------|
+| 400 | `invalid_json` | Unparseable body |
+| 401 | `unauthorized` | Missing Bearer or unknown/revoked key |
+| 402 | `budget_exceeded` | Key has consumed its entire budget |
+| 403 | `scope_denied` | Key is not permitted to request that model/alias |
+| 404 | `model_not_found` | No provider serves that model |
+| 502 | `all_providers_failed` | All hops failed; `details.attempts` contains the trail |
 
-- `agent_keys.budget_used` — acumulado por key (para el corte de budget).
-- `usage_log` — una fila por llamada exitosa: `agent_name`, `key_hash`,
+---
+
+## 8. Metering and Monitoring
+
+Usage is tracked in two places:
+
+- `agent_keys.budget_used` — cumulative per key (for budget enforcement).
+- `usage_log` — one row per successful call: `agent_name`, `key_hash`,
   `provider_name`, `model_id`, `prompt_tokens`, `completion_tokens`,
   `total_tokens`, `created_at`.
 
-Consultar el consumo:
+Query usage:
 
 ```bash
 podman exec cardinal-backend sh -c 'cd /app && bun -e "
@@ -306,69 +306,69 @@ console.log(listUsage(db, 20));
 "'
 ```
 
-Nota: en streaming sin `usage` en el payload, el router estima tokens como
-`bytes/4` (orden de magnitud, no exacto). Los providers que devuelven
-`usage` (la mayoría) registran el número real.
+Note: in streaming without `usage` in the payload, the router estimates tokens as
+`bytes/4` (order of magnitude, not exact). Providers returning `usage` (the majority)
+record the actual count.
 
 ---
 
-## 9. E2E / prueba rápida (mock local)
+## 9. E2E / Quick Test (Local Mock)
 
-El repo incluye un mock upstream OpenAI-compatible para probar sin LLM real:
+The repo includes an OpenAI-compatible upstream mock for testing without a real LLM:
 
 ```bash
-# Terminal 1: mock en :18999
+# Terminal 1: mock on :18999
 python3 scripts/mock-upstream.py
 
-# Terminal 2: seed + e2e (crea provider mock-local, alias "fast", key e2e)
+# Terminal 2: seed + e2e (creates mock-local provider, alias "fast", e2e key)
 podman exec cardinal-backend sh -c 'cd /app && bun backend/src/seed-router.ts'
 podman exec cardinal-backend sh -c 'cd /app && bun backend/src/e2e-router.ts'
 ```
 
-El e2e valida: /v1/models, completion por alias, 401 sin Bearer, streaming SSE,
-metering (budget_used + usage_log), scope.
+The e2e validates: `/v1/models`, completion by alias, 401 without Bearer, SSE streaming,
+metering (`budget_used` + `usage_log`), scope.
 
 ---
 
 ## 10. Troubleshooting
 
-| Síntoma | Causa / Fix |
+| Symptom | Cause / Fix |
 |---------|-------------|
-| Backend no arranca: `POOL_SECRET is required` | Falta `POOL_SECRET` en `.env` + recrear container |
-| Backend en crash loop: `EBUSY: Failed to replace old lockfile` | Workspace nuevo sin lockfile actualizado. Fix: `podman-compose stop backend`, `podman run --rm -v <repo>:/repo -w /repo docker.io/oven/bun:1 sh -c 'bun install'`, `podman-compose up -d backend` |
-| `Cannot find module '@cardinal/db' from '/app/[eval]'` | `bun -e` desde `/app` no resuelve workspaces. Correr desde `/app/backend` o usar un script en `backend/src/` |
-| 502 `all_providers_failed` | Todos los providers del chain están caídos o en cooldown (60s tras 429/5xx). Revisar `details.attempts` y `setProviderStatus` |
-| 404 `model_not_found` | Ningún provider activo sirve ese modelo. Chequear `provider_models` y status de providers |
-| La key revocada sola | Excedió `budget_limit` o `budget_usd_limit` → auto-revoke por diseño |
-| 401 con key que existía | `expires_at` pasado, o revoked |
-| 400 `fusion_not_configured` | Pediste `fusion` sin ruta objeto en `model_routes` |
-| Frontend no levanta (dev) | Blocker de entorno: rolldown native binding + noexec en `~/Data` (ERR_DLOPEN_FAILED). No afecta al router (backend puro) |
+| Backend does not start: `POOL_SECRET is required` | Missing `POOL_SECRET` in `.env` + recreate container |
+| Backend in crash loop: `EBUSY: Failed to replace old lockfile` | New workspace without updated lockfile. Fix: `podman-compose stop backend`, `podman run --rm -v <repo>:/repo -w /repo docker.io/oven/bun:1 sh -c 'bun install'`, `podman-compose up -d backend` |
+| `Cannot find module '@cardinal/db' from '/app/[eval]'` | `bun -e` from `/app` does not resolve workspaces. Run from `/app/backend` or use a script in `backend/src/` |
+| 502 `all_providers_failed` | All providers in the chain are down or in cooldown (60s after 429/5xx). Check `details.attempts` and `setProviderStatus` |
+| 404 `model_not_found` | No active provider serves that model. Check `provider_models` and provider statuses |
+| Key revoked on its own | Exceeded `budget_limit` or `budget_usd_limit` → auto-revoke by design |
+| 401 with previously working key | `expires_at` has passed, or revoked |
+| 400 `fusion_not_configured` | Requested `fusion` without an object route in `model_routes` |
+| Frontend fails to start (dev) | Environment blocker: rolldown native binding + noexec on `~/Data` (ERR_DLOPEN_FAILED). Does not affect the router (pure backend) |
 
 ---
 
-## 11. Providers disponibles hoy (2026-08-20)
+## 11. Providers Available Today (2026-08-20)
 
-| Provider | Estado | Notas |
+| Provider | Status | Notes |
 |----------|--------|-------|
-| `mock-local` | ✅ Activo (e2e) | Mock OpenAI-compatible en host `:18999` vía `host.containers.internal` |
-| `opencode-zen` (`opencode/*-free`) | ✅ Funciona como CLI | Para usarlo como upstream necesita `opencode-llm-proxy` (:4010, plugin en config GLOBAL de opencode) |
-| `opencode-go` (`opencode-go/*`) | ❌ Caído | Suscripción vencida 2026-08 — no usar |
-| `deepseek-direct` | ⏸️ Pendiente | Agregar cuando Santi tenga key (seed 4.1) |
+| `mock-local` | [active] (e2e) | OpenAI-compatible mock on host `:18999` via `host.containers.internal` |
+| `opencode-zen` (`opencode/*-free`) | [active] Works as CLI | To use as upstream, requires `opencode-llm-proxy` (:4010, plugin in GLOBAL opencode config) |
+| `opencode-go` (`opencode-go/*`) | [failed] Down | Subscription expired 2026-08 — do not use |
+| `deepseek-direct` | [pending] | Add when the owner has an API key (seed 4.1) |
 
-**Cómo conectar zen free (cuando quieras):**
-1. Instalar plugin en config global: `npm install opencode-llm-proxy` + registrarlo en `~/.config/opencode/opencode.json`
-2. Correr `opencode serve` con el plugin → levanta `:4010` con wire OpenAI
-3. Seed del provider: `base_url: http://host.containers.internal:4010/v1`
+**How to connect zen free (whenever needed):**
+1. Install plugin in global config: `npm install opencode-llm-proxy` + register it in `~/.config/opencode/opencode.json`
+2. Run `opencode serve` with the plugin → starts `:4010` with OpenAI wire format
+3. Seed the provider: `base_url: http://host.containers.internal:4010/v1`
 4. Alias: `upsertModelRoute(db, "fast", [{provider: "opencode-zen", model: "deepseek-v4-flash-free"}])`
 
 ---
 
-## Referencias
+## References
 
 - Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`
 - Backlog: `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`
-- Índice v0.2.5: `docs/features/2026-09-03-router-surface.md`
+- Index v0.2.5: `docs/features/2026-09-03-router-surface.md`
 - Sprint: `docs/sprints/2026-09-03-router-surface.md`
-- Código: `packages/router/` (core + `fusion.ts`), `backend/src/api/router.ts` (`/v1`),
+- Code: `packages/router/` (core + `fusion.ts`), `backend/src/api/router.ts` (`/v1`),
   `backend/src/api/router-dashboard.ts` (JWT), `backend/src/seed-router.ts`,
   `backend/src/e2e-router.ts`, `scripts/mock-upstream.py`

@@ -1,84 +1,84 @@
-# Superficie Router v0.2.5 (dashboard + keys + fusion) (2026-09-03)
+# Router Surface v0.2.5 (dashboard + keys + fusion) (2026-09-03)
 
-Tres slices en paralelo (Herdr Background, kind Cursor) sobre el pilar 2
-(pool/router). Este doc es el índice unificado; el detalle de cada slice vive
-en su feature doc.
+Three parallel slices (Herdr Background, kind Cursor) across pillar 2
+(pool/router). This document serves as the unified index; slice details live in
+their respective feature docs.
 
 | Slice | Agent | Doc |
 |-------|-------|-----|
-| Dashboard JWT `/router` | `card-router-ui` | [`2026-09-03-router-dashboard.md`](./2026-09-03-router-dashboard.md) |
+| JWT Dashboard `/router` | `card-router-ui` | [`2026-09-03-router-dashboard.md`](./2026-09-03-router-dashboard.md) |
 | Create keys + expiry + USD | `card-keys` | [`2026-09-03-key-create-limits.md`](./2026-09-03-key-create-limits.md) |
 | Fusion / MoA | `card-fusion` | [`2026-09-03-router-fusion.md`](./2026-09-03-router-fusion.md) |
 
 Sprint: [`docs/sprints/2026-09-03-router-surface.md`](../sprints/2026-09-03-router-surface.md).
 
-## Qué se hizo (vista única)
+## What was done (unified view)
 
-El router deja de ser solo `/v1` + CLI. Hay tres superficies que encajan:
+The router is no longer just `/v1` + CLI. Three surfaces fit together:
 
-1. **Operar el pool** — página `/router` (JWT, theme SAO, tablas). Lista
-   providers/modelos/aliases. API `GET/PATCH/PUT /api/router/*`. La UI es
-   read-only; PATCH/PUT existen para clientes.
-2. **Identidad de cliente** — `/keys` crea `sk-cardinal-*` con scopes, budget
-   de tokens, `expires_at` y tope USD. El router corta expiry (401) y USD
-   (402) además del budget de tokens que ya existía.
-3. **Fusion** — `POST /v1/chat/completions` con `model=fusion` (o un alias
-   cuyo `fallback_chain` es `{"mode":"fusion",...}`) fanea N proposers y un
-   judge sintetiza una completion. Failover secuencial no cambia.
+1. **Operating the pool** — `/router` page (JWT, SAO theme, tables). Lists
+   providers/models/aliases. API `GET/PATCH/PUT /api/router/*`. The UI is
+   read-only; PATCH/PUT exist for clients.
+2. **Client identity** — `/keys` creates `sk-cardinal-*` with scopes, token
+   budget, `expires_at`, and USD cap. The router cuts off on expiry (401) and USD
+   (402) in addition to pre-existing token budgets.
+3. **Fusion** — `POST /v1/chat/completions` with `model=fusion` (or an alias
+   whose `fallback_chain` is `{"mode":"fusion",...}`) fans out to N proposers and
+   a judge synthesizes a completion. Sequential failover remains unchanged.
 
-Separación de responsabilidades (no mezclar):
+Separation of responsibilities:
 
-| Superficie | Auth | Quién |
-|------------|------|--------|
-| `/v1/chat/completions`, `/v1/models` | Bearer `sk-cardinal-*` | agentes / apps |
-| `/api/router/*`, `/router` | cookie JWT | admin dashboard |
-| `/api/keys`, `/keys` | cookie JWT | admin dashboard |
+| Surface | Auth | Who |
+|---------|------|-----|
+| `/v1/chat/completions`, `/v1/models` | Bearer `sk-cardinal-*` | agents / apps |
+| `/api/router/*`, `/router` | JWT cookie | admin dashboard |
+| `/api/keys`, `/keys` | JWT cookie | admin dashboard |
 
-## Por qué
+## Why
 
-El pool (v0.2.2) tenía motor y `/keys` de list/revoke, pero Settings seguía
-con “MODEL ROUTER coming in Fase 2”, create de keys era CLI-only, y no había
-Mixture of Agents. Santi pidió las tres features juntas, inspiradas en
-FreeLLMAPI, sin clonar su key unificada ni el catálogo público.
+The pool (v0.2.2) had an engine and `/keys` for list/revoke, but Settings retained
+"MODEL ROUTER coming in Fase 2", key creation was CLI-only, and there was no
+Mixture of Agents. Santi requested all three features together, inspired by
+FreeLLMAPI, without cloning its unified key or public catalog.
 
-## Decisiones (unificadas)
+## Decisions (unified)
 
-- Tres agentes, mismo working tree, ownership de archivos: dashboard no toca
-  `packages/router/src/router.ts`; keys solo el pre-loop de auth/budget; Fusion
-  vive en `fusion.ts` + un dispatch corto.
-- Version bump **0.2.5** (0.2.4 quedó para mailbox MCP). En `dev` solo PATCH.
-- Fusion no se edita en `/router` v1: `GET /api/router/routes` parsea
-  `fallback_chain` como array; un objeto Fusion se muestra como hops vacíos
-  (`—`). Seed por SQL. Follow-up.
-- Metering USD de Fusion: el pre-check de tope corre antes del dispatch; el
-  `meterSuccess` de `fusion.ts` no incrementa `budget_usd_used`. Follow-up.
-- Sin commit en los agentes; el padre unifica docs y estado.
+- Three agents, same working tree, file ownership: dashboard does not touch
+  `packages/router/src/router.ts`; keys only touches auth/budget pre-loops; Fusion
+  lives in `fusion.ts` + a short dispatch.
+- Version bump **0.2.5** (0.2.4 reserved for mailbox MCP). In `dev`, PATCH only.
+- Fusion is not edited in `/router` v1: `GET /api/router/routes` parses
+  `fallback_chain` as an array; a Fusion object renders as empty hops (`-`).
+  Seeded via SQL. Follow-up.
+- Fusion USD metering: cap pre-check runs before dispatch; `meterSuccess` in
+  `fusion.ts` does not increment `budget_usd_used`. Follow-up.
+- No commit by subagents; parent unifies docs and state.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Un solo agente, tres PRs seriales:** rechazado. Santi pidió una sesión
-  Cursor por feature en Herdr Background.
-- **Fusion como tab de primer nivel (FreeLLMAPI):** diferido. Cardinal tiene
-  pocos providers; primero el dashboard de cadenas y el create de keys.
-- **Key unificada estilo `freellmapi-…`:** rechazado. Rompe `sk-cardinal-*` +
-  scopes por agente.
+- **Single agent, three serial PRs:** rejected. Santi requested a Cursor session
+  per feature in Herdr Background.
+- **Fusion as a top-level tab (FreeLLMAPI):** deferred. Cardinal has few
+  providers; chain dashboard and key creation come first.
+- **Unified key format like `freellmapi-...`:** rejected. Breaks `sk-cardinal-*` +
+  per-agent scopes.
 
-## Archivos (unión de los tres slices)
+## Files (union of the three slices)
 
-Ver cada feature doc. Este índice no duplica el listado.
+See each individual feature doc. This index does not duplicate the list.
 
-## Verificación
+## Verification
 
-Padre, suite unificada sobre el working tree combinado (2026-09-03):
+Parent, unified suite over the combined working tree (2026-09-03):
 
-- `bun test --timeout 30000 packages/*/src backend/src` → **417 pass / 0 fail**
-- `bun run build` (frontend) → Vite 8.1.5, **exit 0**
+- `bun test --timeout 30000 packages/*/src backend/src` -> **417 pass / 0 fail**
+- `bun run build` (frontend) -> Vite 8.1.5, **exit 0**
 
-## Huecos conocidos (no este bump)
+## Known Gaps (not in this bump)
 
-- UI `/router` no llama PATCH/PUT; no muestra panel/judge de Fusion.
-- `upsertModelRoute` y `PUT /api/router/routes/:alias` solo aceptan arrays
-  (failover). Fusion se siembra con INSERT del objeto JSON.
-- Fusion no meterea USD por hop; `best_of` y streaming Fusion = 400/501.
-- Seed + e2e zen free real (backlog #5) y spike-003 opencode-go siguen abiertos.
-- Item #13 one-shot keys: diferido.
+- `/router` UI does not call PATCH/PUT; does not show Fusion panel/judge.
+- `upsertModelRoute` and `PUT /api/router/routes/:alias` only accept arrays
+  (failover). Fusion is seeded by inserting the JSON object directly.
+- Fusion does not meter hop-level USD; `best_of` and Fusion streaming return 400/501.
+- Seed + e2e real free zen (backlog #5) and spike-003 opencode-go remain open.
+- Backlog item #13 one-shot keys: deferred.

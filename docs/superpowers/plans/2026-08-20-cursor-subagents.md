@@ -4,21 +4,21 @@
 
 **Goal:** Ship nine Cursor subagents plus canonical agent-agnostic role docs so Composer can delegate Cardinal development from inside Cursor (in-session specialists + Herdr for other instances/kinds).
 
-**Architecture:** Layered. `docs/agents/roles/<rol>.md` is the runtime-agnostic source of truth (misión, when, rules, output). `.cursor/agents/<rol>.md` is the Cursor adapter (YAML routing + short Spanish prompt that must read the role doc first). The Composer parent is wired via `AGENTS.md` and `.cursor/rules/cardinal.mdc`. OpenCode is not expanded; existing agents get a one-paragraph pointer.
+**Architecture:** Layered. `docs/agents/roles/<role>.md` is the runtime-agnostic source of truth (mission, when, rules, output). `.cursor/agents/<role>.md` is the Cursor adapter (YAML routing + short prompt that must read the role doc first). The Composer parent is wired via `AGENTS.md` and `.cursor/rules/cardinal.mdc`. OpenCode is not expanded; existing agents get a one-paragraph pointer.
 
 **Tech Stack:** Cursor custom subagents (`.cursor/agents/*.md`), Markdown + BMAD-lite regions, existing `scripts/verify-dev-setup.sh`. No application code, no new dependencies.
 
 ## Global Constraints
 
 - Spec: `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md` — follow it; do not invent extra agents.
-- Role docs are **agent-agnostic**: no `Task` tool, no `.cursor/` paths, no OpenCode frontmatter. Spanish. Regions: `when`, `rules`, `output`.
+- Role docs are **agent-agnostic**: no `Task` tool, no `.cursor/` paths, no OpenCode frontmatter. Regions: `when`, `rules`, `output`.
 - Output contracts: the markdown fence/template belongs in the role file's `output` section. The agent uses that template in its last message. Do not instruct agents to edit the role doc.
-- Cursor adapters: `model: inherit`, `is_background: false` on all nine. `readonly: true` only on `reviewer`, `security-reviewer`, `verifier`. `description` in **English**. Body in **Spanish**, ≤ ~80 lines.
+- Cursor adapters: `model: inherit`, `is_background: false` on all nine. `readonly: true` only on `reviewer`, `security-reviewer`, `verifier`. `description` in **English**. Body in **English**, <= ~80 lines.
 - Cursor is the current development surface. Do not add OpenCode agents named `ws-protocol`, `frontend`, `verifier`, `security-reviewer`, or `herdr-dispatcher`.
 - Do not modify `docs/agents/kirito-soul.md`, `docs/agents/agil-soul.md`, `docs/agents/lisbeth-soul.md`, or `docs/agents/prompts/*`.
 - Cardinal the product does not spawn Herdr agents. Only `herdr-dispatcher` talks to Herdr, and only when `HERDR_ENV=1`.
 - Docs/config work: no TDD. Verify with file checks + `bash scripts/verify-dev-setup.sh`.
-- Commits: Conventional Commits, subject English ≤72 chars, body Spanish. Do not commit unless the user asked to execute this plan (this file still lists commit steps for the executor).
+- Commits: Conventional Commits, subject English <=72 chars, body English. Do not commit unless the user asked to execute this plan (this file still lists commit steps for the executor).
 
 ---
 
@@ -53,50 +53,50 @@
 ```markdown
 # Builder
 
-Implementás exactamente la spec. Sin funcionalidad extra ni “mejoras” no pedidas.
+Implement exactly the spec. No extra functionality or unrequested "improvements".
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Implementar en `packages/` **excepto** `packages/ws/`, y en `backend/`.
-- GREEN: hacer pasar tests que `tester` ya dejó en RED.
-- Código de aplicación TypeScript/Bun que no es protocolo WS ni UI.
+- Implement in `packages/` **except** `packages/ws/`, and in `backend/`.
+- GREEN: make tests pass that `tester` already left in RED.
+- TypeScript/Bun application code that is not WS protocol or UI.
 
-## Cuándo no
+## When no
 
-- El trabajo es sobre todo `packages/ws/**` → rol `ws-protocol`.
-- El trabajo es sobre todo `frontend/**` → rol `frontend`.
-- Escribir tests RED → rol `tester`.
-- Verificar un “listo” → rol `verifier`.
-- Documentar → rol `docs`.
+- Work is primarily `packages/ws/**` → role `ws-protocol`.
+- Work is primarily `frontend/**` → role `frontend`.
+- Write RED tests → role `tester`.
+- Verify a "done" → role `verifier`.
+- Document → role `docs`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), WebSocket nativo, SQLite. Runtime containerizado (Podman); no instalar dependencias nativas en el host.
-- Grafo de packages: dependencias solo hacia abajo (core → db → auth/keys → ws → backend). Nunca cíclicas.
-- Ámbitos TDD (auth, keys, ws, db, router): no empieces implementación si no hay test RED. Si te asignan GREEN, los tests ya existen.
-- Frontend types 1:1 con el JSON del backend no es tu zona; si el cambio cruza UI, otro rol lo toma en paralelo.
-- Audit de leaks: no hardcodear `sk-cardinal-*`, tokens, paths absolutos, emails.
-- No commitees salvo pedido explícito del humano.
+- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), native WebSocket, SQLite. Containerized runtime (Podman); do not install native dependencies on the host.
+- Package graph: dependencies only downward (core → db → auth/keys → ws → backend). Never circular.
+- TDD scopes (auth, keys, ws, db, router): do not start implementation if there is no RED test. If assigned GREEN, tests already exist.
+- Frontend types 1:1 with backend JSON is not your zone; if the change crosses UI, another role takes it in parallel.
+- Leak audit: do not hardcode `sk-cardinal-*`, tokens, absolute paths, emails.
+- Do not commit unless explicitly requested by the human.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
+Include a markdown fence in your last message with exactly these sections:
 
     ## Files
     - path (created|modified)
 
     ## Verify
-    comando + resultado (bun test del paquete tocado; bun run build si tocaste frontend)
+    command + result (bun test of the touched package; bun run build if you touched frontend)
 
     ## Spec deviations
     none
 
-Si hubo un bloqueo que forzó desviación, listala; si no, `none`.
+If there was a blocker that forced a deviation, list it; otherwise, `none`.
 <!-- ENDREGION: output -->
 ```
 
@@ -105,34 +105,34 @@ Si hubo un bloqueo que forzó desviación, listala; si no, `none`.
 ```markdown
 # Tester
 
-Escribís tests primero. TDD estricto: RED antes de cualquier implementación.
+Write tests first. Strict TDD: RED before any implementation.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Ámbitos TDD obligatorio: auth (JWT, expiración, login), keys (generación, hash SHA-256, revocación), protocolo WS (parseo, state machine, ping/pong), db (migraciones, integridad), router (fallback chain, rate limiting, budget).
-- Crear o extender `*.test.ts` **antes** del código de producción.
+- Mandatory TDD scopes: auth (JWT, expiration, login), keys (generation, SHA-256 hash, revocation), WS protocol (parsing, state machine, ping/pong), db (migrations, integrity), router (fallback chain, rate limiting, budget).
+- Create or extend `*.test.ts` **before** production code.
 
-## Cuándo no
+## When no
 
-- Verificar trabajo ya reclamado como listo → rol `verifier`.
-- Implementar producción para poner tests en GREEN → `builder` o `ws-protocol`.
-- Frontend: no hay TDD unitario obligatorio; la verificación es `bun run build`.
+- Verify work already claimed as done → role `verifier`.
+- Implement production to put tests GREEN → `builder` or `ws-protocol`.
+- Frontend: no mandatory unit TDD; verification is `bun run build`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- El test debe FALLAR antes de la implementación (RED). Corré `bun test` y confirmá el fallo.
-- Tests junto al fuente: `*.test.ts`. Solo esos archivos se escriben.
-- No implementes el código de producción. Reportá qué falta para GREEN.
-- Usá `bun test` (path del paquete si aplica).
+- The test must FAIL before the implementation (RED). Run `bun test` and confirm the failure.
+- Tests alongside source: `*.test.ts`. Only those files are written.
+- Do not implement production code. Report what is needed for GREEN.
+- Use `bun test` (package path if applicable).
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
+Include a markdown fence in your last message with exactly these sections:
 
     ## Tests
     - path/to/foo.test.ts
@@ -141,7 +141,7 @@ Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
     RED | GREEN
 
     ## Missing implementation
-    qué tiene que hacer el implementer para GREEN
+    what the implementer needs to do for GREEN
 <!-- ENDREGION: output -->
 ```
 
@@ -150,36 +150,36 @@ Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
 ```markdown
 # Docs
 
-Documentás features y fixes ya verificados.
+Document verified features and fixes.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Feature, fix o patch **después** de que `verifier` (o el padre) confirmó evidencia.
-- Archivo: `docs/features/<YYYY-MM-DD>-<nombre>.md`.
+- Feature, fix, or patch **after** `verifier` (or the parent) confirmed evidence.
+- File: `docs/features/<YYYY-MM-DD>-<name>.md`.
 
-## Cuándo no
+## When no
 
-- Durante la implementación.
-- Bumps de versión o cambios triviales de una línea.
+- During implementation.
+- Version bumps or trivial one-line changes.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- El doc incluye: **qué se hizo, por qué, decisiones, alternativas consideradas, archivos creados/modificados**.
-- No toques SOULs (`docs/agents/*-soul.md`) ni prompts one-shot de PR.
-- Docs de agentes pueden usar BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`.
-- Solo escribí bajo `docs/**` (y `README.md` si el cambio lo exige). No toques código de aplicación.
+- The doc includes: **what was done, why, decisions, alternatives considered, files created/modified**.
+- Do not touch SOULs (`docs/agents/*-soul.md`) or one-shot PR prompts.
+- Agent docs may use BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`.
+- Only write under `docs/**` (and `README.md` if the change requires it). Do not touch application code.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     ## Doc
-    docs/features/<fecha>-<nombre>.md
+    docs/features/<date>-<name>.md
 <!-- ENDREGION: output -->
 ```
 
@@ -205,7 +205,7 @@ git add docs/agents/roles/builder.md docs/agents/roles/tester.md docs/agents/rol
 git commit -m "$(cat <<'EOF'
 docs(agents): add canonical builder, tester, and docs roles
 
-Roles agnósticos en docs/agents/roles/ para que Cursor (y otros runtimes) compartan misión, routing y contrato de output.
+Runtime-agnostic roles in docs/agents/roles/ so Cursor (and other runtimes) share mission, routing, and output contract.
 EOF
 )"
 ```
@@ -220,7 +220,7 @@ EOF
 - Create: `docs/agents/roles/verifier.md`
 
 **Interfaces:**
-- Consumes: spec sections 3, 7; `docs/agents/prompts/standard-review.md` (espíritu, no copiar el template de PR); `docs/agents/prompts/security-review-checklist.md` (referencia, no reescribir)
+- Consumes: spec sections 3, 7; `docs/agents/prompts/standard-review.md` (spirit, do not copy the PR template); `docs/agents/prompts/security-review-checklist.md` (reference, do not rewrite)
 - Produces: read-only role docs
 
 - [ ] **Step 1: Create `docs/agents/roles/reviewer.md`**
@@ -228,43 +228,43 @@ EOF
 ```markdown
 # Reviewer
 
-Code review de calidad. No modificás archivos.
+Code quality review. You do not modify files.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Diff de feature/fix: claridad, mantenibilidad, convenciones de `AGENTS.md`, tests (happy path y edges), naming, simplicidad.
+- Feature/fix diff: clarity, maintainability, `AGENTS.md` conventions, tests (happy path and edges), naming, simplicity.
 
-## Cuándo no
+## When no
 
-- Vulnerabilidades, leaks, auth, inyección → rol `security-reviewer` (lanzar en paralelo si el diff toca auth/keys/ws/protocolo).
-- Arquitectura de producto / elección de stack.
-- Implementar fixes.
+- Vulnerabilities, leaks, auth, injection → role `security-reviewer` (launch in parallel if the diff touches auth/keys/ws/protocol).
+- Product architecture / stack choice.
+- Implementing fixes.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Read-only. `bun test` / `git diff` / `git log` están bien; no edits ni shell que mute estado.
-- Alineado al espíritu de `docs/agents/prompts/standard-review.md` (calidad, no security). No uses las variables de PR one-shot (`{pr_diff}`, etc.) salvo que el padre te las pase.
-- No reescribas el checklist de seguridad.
+- Read-only. `bun test` / `git diff` / `git log` are fine; no edits or shell that mutates state.
+- Aligned with the spirit of `docs/agents/prompts/standard-review.md` (quality, not security). Do not use the PR one-shot variables (`{pr_diff}`, etc.) unless the parent passes them.
+- Do not rewrite the security checklist.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     CRITICAL:
-    (none) | items que bloquean — bugs, rotura de build
+    (none) | items that block — bugs, build breakage
 
     HIGH:
-    (none) | debería arreglarse antes de merge
+    (none) | should be fixed before merge
 
     LOW:
-    (none) | sugerencias
+    (none) | suggestions
 
-Cada sección vacía debe decir `(none)` explícito.
+Each empty section must say `(none)` explicitly.
 <!-- ENDREGION: output -->
 ```
 
@@ -273,43 +273,43 @@ Cada sección vacía debe decir `(none)` explícito.
 ```markdown
 # Security Reviewer
 
-Revisión de seguridad. No modificás archivos. Solo findings confirmados.
+Security review. You do not modify files. Confirmed findings only.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Diff que toca auth, keys, ws, protocolo, cookies, JWT, endpoints, input de usuario.
-- Sospecha de leaks (`sk-cardinal-*`, tokens, secrets, paths absolutos, emails).
+- Diff touching auth, keys, ws, protocol, cookies, JWT, endpoints, user input.
+- Suspicion of leaks (`sk-cardinal-*`, tokens, secrets, absolute paths, emails).
 
-## Cuándo no
+## When no
 
-- Estilo, naming, claridad → rol `reviewer`.
-- Pentest ofensivo / exploits.
+- Style, naming, clarity → role `reviewer`.
+- Offensive pentest / exploits.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Read-only. Evaluá el diff contra `docs/agents/prompts/security-review-checklist.md` (no lo copies ni lo reescribas). Ítems N/A se omiten.
-- No especules. Si no está confirmado, no lo reportes.
-- `readonly` implica: sin edits; `git diff` y lectura de código sí.
+- Read-only. Evaluate the diff against `docs/agents/prompts/security-review-checklist.md` (do not copy or rewrite it). N/A items are omitted.
+- Do not speculate. If not confirmed, do not report it.
+- `readonly` means: no edits; `git diff` and reading code are fine.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     CRITICAL:
-    (none) | archivo:línea — vector — por qué
+    (none) | file:line — vector — why
 
     HIGH:
-    (none) | archivo:línea — vector
+    (none) | file:line — vector
 
     LOW:
-    (none) | archivo:línea
+    (none) | file:line
 
-Cada finding lleva path:línea y vector en lenguaje claro.
+Each finding includes path:line and vector in plain language.
 <!-- ENDREGION: output -->
 ```
 
@@ -318,36 +318,36 @@ Cada finding lleva path:línea y vector en lenguaje claro.
 ```markdown
 # Verifier
 
-Validador escéptico. No creés claims. No parcheás código.
+Skeptical validator. Do not trust claims. Do not patch code.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Alguien dijo que el trabajo está listo (padre, builder, frontend, ws-protocol).
-- Antes de `docs` y antes de sugerir commit.
+- Someone said the work is done (parent, builder, frontend, ws-protocol).
+- Before `docs` and before suggesting a commit.
 
-## Cuándo no
+## When no
 
-- Escribir tests nuevos → `tester`.
-- Implementar o arreglar → `builder` / `ws-protocol` / `frontend`.
+- Write new tests → `tester`.
+- Implement or fix → `builder` / `ws-protocol` / `frontend`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Corré evidencia: `bun test` (ámbitos tocados o suite) y/o `bun run build` si hay frontend.
-- Comprobá que los archivos reclamados existen y que los tests no son solo archivos vacíos.
-- Read-only: sin edits ni shell que mute estado. Correr tests/build está permitido.
-- Verdict `FAIL` si hay claimed-but-broken o tests rojos. El padre re-delega; no marques la feature completa.
+- Run evidence: `bun test` (touched scopes or full suite) and/or `bun run build` if there is frontend.
+- Check that claimed files exist and that tests are not just empty files.
+- Read-only: no edits or shell that mutates state. Running tests/build is allowed.
+- Verdict `FAIL` if there is claimed-but-broken or red tests. Parent re-delegates; do not mark the feature complete.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     ## Ran
-    comandos ejecutados
+    commands executed
 
     ## Passed
     - …
@@ -385,7 +385,7 @@ git add docs/agents/roles/reviewer.md docs/agents/roles/security-reviewer.md doc
 git commit -m "$(cat <<'EOF'
 docs(agents): add reviewer, security-reviewer, and verifier roles
 
-Separa calidad, seguridad y verificación de claims. Los tres son read-only y no tocan SOULs ni prompts one-shot.
+Separates quality, security, and claims verification. All three are read-only and do not touch SOULs or one-shot prompts.
 EOF
 )"
 ```
@@ -408,38 +408,38 @@ EOF
 ```markdown
 # WS Protocol
 
-Implementás el protocolo WebSocket nativo en `packages/ws/`.
+Implement the native WebSocket protocol in `packages/ws/`.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- `packages/ws/**`: parseo de mensajes, state machine, ping/pong, timeouts, hub.
-- TDD: este ámbito es obligatorio — GREEN sobre tests RED de `tester`.
+- `packages/ws/**`: message parsing, state machine, ping/pong, timeouts, hub.
+- TDD: this scope is mandatory — GREEN over RED tests from `tester`.
 
-## Cuándo no
+## When no
 
-- Handlers HTTP o composición en `backend/` que solo *usan* el hub → `builder`.
-- Cliente React / dashboard → `frontend`.
+- HTTP handlers or composition in `backend/` that only *use* the hub → `builder`.
+- React client / dashboard → `frontend`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Stack: TypeScript + Bun, WebSocket nativo. No reinventar orquestación de agentes.
-- Mismos constraints de builder: spec exacta, sin extras, Podman, no leaks.
-- No escribas tests RED (eso es `tester`). No verifiques claims (eso es `verifier`).
+- Stack: TypeScript + Bun, native WebSocket. Do not reinvent agent orchestration.
+- Same constraints as builder: exact spec, no extras, Podman, no leaks.
+- Do not write RED tests (that is `tester`). Do not verify claims (that is `verifier`).
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     ## Files
     - path (created|modified)
 
     ## Verify
-    comando + resultado
+    command + result
 
     ## Spec deviations
     none
@@ -451,40 +451,40 @@ Incluí un fence markdown en tu último mensaje con:
 ```markdown
 # Frontend
 
-Implementás UI en `frontend/`. Types del cliente = JSON real del backend.
+Implement UI in `frontend/`. Client types = real backend JSON.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- `frontend/**`: React, Vite, Tailwind v4, páginas, hooks, cliente WS del dashboard.
+- `frontend/**`: React, Vite, Tailwind v4, pages, hooks, dashboard WS client.
 
-## Cuándo no
+## When no
 
-- Cambiar el protocolo en `packages/ws/` → `ws-protocol`.
-- Cambiar handlers/API en `backend/` o `packages/` (salvo types compartidos que el padre coordine) → `builder`.
+- Change the protocol in `packages/ws/` → `ws-protocol`.
+- Change handlers/API in `backend/` or `packages/` (except shared types the parent coordinates) → `builder`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Types 1:1 con el JSON del backend (flat fields, no nested). Mismatch = pantalla negra.
-- El WS del frontend va a `ws://127.0.0.1:8787/ws`, **no** por el proxy de Vite.
-- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (127.0.0.1, no localhost — cookies).
-- No TDD unitario obligatorio. Verificación: `bun run build` (typecheck + Vite).
-- Runtime containerizado; no instalar deps nativas en el host.
-- No extras fuera de spec.
+- Types 1:1 with backend JSON (flat fields, no nested). Mismatch = black screen.
+- Frontend WS connects to `ws://127.0.0.1:8787/ws`, **not** through the Vite proxy.
+- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (127.0.0.1, not localhost — cookies).
+- No mandatory unit TDD. Verification: `bun run build` (typecheck + Vite).
+- Containerized runtime; do not install native deps on the host.
+- No extras outside spec.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     ## Files
     - path (created|modified)
 
     ## Verify
-    bun run build (en frontend/) + resultado
+    bun run build (in frontend/) + result
 
     ## Spec deviations
     none
@@ -496,38 +496,38 @@ Incluí un fence markdown en tu último mensaje con:
 ```markdown
 # Herdr Dispatcher
 
-Despachás trabajo a un pane hermano del multiplexer local. No implementás producto.
+Dispatch work to a sibling pane of the local multiplexer. Do not implement product.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When yes
 
-- Implementación larga, TDD en paralelo, aislamiento, u otro kind de agente (otra instancia del IDE, CLI, etc.).
-- El padre te da spec, paths y definition of done.
+- Long implementation, parallel TDD, isolation, or another kind of agent (another IDE instance, CLI, etc.).
+- The parent gives you spec, paths, and definition of done.
 
-## Cuándo no
+## When no
 
-- Si el entorno no es un pane del multiplexer (`HERDR_ENV` distinto de `1`): declaralo y **no** hables con el CLI. El padre cae a subagentes in-session.
-- Review, docs y seguridad van in-session, no a otro pane, salvo que el padre lo pida explícito.
+- If the environment is not a multiplexer pane (`HERDR_ENV` other than `1`): declare it and **do not** talk to the CLI. The parent falls back to in-session subagents.
+- Review, docs, and security go in-session, not to another pane, unless the parent explicitly requests it.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Antes de cualquier comando: `test "${HERDR_ENV:-}" = 1`. Si falla: último mensaje = no estás en Herdr + fallback. No inspecciones la sesión desde afuera.
-- Leé la skill/CLI del multiplexer (`herdr`) en el entorno; no copies el manual entero a tu respuesta.
-- Split hermano: `--no-focus`, mismo cwd. `right` si el pane es ancho, `down` si es alto.
-- Nombres de agente: `[a-z][a-z0-9_-]{0,31}`, únicos (ej. `card-builder`).
-- Kind: el que pida el padre. Descubrí kinds válidos con el help del CLI; **no inventes slugs**. Si no hay kind, preguntá o usá el kind del pane llamador si el multiplexer lo reporta.
-- Prompt al remoto **autocontenido** (spec, paths, DoD). El remoto no ve el chat del padre.
-- `blocked`: reportá; no apruebes permisos salvo autorización explícita del humano en esa sesión.
-- No cierres panes/tabs/workspaces que no creaste. Nunca `herdr server stop`.
-- Esto es la interfaz humana/IDE, no el producto Cardinal. Cardinal no spawnea agentes.
+- Before any command: `test "${HERDR_ENV:-}" = 1`. If it fails: last message = not in Herdr + fallback. Do not inspect the session from outside.
+- Read the multiplexer skill/CLI (`herdr`) from the environment; do not copy the entire manual into your response.
+- Sibling split: `--no-focus`, same cwd. `right` if the pane is wide, `down` if tall.
+- Agent names: `[a-z][a-z0-9_-]{0,31}`, unique (e.g. `card-builder`).
+- Kind: whatever the parent requests. Discover valid kinds with the CLI help; **do not invent slugs**. If no kind, ask or use the calling pane's kind if the multiplexer reports it.
+- Prompt to remote must be **self-contained** (spec, paths, DoD). The remote does not see the parent's chat.
+- `blocked`: report it; do not approve permissions unless explicitly authorized by the human in that session.
+- Do not close panes/tabs/workspaces you did not create. Never `herdr server stop`.
+- This is the human/IDE interface, not the Cardinal product. Cardinal does not spawn agents.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (last message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your last message with:
 
     ## Dispatch
     pane_id: …
@@ -537,10 +537,10 @@ Incluí un fence markdown en tu último mensaje con:
     kind: …
 
     ## Result
-    resumen del remoto
+    remote summary
 
     ## Fallback
-    (none) | not in Herdr — padre debe usar subagentes in-session
+    (none) | not in Herdr — parent must use in-session subagents
 <!-- ENDREGION: output -->
 ```
 
@@ -563,7 +563,7 @@ git add docs/agents/roles/ws-protocol.md docs/agents/roles/frontend.md docs/agen
 git commit -m "$(cat <<'EOF'
 docs(agents): add ws-protocol, frontend, and herdr-dispatcher roles
 
-Especialistas de dominio más el dispatcher del multiplexer. El role doc de Herdr no implementa producto ni spawnea desde Cardinal.
+Domain specialists plus the multiplexer dispatcher. The Herdr role doc does not implement product or spawn from Cardinal.
 EOF
 )"
 ```
@@ -584,7 +584,7 @@ EOF
 - Create: `.cursor/agents/herdr-dispatcher.md`
 
 **Interfaces:**
-- Consumes: `docs/agents/roles/<rol>.md` from Tasks 1–3
+- Consumes: `docs/agents/roles/<role>.md` from Tasks 1–3
 - Produces: Cursor Task-tool subagents (`name` = filename)
 
 Write each file exactly as below. First action in every body: read the role doc.
@@ -600,13 +600,13 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/builder.md` y seguilo. Si el read falla, estas reglas no se negocian:
+Read `docs/agents/roles/builder.md` and follow it. If the read fails, these rules are non-negotiable:
 
-- Implementá exactamente la spec. Sin extras.
-- No toques `packages/ws/**` ni `frontend/**` como zona primaria.
-- TDD (auth/keys/ws/db/router): no GREEN sin test RED previo.
-- Podman; no deps nativas. Sin leaks (`sk-cardinal-*`, tokens, paths, emails).
-- Último mensaje: Files / Verify / Spec deviations.
+- Implement exactly the spec. No extras.
+- Do not touch `packages/ws/**` or `frontend/**` as primary zone.
+- TDD (auth/keys/ws/db/router): no GREEN without a prior RED test.
+- Podman; no native deps. No leaks (`sk-cardinal-*`, tokens, paths, emails).
+- Last message: Files / Verify / Spec deviations.
 ```
 
 - [ ] **Step 2: Create `.cursor/agents/tester.md`**
@@ -620,11 +620,11 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/tester.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/tester.md` and follow it. If the read fails:
 
-- Solo escribí `*.test.ts`. El test debe FALLAR (RED) antes del código de producción.
-- No implementes producción. No verifiques un “listo” (eso es `verifier`).
-- Corré `bun test`. Último mensaje: Tests / Result RED|GREEN / Missing implementation.
+- Only write `*.test.ts`. The test must FAIL (RED) before production code.
+- Do not implement production. Do not verify a "done" (that is `verifier`).
+- Run `bun test`. Last message: Tests / Result RED|GREEN / Missing implementation.
 ```
 
 - [ ] **Step 3: Create `.cursor/agents/docs.md`**
@@ -638,11 +638,11 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/docs.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/docs.md` and follow it. If the read fails:
 
-- Solo después de verificación. Path: `docs/features/<YYYY-MM-DD>-<nombre>.md`.
-- Incluí qué, por qué, decisiones, alternativas, archivos.
-- No toques SOULs ni código de aplicación. Último mensaje: path del doc.
+- Only after verification. Path: `docs/features/<YYYY-MM-DD>-<name>.md`.
+- Include what, why, decisions, alternatives, files.
+- Do not touch SOULs or application code. Last message: path of the doc.
 ```
 
 - [ ] **Step 4: Create `.cursor/agents/reviewer.md`**
@@ -656,10 +656,10 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/reviewer.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/reviewer.md` and follow it. If the read fails:
 
-- Read-only. Calidad, no security.
-- Output: CRITICAL / HIGH / LOW con `(none)` si vacío.
+- Read-only. Quality, not security.
+- Output: CRITICAL / HIGH / LOW with `(none)` if empty.
 ```
 
 - [ ] **Step 5: Create `.cursor/agents/security-reviewer.md`**
@@ -673,10 +673,10 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/security-reviewer.md` y el checklist `docs/agents/prompts/security-review-checklist.md`. Si el read falla:
+Read `docs/agents/roles/security-reviewer.md` and the checklist `docs/agents/prompts/security-review-checklist.md`. If the read fails:
 
-- Read-only. Solo findings confirmados, con archivo:línea y vector.
-- Output: CRITICAL / HIGH / LOW. Estilo/naming no es tu scope.
+- Read-only. Confirmed findings only, with file:line and vector.
+- Output: CRITICAL / HIGH / LOW. Style/naming is not your scope.
 ```
 
 - [ ] **Step 6: Create `.cursor/agents/verifier.md`**
@@ -690,10 +690,10 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/verifier.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/verifier.md` and follow it. If the read fails:
 
-- No creas claims. Corré `bun test` y/o `bun run build`.
-- No parchees. Verdict PASS o FAIL. FAIL → el padre re-delega.
+- Do not trust claims. Run `bun test` and/or `bun run build`.
+- Do not patch. Verdict PASS or FAIL. FAIL → parent re-delegates.
 - Output: Ran / Passed / Claimed but broken / Gaps / Verdict.
 ```
 
@@ -708,10 +708,10 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/ws-protocol.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/ws-protocol.md` and follow it. If the read fails:
 
-- Zona primaria: `packages/ws/**`. No UI, no HTTP que solo usa el hub.
-- TDD: GREEN sobre RED de `tester`. Spec exacta, sin extras.
+- Primary zone: `packages/ws/**`. No UI, no HTTP that only uses the hub.
+- TDD: GREEN over RED from `tester`. Exact spec, no extras.
 - Output: Files / Verify / Spec deviations.
 ```
 
@@ -726,10 +726,10 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/frontend.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/frontend.md` and follow it. If the read fails:
 
-- Types 1:1 con JSON del backend (flat). WS a `ws://127.0.0.1:8787/ws`.
-- Verify con `bun run build`. No TDD unitario obligatorio.
+- Types 1:1 with backend JSON (flat). WS to `ws://127.0.0.1:8787/ws`.
+- Verify with `bun run build`. No mandatory unit TDD.
 - Output: Files / Verify / Spec deviations.
 ```
 
@@ -744,12 +744,12 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/herdr-dispatcher.md`. Si `HERDR_ENV=1`, leé y seguí la skill `herdr` del entorno. Si el read falla:
+Read `docs/agents/roles/herdr-dispatcher.md`. If `HERDR_ENV=1`, read and follow the `herdr` skill from the environment. If the read fails:
 
-1. `test "${HERDR_ENV:-}" = 1` — si no, reportá fallback y pará. No corras `herdr`.
-2. Split hermano `--no-focus` `--cwd "$PWD"`. Start + prompt autocontenido + wait.
-3. No inventes kind slugs. No implementes producto. No cierres panes ajenos. Nunca `herdr server stop`.
-4. Output: pane_id, agent, kind, Result o Fallback.
+1. `test "${HERDR_ENV:-}" = 1` — if not, report fallback and stop. Do not run `herdr`.
+2. Sibling split `--no-focus` `--cwd "$PWD"`. Start + self-contained prompt + wait.
+3. Do not invent kind slugs. Do not implement product. Do not close others' panes. Never `herdr server stop`.
+4. Output: pane_id, agent, kind, Result or Fallback.
 ```
 
 - [ ] **Step 10: Verify adapters**
@@ -786,7 +786,7 @@ git add .cursor/agents/*.md
 git commit -m "$(cat <<'EOF'
 feat(cursor): add nine specialized subagent adapters
 
-Adapters en .cursor/agents/ con routing por description. El padre de Cursor puede delegar builder, tester, verifier, reviews, docs, ws, frontend y Herdr.
+Adapters in .cursor/agents/ with description-based routing. The Cursor parent can delegate builder, tester, verifier, reviews, docs, ws, frontend, and Herdr.
 EOF
 )"
 ```
@@ -797,7 +797,7 @@ EOF
 
 **Files:**
 - Modify: `AGENTS.md` (Swarm / Agent Roles / Delegation / Cursor Section / repo tree)
-- Modify: `.cursor/rules/cardinal.mdc` (replace “Cuándo usar Cursor vs OpenCode”)
+- Modify: `.cursor/rules/cardinal.mdc` (replace "When to use Cursor vs OpenCode")
 
 **Interfaces:**
 - Consumes: the nine adapter names from Task 4
@@ -809,59 +809,59 @@ Inside the `cardinal-system/` tree block, add `.cursor/` next to the other top-l
 
 ```
 ├── .cursor/
-│   ├── agents/              subagentes Cursor (adapters)
+│   ├── agents/              Cursor subagent adapters
 │   └── rules/
 ```
 
-Under `docs/agents/` add `│   │   └── roles/           roles canónicos (agnósticos)`.
+Under `docs/agents/` add `│   │   └── roles/           canonical roles (agnostic)`.
 
 - [ ] **Step 2: Replace the Swarm / Cursor sections at the bottom of `AGENTS.md`**
 
-Delete from `## 🕸️ Swarm Workflow (OpenCode)` through the end of `## 🖥️ Cursor Section` (keep `## ⚙️ OpenCode Config Reference`). Insert:
+Delete from `## Swarm Workflow (OpenCode)` through the end of `## Cursor Section` (keep `## OpenCode Config Reference`). Insert:
 
 ```markdown
-## 🕸️ Swarm Workflow
+## Swarm Workflow
 
-**Cursor es la superficie de desarrollo ahora.** Composer es el padre: implementa cambios de 1–2 archivos sin lógica crítica; delega el resto a subagentes en `.cursor/agents/`.
+**Cursor is the development surface now.** Composer is the parent: implements 1–2 file changes without critical logic; delegates the rest to subagents in `.cursor/agents/`.
 
-- TDD obligatorio (auth, keys, ws, db, router), multi-archivo, review, docs de feature, verificación, u otro pane/kind → delegar.
-- Invocación: automática por `description`, o explícita (`/builder`, `/verifier`, “usá el subagente frontend”).
-- Tras un “listo”, siempre `verifier` con evidencia (`bun test` / `bun run build`).
-- Herdr (otra instancia de Cursor u otro kind) **solo** vía `herdr-dispatcher`, y solo si `HERDR_ENV=1`. Si no, in-session.
-- OpenCode CLI (`.opencode/`) sigue disponible (`/feature`, `/test`, `/review`); no es el camino diario.
+- Mandatory TDD (auth, keys, ws, db, router), multi-file, review, feature docs, verification, or another pane/kind → delegate.
+- Invocation: automatic by `description`, or explicit (`/builder`, `/verifier`, "use the frontend subagent").
+- After a "done", always `verifier` with evidence (`bun test` / `bun run build`).
+- Herdr (another Cursor instance or another kind) **only** via `herdr-dispatcher`, and only if `HERDR_ENV=1`. If not, in-session.
+- OpenCode CLI (`.opencode/`) remains available (`/feature`, `/test`, `/review`); not the daily path.
 
-Flujo: tester RED → builder | ws-protocol | frontend GREEN → verifier → reviewer ∥ security-reviewer (si auth/keys/ws) → docs → el padre sugiere commit (no commitea salvo pedido).
+Flow: tester RED → builder | ws-protocol | frontend GREEN → verifier → reviewer || security-reviewer (if auth/keys/ws) → docs → parent suggests commit (does not commit unless asked).
 
-## 🤖 Agent Roles (Cursor)
+## Agent Roles (Cursor)
 
-| Agente | Readonly | Rol |
+| Agent | Readonly | Role |
 |--------|----------|-----|
-| `builder` | no | Implementa spec en `packages/` (salvo `ws/`) y `backend/` |
-| `ws-protocol` | no | Protocolo en `packages/ws/` |
-| `frontend` | no | `frontend/**`, types 1:1 con JSON, WS a `:8787` |
-| `tester` | no | TDD RED en `*.test.ts` |
-| `verifier` | sí | Corre tests/build; no cree claims; no parchea |
-| `reviewer` | sí | Calidad CRITICAL/HIGH/LOW |
-| `security-reviewer` | sí | Auth/keys/ws/leaks; findings confirmados |
-| `docs` | no | `docs/features/` tras verificar |
-| `herdr-dispatcher` | no | Split/start/prompt en Herdr; no implementa producto |
+| `builder` | no | Implements spec in `packages/` (except `ws/`) and `backend/` |
+| `ws-protocol` | no | Protocol in `packages/ws/` |
+| `frontend` | no | `frontend/**`, types 1:1 with JSON, WS to `:8787` |
+| `tester` | no | TDD RED in `*.test.ts` |
+| `verifier` | yes | Runs tests/build; does not trust claims; does not patch |
+| `reviewer` | yes | Quality CRITICAL/HIGH/LOW |
+| `security-reviewer` | yes | Auth/keys/ws/leaks; confirmed findings |
+| `docs` | no | `docs/features/` after verifying |
+| `herdr-dispatcher` | no | Split/start/prompt in Herdr; does not implement product |
 
-Políticas canónicas: `docs/agents/roles/<rol>.md`. Adapters: `.cursor/agents/<rol>.md`. Built-ins de Cursor (`explore`, `bash`, `browser`) no se redefinen.
+Canonical policies: `docs/agents/roles/<role>.md`. Adapters: `.cursor/agents/<role>.md`. Cursor built-ins (`explore`, `bash`, `browser`) are not redefined.
 
-## 📤 Delegation Rules
+## Delegation Rules
 
-- Padre Cursor: trabajo chico in-session; no es un orchestrator estricto.
-- Un subagente = una responsabilidad. `builder` no pisa `ws-protocol` ni `frontend`.
-- Backend+UI en paralelo (`builder`/`ws-protocol` + `frontend`). TDD nunca al revés (RED antes de GREEN).
-- El padre verifica resultados antes de marcar completo. `verifier` FAIL → re-delegar.
-- Commits: identidad del owner (`git config`); jamás nombre de agente. Solo si el humano lo pide.
-- Cardinal-producto no spawnea agentes en Herdr.
+- Cursor parent: small work in-session; not a strict orchestrator.
+- One subagent = one responsibility. `builder` does not step on `ws-protocol` or `frontend`.
+- Backend+UI in parallel (`builder`/`ws-protocol` + `frontend`). TDD never in reverse (RED before GREEN).
+- Parent verifies results before marking complete. `verifier` FAIL → re-delegate.
+- Commits: owner identity (`git config`); never agent name. Only if the human requests it.
+- Cardinal-product does not spawn agents in Herdr.
 
-## 🖥️ Cursor Section
+## Cursor Section
 
-- Cursor lee `AGENTS.md` + `.cursor/rules/cardinal.mdc` + `.cursor/agents/`.
-- Composer orquesta e implementa lo chico. Especialistas y Herdr se delegan.
-- OpenCode CLI es swarm legado, no el camino diario.
+- Cursor reads `AGENTS.md` + `.cursor/rules/cardinal.mdc` + `.cursor/agents/`.
+- Composer orchestrates and implements small work. Specialists and Herdr are delegated.
+- OpenCode CLI is legacy swarm, not the daily path.
 ```
 
 - [ ] **Step 3: Replace `.cursor/rules/cardinal.mdc` in full**
@@ -874,36 +874,36 @@ globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
 
 # Cardinal System — Development Rules
 
-- Lee `AGENTS.md` para las reglas completas (branching, commits, TDD, versionado)
-- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), React + Vite + Tailwind v4, WebSocket nativo
-- Runtime siempre containerizado con Podman — no instalar dependencias nativas en el host
-- TDD obligatorio en: auth, keys, ws, db, router (RED → GREEN → REFACTOR)
-- Branching: `feature/* → dev → main`. Commits directos a `dev`; PR con review solo para `dev → main` (merge commit)
-- Commits: Conventional Commits, primera línea en inglés ≤72 chars, body en español
-- Versionado: `MAJOR.FASE.PATCH` (source: `package.json` raíz). En `dev` solo PATCH
-- Audit de leaks antes de commit: keys `sk-cardinal-*`, tokens, paths absolutos, emails
-- Frontend types DEBEN matchear 1:1 el JSON real del backend (flat fields, no nested) — mismatch = pantalla negra
-- El WS del frontend va directo a `ws://127.0.0.1:8787/ws`, NO por el proxy de Vite (roto en Bun)
-- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (usar 127.0.0.1, no localhost — cookies)
-- Ecosistema y knowledge base: `context/ecosystem.md`
+- Read `AGENTS.md` for full rules (branching, commits, TDD, versioning)
+- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), React + Vite + Tailwind v4, native WebSocket
+- Runtime always containerized with Podman — do not install native dependencies on the host
+- Mandatory TDD in: auth, keys, ws, db, router (RED → GREEN → REFACTOR)
+- Branching: `feature/* → dev → main`. Direct commits to `dev`; PR with review only for `dev → main` (merge commit)
+- Commits: Conventional Commits, first line in English <=72 chars, body in English
+- Versioning: `MAJOR.FASE.PATCH` (source: root `package.json`). In `dev` only PATCH
+- Leak audit before commit: keys `sk-cardinal-*`, tokens, absolute paths, emails
+- Frontend types MUST match the real backend JSON 1:1 (flat fields, no nested) — mismatch = black screen
+- Frontend WS connects directly to `ws://127.0.0.1:8787/ws`, NOT through the Vite proxy (broken in Bun)
+- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (use 127.0.0.1, not localhost — cookies)
+- Ecosystem and knowledge base: `context/ecosystem.md`
 
-## Cursor como padre
+## Cursor as Parent
 
-Cursor Composer es la interfaz de desarrollo. Implementá vos los cambios de 1–2 archivos sin lógica crítica. Delegá siempre si toca auth/keys/ws/db/router, es multi-archivo, pide review, docs de feature, verificación, u otro pane/kind.
+Cursor Composer is the development interface. Implement yourself 1–2 file changes without critical logic. Always delegate if it touches auth/keys/ws/db/router, is multi-file, requires review, feature docs, verification, or another pane/kind.
 
-| Subagente | Usar cuando |
+| Subagent | Use when |
 |-----------|-------------|
-| `builder` | Implementar spec en packages/ (salvo ws/) y backend/ |
+| `builder` | Implement spec in packages/ (except ws/) and backend/ |
 | `ws-protocol` | packages/ws/** |
 | `frontend` | frontend/** |
-| `tester` | TDD RED (use proactively en ámbitos TDD) |
-| `verifier` | Alguien dijo listo (use proactively) |
-| `reviewer` | Calidad del diff |
+| `tester` | TDD RED (use proactively in TDD scopes) |
+| `verifier` | Someone said done (use proactively) |
+| `reviewer` | Diff quality |
 | `security-reviewer` | auth/keys/ws/leaks (use proactively) |
-| `docs` | Feature ya verificada |
-| `herdr-dispatcher` | Largo, paralelo, aislamiento, otro kind — solo si HERDR_ENV=1 |
+| `docs` | Verified feature |
+| `herdr-dispatcher` | Long, parallel, isolation, another kind — only if HERDR_ENV=1 |
 
-Roles canónicos: `docs/agents/roles/`. No spawnees Herdr vos; usá `herdr-dispatcher`. OpenCode CLI es opcional, no el camino diario.
+Canonical roles: `docs/agents/roles/`. Do not spawn Herdr yourself; use `herdr-dispatcher`. OpenCode CLI is optional, not the daily path.
 ```
 
 - [ ] **Step 4: Verify parent wiring**
@@ -911,16 +911,16 @@ Roles canónicos: `docs/agents/roles/`. No spawnees Herdr vos; usá `herdr-dispa
 Run:
 
 ```bash
-grep -q 'Cursor es la superficie de desarrollo ahora' AGENTS.md
+grep -q 'Cursor is the development surface now' AGENTS.md
 grep -q 'herdr-dispatcher' AGENTS.md
 grep -q 'security-reviewer' AGENTS.md
-grep -q 'OpenCode CLI es swarm legado' AGENTS.md || grep -q 'no es el camino diario' AGENTS.md
-grep -q 'Cursor Composer es la interfaz de desarrollo' .cursor/rules/cardinal.mdc
+grep -q 'OpenCode CLI is legacy swarm' AGENTS.md || grep -q 'not the daily path' AGENTS.md
+grep -q 'Cursor Composer is the development interface' .cursor/rules/cardinal.mdc
 grep -q 'planning de features complejas' .cursor/rules/cardinal.mdc && { echo 'old Cursor vs OpenCode section still present'; exit 1; } || true
 echo OK
 ```
 
-Expected: `OK`. The old line “planning de features complejas” must **not** remain in `cardinal.mdc`.
+Expected: `OK`. The old line "planning de features complejas" must **not** remain in `cardinal.mdc`.
 
 - [ ] **Step 5: Commit**
 
@@ -929,7 +929,7 @@ git add AGENTS.md .cursor/rules/cardinal.mdc
 git commit -m "$(cat <<'EOF'
 docs: make Cursor the development surface and list subagents
 
-AGENTS.md y cardinal.mdc dejan de tratar a Cursor como solo planning visual. Composer delega por tamaño a los 9 subagentes.
+AGENTS.md and cardinal.mdc stop treating Cursor as visual planning only. Composer delegates by size to the 9 subagents.
 EOF
 )"
 ```
@@ -958,21 +958,21 @@ In `.opencode/agents/builder.md`, immediately after `# Builder — Cardinal Syst
 
 ```markdown
 
-Política canónica: `docs/agents/roles/builder.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+Canonical policy: `docs/agents/roles/builder.md` (read it and do not contradict it). This file only adds OpenCode tools/ACLs.
 ```
 
 In `.opencode/agents/tester.md`, after `# Tester — Cardinal System`:
 
 ```markdown
 
-Política canónica: `docs/agents/roles/tester.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+Canonical policy: `docs/agents/roles/tester.md` (read it and do not contradict it). This file only adds OpenCode tools/ACLs.
 ```
 
 In `.opencode/agents/docs.md`, after `# Docs — Cardinal System`:
 
 ```markdown
 
-Política canónica: `docs/agents/roles/docs.md` (leela y no la contradigas). Este archivo solo añade tools/ACLs de OpenCode.
+Canonical policy: `docs/agents/roles/docs.md` (read it and do not contradict it). This file only adds OpenCode tools/ACLs.
 ```
 
 - [ ] **Step 2: OpenCode `reviewer` keeps dual scope** (this runtime has no `security-reviewer`)
@@ -981,10 +981,10 @@ After `# Reviewer — Cardinal System` in `.opencode/agents/reviewer.md`:
 
 ```markdown
 
-Calidad canónica: `docs/agents/roles/reviewer.md`. En OpenCode no existe `security-reviewer`; evaluá también `docs/agents/prompts/security-review-checklist.md` en el mismo pase. Este archivo solo añade ACLs.
+Canonical quality: `docs/agents/roles/reviewer.md`. In OpenCode there is no `security-reviewer`; also evaluate `docs/agents/prompts/security-review-checklist.md` in the same pass. This file only adds ACLs.
 ```
 
-Keep the existing “Scope de review” including security — do not delete it.
+Keep the existing "Review scope" including security — do not delete it.
 
 - [ ] **Step 3: Point OpenCode orchestrator at roles without changing its no-code rule**
 
@@ -992,7 +992,7 @@ After `# Orchestrator — Cardinal System` in `.opencode/agents/orchestrator.md`
 
 ```markdown
 
-Las políticas de `@builder` `@tester` `@reviewer` `@docs` viven en `docs/agents/roles/`. Este runtime no incluye `verifier`, `security-reviewer`, `ws-protocol`, `frontend` ni `herdr-dispatcher` (eso es Cursor). Cursor es la superficie diaria de desarrollo del repo.
+The policies of `@builder` `@tester` `@reviewer` `@docs` live in `docs/agents/roles/`. This runtime does not include `verifier`, `security-reviewer`, `ws-protocol`, `frontend`, or `herdr-dispatcher` (that is Cursor). Cursor is the daily development surface for this repo.
 ```
 
 - [ ] **Step 4: Add a Cursor agents check to `scripts/verify-dev-setup.sh`**
@@ -1008,33 +1008,33 @@ for r in $CURSOR_AGENTS; do
   if [ -f "$f" ] && grep -q "^name: $r$" "$f" && grep -q "^model: inherit$" "$f"; then
     cursor_count=$((cursor_count+1))
   else
-    bad "adapter Cursor inválido o faltante: $f"
+    bad "invalid or missing Cursor adapter: $f"
   fi
 done
 if [ "$cursor_count" -eq 9 ]; then
-  ok "9 adapters Cursor (name + model inherit)"
+  ok "9 Cursor adapters (name + model inherit)"
 fi
 for r in reviewer security-reviewer verifier; do
   if grep -q "^readonly: true$" ".cursor/agents/$r.md" 2>/dev/null; then
     :
   else
-    bad "readonly true faltante en .cursor/agents/$r.md"
+    bad "readonly true missing in .cursor/agents/$r.md"
   fi
 done
 if grep -q "^readonly: true$" .cursor/agents/reviewer.md \
    && grep -q "^readonly: true$" .cursor/agents/security-reviewer.md \
    && grep -q "^readonly: true$" .cursor/agents/verifier.md; then
-  ok "readonly en reviewer, security-reviewer, verifier"
+  ok "readonly in reviewer, security-reviewer, verifier"
 fi
 ```
 
-Update the header comment of the script from “Cursor rules” to “Cursor rules y .cursor/agents”.
+Update the header comment of the script from "Cursor rules" to "Cursor rules and .cursor/agents".
 
 - [ ] **Step 5: Run the verifier**
 
 Run: `bash scripts/verify-dev-setup.sh`
 
-Expected: exit 0. The Cursor agents section shows 9 adapters and readonly checks. OpenCode agent count may fail if `opencode` is not installed — if the script fails only on `opencode no encontrado`, that is pre-existing; do not change that branch unless you also see Cursor-agent failures (those must be zero).
+Expected: exit 0. The Cursor agents section shows 9 adapters and readonly checks. OpenCode agent count may fail if `opencode` is not installed — if the script fails only on `opencode not found`, that is pre-existing; do not change that branch unless you also see Cursor-agent failures (those must be zero).
 
 - [ ] **Step 6: Confirm no new OpenCode agents and no soul diffs**
 
@@ -1054,7 +1054,7 @@ git add .opencode/agents/builder.md .opencode/agents/tester.md .opencode/agents/
 git commit -m "$(cat <<'EOF'
 chore(dev): point OpenCode roles at canonical docs and verify Cursor agents
 
-OpenCode no se expande. verify-dev-setup.sh chequea los 9 adapters de .cursor/agents/.
+OpenCode is not expanded. verify-dev-setup.sh checks the 9 .cursor/agents/ adapters.
 EOF
 )"
 ```
@@ -1077,56 +1077,56 @@ EOF
 ```markdown
 # Cursor subagents (2026-08-20)
 
-## Qué se hizo
+## What was done
 
-Nueve subagentes de Cursor (`.cursor/agents/`) y roles canónicos agnósticos en `docs/agents/roles/`. Composer pasa a ser la superficie de desarrollo: delega por tamaño, verifica con `verifier`, y usa `herdr-dispatcher` para otras instancias/kinds si hay Herdr.
+Nine Cursor subagents (`.cursor/agents/`) and canonical agnostic roles in `docs/agents/roles/`. Composer becomes the development surface: delegates by size, verifies with `verifier`, and uses `herdr-dispatcher` for other instances/kinds when Herdr is available.
 
-## Por qué
+## Why
 
-El swarm de OpenCode existía, pero el desarrollo diario del repo es Cursor. Hacía falta delegar desde adentro sin duplicar identidades (SOULs) ni hacer que Cardinal spawnee agentes.
+The OpenCode swarm existed, but the daily development of the repo is Cursor. Delegation from inside was needed without duplicating identities (SOULs) or having Cardinal spawn agents.
 
-## Decisiones
+## Decisions
 
-- Híbrido: roles de proceso + especialistas (`ws-protocol`, `frontend`) + `verifier` + `herdr-dispatcher`.
-- Capas: role doc agnóstico + adapter Cursor corto. `description` en inglés; cuerpos en español.
-- `readonly` en reviewer / security-reviewer / verifier. `is_background: false` en todos.
-- OpenCode no se expande; los 5 agentes existentes apuntan al role doc. Reviewer de OpenCode sigue cubriendo security porque ese runtime no tiene `security-reviewer`.
-- SOULs y prompts one-shot de PR no se tocaron.
+- Hybrid: process roles + specialists (`ws-protocol`, `frontend`) + `verifier` + `herdr-dispatcher`.
+- Layers: agnostic role doc + short Cursor adapter. `description` in English; bodies in English.
+- `readonly` on reviewer / security-reviewer / verifier. `is_background: false` on all.
+- OpenCode is not expanded; the 5 existing agents point to the role doc. OpenCode reviewer still covers security because that runtime has no `security-reviewer`.
+- SOULs and one-shot PR prompts were not touched.
 
-## Alternativas consideradas
+## Alternatives considered
 
-- Solo roles de proceso (espejo OpenCode): insuficiente para ws/frontend/Herdr/verifier.
-- Especialistas por cada package: demasiado ruido para el Task tool.
-- Wrappers flacos (solo “leé el doc”): frágil en contexto vacío.
-- Padre orchestrator estricto: peor para diffs de 1–2 archivos.
+- Only process roles (OpenCode mirror): insufficient for ws/frontend/Herdr/verifier.
+- Specialists per package: too much noise for the Task tool.
+- Thin wrappers (only "read the doc"): fragile in empty context.
+- Strict orchestrator parent: worse for 1–2 file diffs.
 
-## Archivos creados/modificados
+## Files created/modified
 
-- Creados: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), este doc
-- Modificados: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (punteros), `scripts/verify-dev-setup.sh`, spec status
+- Created: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), this doc
+- Modified: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (pointers), `scripts/verify-dev-setup.sh`, spec status
 ```
 
 - [ ] **Step 2: Update spec header**
 
 In `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md`, change:
 
-`> Estado: Diseño validado (brainstorm). Pendiente plan de implementación.`
+`> Status: Validated design (brainstorm). Implementation plan pending.`
 
 to:
 
-`> Estado: Diseño validado. Plan: docs/superpowers/plans/2026-08-20-cursor-subagents.md`
+`> Status: Validated design. Plan: docs/superpowers/plans/2026-08-20-cursor-subagents.md`
 
-Remove the footer line `*Siguiente paso: plan en docs/superpowers/plans/ tras aprobación de este spec.*` or replace with `*Implementación: ver el plan.*`
+Remove the footer line `*Next step: plan in docs/superpowers/plans/ after approval of this spec.*` or replace with `*Implementation: see the plan.*`
 
 - [ ] **Step 3: Dry-run routing (manual checklist — print PASS/FAIL for each)**
 
-| Pedido | Debe delegar a | No debe |
+| Request | Should delegate to | Should not |
 |--------|----------------|---------|
-| Fix JWT expiry | `tester` + `builder` + `verifier` + `security-reviewer` ∥ `reviewer` | padre implementando solo |
-| Padding de `AgentCard` | padre o `frontend` | `tester`, `herdr-dispatcher` |
-| Ping/pong timeout en `packages/ws` | `tester` + `ws-protocol` + `verifier` | `builder` como zona primaria |
-| “está listo el login” | `verifier` primero | `docs` antes de PASS |
-| Feature larga en Herdr sin `HERDR_ENV` | fallback in-session que `herdr-dispatcher` declara | `herdr *` |
+| Fix JWT expiry | `tester` + `builder` + `verifier` + `security-reviewer` || `reviewer` | parent implementing alone |
+| `AgentCard` padding | parent or `frontend` | `tester`, `herdr-dispatcher` |
+| Ping/pong timeout in `packages/ws` | `tester` + `ws-protocol` + `verifier` | `builder` as primary zone |
+| "login is done" | `verifier` first | `docs` before PASS |
+| Long feature in Herdr without `HERDR_ENV` | in-session fallback that `herdr-dispatcher` declares | `herdr *` |
 
 Run souls check again:
 
@@ -1145,7 +1145,7 @@ git add docs/features/2026-08-20-cursor-subagents.md docs/superpowers/specs/2026
 git commit -m "$(cat <<'EOF'
 docs: record Cursor subagents feature and spec status
 
-Feature doc con qué/por qué/decisiones. El spec apunta al plan de implementación.
+Feature doc with what/why/decisions. The spec points to the implementation plan.
 EOF
 )"
 ```
@@ -1156,14 +1156,14 @@ EOF
 
 | Spec section | Task |
 |--------------|------|
-| 1 Objetivo / fuera de alcance | Global Constraints + Tasks 4–6 (no souls, no new OpenCode agents, no app code) |
-| 2 Principios | Tasks 1–4 (layers), Task 5 (Cursor surface), Task 6 (OpenCode not expanded) |
-| 3 Roster + anti-pisado | Role docs Tasks 1–3, parent table Task 5, dry-run Task 7 |
-| 4 Capas / frontmatter | Task 4 Step 10 checks name/model/readonly/is_background |
-| 5 Flujo | Task 5 AGENTS.md flujo |
+| 1 Objective / out of scope | Global Constraints + Tasks 4–6 (no souls, no new OpenCode agents, no app code) |
+| 2 Principles | Tasks 1–4 (layers), Task 5 (Cursor surface), Task 6 (OpenCode not expanded) |
+| 3 Roster + no-stepping | Role docs Tasks 1–3, parent table Task 5, dry-run Task 7 |
+| 4 Layers / frontmatter | Task 4 Step 10 checks name/model/readonly/is_background |
+| 5 Flow | Task 5 AGENTS.md flow |
 | 6 Herdr | Task 3 herdr-dispatcher + Task 4 adapter |
 | 7 Output contracts | REGION output in every role doc |
 | 8 OpenCode | Task 6 |
-| 10 Verificación | Task 4 Step 10, Task 6 script, Task 7 dry-run |
+| 10 Verification | Task 4 Step 10, Task 6 script, Task 7 dry-run |
 
 No placeholders. OpenCode reviewer dual-scope is an explicit spec-compatible exception (no security-reviewer on that runtime).

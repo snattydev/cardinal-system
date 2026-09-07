@@ -1,95 +1,94 @@
 # Key create + expiry/USD limits (2026-09-03)
 
-Dashboard `/keys` ahora crea keys persistentes (`sk-cardinal-*`) con scopes,
-budget de tokens, expiración y tope USD. El router respeta expiry y USD. El
-plaintext se muestra una sola vez.
+The `/keys` dashboard now creates persistent keys (`sk-cardinal-*`) with scopes,
+token budget, expiration, and USD cap. The router enforces expiry and USD limits.
+Plaintext is displayed only once.
 
-## Qué se hizo
+## What was done
 
-La página protegida `/keys` deja de ser solo listar/revocar: ahora crea keys
-persistentes con scopes, límite de tokens, fecha de expiración y tope USD. El
-plaintext (`sk-cardinal-*`) se muestra una sola vez en un banner con copy; no
-vuelve a aparecer en el listado.
+The protected `/keys` page is no longer list/revoke only: it now creates persistent
+keys with scopes, token budget limit, expiration date, and USD cap. The plaintext
+(`sk-cardinal-*`) is displayed once in a copyable banner; it never reappears in the
+list.
 
-La API JWT agrega `POST /api/keys` (misma cookie que `GET`). El body es
-`{ agentName, scopes?, budgetLimit?, expiresAt?, budgetUsdLimit? }`. Responde
-200 `{ key: plaintext, item: KeyItem }` o 400 `agent_not_found` /
-`invalid_payload`. `created_by=human`. Un `expiresAt` pasado o no parseable
-es 400. A diferencia del CLI `keygen`, el endpoint **no** registra el agente:
-si no existe, 400.
+The JWT API adds `POST /api/keys` (same cookie as `GET`). The body is
+`{ agentName, scopes?, budgetLimit?, expiresAt?, budgetUsdLimit? }`. Returns
+200 `{ key: plaintext, item: KeyItem }` or 400 `agent_not_found` /
+`invalid_payload`. `created_by=human`. A past or unparseable `expiresAt` returns
+400. Unlike the CLI `keygen`, the endpoint does **not** register the agent:
+returns 400 if it does not exist.
 
-`KeyItem` (camelCase) suma `expiresAt`, `budgetUsdLimit` y `budgetUsdUsed`.
+`KeyItem` (camelCase) adds `expiresAt`, `budgetUsdLimit`, and `budgetUsdUsed`.
 
-Schema: migración 14 en `agent_keys` agrega `expires_at TEXT NULL`,
-`budget_usd_limit REAL NULL` y `budget_usd_used REAL NOT NULL DEFAULT 0`.
-`createAgentKey` acepta `expiresAt` / `budgetUsdLimit`.
-`findActiveKeyByHash` rechaza `expires_at` pasado (`Date.parse <= now`) además
-de revoked. `consumeBudgetUsd` solo incrementa si hay límite; falla si el
-incremento excedería el tope; no incrementa si el límite es null.
+Schema: migration 14 on `agent_keys` adds `expires_at TEXT NULL`,
+`budget_usd_limit REAL NULL`, and `budget_usd_used REAL NOT NULL DEFAULT 0`.
+`createAgentKey` accepts `expiresAt` / `budgetUsdLimit`.
+`findActiveKeyByHash` rejects past `expires_at` (`Date.parse <= now`) in addition
+to revoked keys. `consumeBudgetUsd` only increments if a limit exists; fails if the
+increment would exceed the cap; does not increment if limit is null.
 
-El router, antes del loop de hops: key expirada → `unauthorized`;
-`budget_usd_used >= budget_usd_limit` → `budget_exceeded` (HTTP 402 ya
-existía). Metering USD: `(totalTokens/1e6)*hop.costPerMtok`. Costo 0 no
-incrementa; sin límite USD no incrementa. Overshoot USD (`consumeBudgetUsd`
-false) revoca la key, espejo del overshoot de tokens.
+The router, before the hop loop: expired key -> `unauthorized`;
+`budget_usd_used >= budget_usd_limit` -> `budget_exceeded` (HTTP 402 already
+existed). USD metering: `(totalTokens/1e6)*hop.costPerMtok`. Cost 0 does not
+increment; keys without a USD limit do not increment. USD overshoot (`consumeBudgetUsd`
+false) revokes the key, mirroring token overshoot behavior.
 
-UI: form (agente + datalist del roster, scopes separados por coma, tokens,
-datetime-local, USD), banner de plaintext + copy, filas con expiración y
+UI: form (agent + roster datalist, comma-separated scopes, tokens,
+datetime-local, USD), plaintext banner + copy button, rows displaying expiration and
 USD used/limit.
 
-El CLI `bun run keygen` sigue existiendo; no se reescribió.
+The CLI `bun run keygen` still exists; it was not rewritten.
 
-## Por qué
+## Why
 
-El spec 2026-08-20 dejó create fuera a propósito (CLI only): el plaintext se
-imprime una sola vez y no había UI de creación. Ahora se pide create desde el
-dashboard, con límites reales. Los tokens ya se enforceaban; expiry y USD no
-existían en schema ni en el router. `providers.cost_per_mtok` ya estaba
-(default 0) y no cortaba keys.
+Spec 2026-08-20 intentionally excluded key creation (CLI only): plaintext is
+printed once and there was no creation UI. Creation is now required from the
+dashboard with real limits. Tokens were already enforced; expiry and USD did not
+exist in schema or router. `providers.cost_per_mtok` already existed
+(default 0) but did not revoke keys.
 
-## Decisiones
+## Decisions
 
-- Create **no** pre-registra el agente: 400 si no existe. El CLI keygen sí lo
-  hace. El dashboard opera sobre agentes conocidos.
-- Response `{ key, item }` para no chocar con revoke `{ key: KeyItem }`.
-- Expiry comparada en JS (`Date.parse`) porque SQLite `datetime('now')` no es
-  ISO con T/Z.
-- USD se suma solo si hay `budget_usd_limit`; `cost_per_mtok` 0 no mueve el
-  used.
-- Overshoot USD post-success revoca (como tokens), no deja fail-open.
-- Sin página `/router` en este slice (la arma el dashboard). Sin Fusion.
+- Create does **not** pre-register the agent: 400 if it does not exist. CLI keygen
+  does. The dashboard operates on known agents.
+- Response `{ key, item }` to avoid colliding with revoke `{ key: KeyItem }`.
+- Expiry compared in JS (`Date.parse`) because SQLite `datetime('now')` is not
+  ISO with T/Z.
+- USD increments only when `budget_usd_limit` is set; `cost_per_mtok` 0 does not
+  change used amount.
+- Post-success USD overshoot revokes the key (like tokens), preventing fail-open states.
+- No `/router` page in this slice (handled by the dashboard slice). No Fusion.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Pre-registrar el agente como keygen:** rechazado — el spec pide 400 si el
-  agente no existe.
-- **Filtrar expiradas en SQL vs JS:** JS, por el formato ISO del wire.
-- **402 pre-flight estimando tokens:** imposible sin usage; se chequea
-  `used >= limit` antes del loop y overshoot después.
-- **Incluir plaintext en el listado:** no — una sola vez, en el banner de
-  create.
+- **Pre-register agent like keygen:** rejected — spec requires 400 if agent does
+  not exist.
+- **Filter expired keys in SQL vs JS:** JS, due to the ISO wire format.
+- **402 pre-flight estimating tokens:** impossible without usage; checked via
+  `used >= limit` before the loop and overshoot afterwards.
+- **Include plaintext in listing:** no — shown once in the create banner.
 
-## Archivos
+## Files
 
-- Creados: `docs/features/2026-09-03-key-create-limits.md`.
-- Modificados: `packages/db/src/schema.ts`, `packages/db/src/repos.ts`,
+- Created: `docs/features/2026-09-03-key-create-limits.md`.
+- Modified: `packages/db/src/schema.ts`, `packages/db/src/repos.ts`,
   `packages/db/src/index.ts`, `packages/db/src/db.test.ts`,
   `packages/core/src/types.ts`, `packages/router/src/resolve.ts`,
   `packages/router/src/router.ts`, `packages/router/src/router.test.ts`,
   `backend/src/api/keys.ts`, `backend/src/api/keys.test.ts`,
   `backend/src/server.ts`, `backend/src/server.test.ts`,
   `frontend/src/pages/Keys.tsx`, `frontend/src/lib/types.ts` (`KeyItem`).
-- Nota: el mapper de hop en Fusion recibió `costPerMtok` porque el tipo
-  `ResolvedHop` lo exige; no es parte funcional de este slice.
+- Note: Fusion hop mapper received `costPerMtok` because the `ResolvedHop`
+  type requires it; not a functional part of this slice.
 
-## Verificación
+## Verification
 
-- Slice: 146 pass en db + router + keys + server; frontend build exit 0.
-- Suite unificada (padre, 2026-09-03): **417 pass / 0 fail**.
+- Slice: 146 pass in db + router + keys + server; frontend build exit 0.
+- Unified suite (parent, 2026-09-03): **417 pass / 0 fail**.
 
-## Relacionado
+## Related
 
-Índice: [`2026-09-03-router-surface.md`](./2026-09-03-router-surface.md).
+Index: [`2026-09-03-router-surface.md`](./2026-09-03-router-surface.md).
 Dashboard `/router`: [`2026-09-03-router-dashboard.md`](./2026-09-03-router-dashboard.md).
 Fusion: [`2026-09-03-router-fusion.md`](./2026-09-03-router-fusion.md).
 Version: **0.2.5**.

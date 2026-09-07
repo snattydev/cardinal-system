@@ -34,7 +34,7 @@ cardinal-system/
 │   │   ├── prompts/
 │   │   ├── roles/             canonical roles (agnostic)
 │   │   └── cursor-workflow.md delegation in Cursor
-│   ├── guides/                live manuals (router, etc.)
+│   ├── guides/                live manuals (router, pitfalls)
 │   ├── sprints/               sprint logs (historical record)
 │   ├── roadmap/               detail per phase
 │   ├── superpowers/
@@ -42,12 +42,13 @@ cardinal-system/
 │   │   └── plans/             implementation plans
 │   ├── references/            talks, papers, external architectures
 │   ├── cronjobs.md            planned cronjobs
-│   ├── skills.md              planned skills
+│   ├── skills.md              skill inventory
 │   ├── stack.md               technical stack
 │   ├── security.md            security model
+│   ├── api.md                 REST + WS reference
 │   ├── vision.md              vision and principles
 │   └── roadmap.md             live priorities
-├── skills/                    Hermes skills for Cardinal development
+├── skills/                    Cardinal skills (source of truth; sync out to Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)
 ├── README.md
@@ -56,11 +57,12 @@ cardinal-system/
 
 ## Trackers
 
-- Planned and pending skills → [`docs/skills.md`](../docs/skills.md)
+- Skill inventory → [`docs/skills.md`](../docs/skills.md)
 - Cronjobs planned per phase → [`docs/cronjobs.md`](../docs/cronjobs.md)
 
 ## Active skills
 
-- `cardinal-dev` — Full development workflow (branching, commits, PRs, versioning, TDD, review). Index.
-- `cardinal-commit` — Commit format: conventional commits, types, scope, examples.
-- `cardinal-pr` — Create a PR step by step: branch → bump → commit → push → template → reviewers.
+- `cardinal-dev` — index into `AGENTS.md` and the skills below.
+- `cardinal-commit` — commit format: conventional commits, English subject and body.
+- `cardinal-pr` — create a PR: branch → bump → commit → push → template → reviewers.
+- `cardinal-system` — runtime URLs; pointers to `docs/api.md` and `docs/guides/pitfalls.md`.

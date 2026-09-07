@@ -1,58 +1,58 @@
 # Keys Dashboard (2026-08-21)
 
-Dashboard para listar y revocar keys persistentes de agentes.
+Dashboard for listing and revoking persistent agent keys.
 
-## Qué se hizo
+## What was done
 
-Se habilitó la página protegida `/keys` para listar keys activas creadas por
-humanos y revocarlas individualmente. La API JWT expone `GET /api/keys`, su
-variante de historial `?status=revoked`, y `POST /api/keys/:id/revoke`; sus
-responses usan camelCase y no incluyen hashes ni plaintext.
+Enabled the protected `/keys` page to list active human-created keys and revoke
+them individually. The JWT API exposes `GET /api/keys`, its history variant
+`?status=revoked`, and `POST /api/keys/:id/revoke`; responses use camelCase and
+omit hashes and plaintext.
 
-La página agrega confirmación inline para revoke y deja las keys revocadas detrás
-de un control mínimo con icono de log. También habilita el enlace Keys del
-sidebar, enlaza la tarjeta Keys Active de Overview y reemplaza el placeholder de
-Settings. Los contadores `keysActive` y `keysRevoked` ahora consideran solo keys
-persistentes (`created_by=human`).
+The page includes inline confirmation for revoke and keeps revoked keys behind
+a minimal log-icon control. It also enables the Keys link in the sidebar, links
+the Keys Active card on Overview, and replaces the Settings placeholder. The
+`keysActive` and `keysRevoked` counters now consider only persistent keys
+(`created_by=human`).
 
-## Por qué
+## Why
 
-La CLI ya permitía administrar `agent_keys`, pero el dashboard mostraba Keys como
-una capacidad futura. Este slice cierra ese hueco sin exponer secretos ni mezclar
-las keys persistentes administradas por humanos con las keys one-shot del sistema.
+The CLI already supported managing `agent_keys`, but the dashboard displayed Keys
+as a future capability. This slice closes that gap without exposing secrets or
+mixing human-managed persistent keys with system one-shot keys.
 
-## Decisiones
+## Decisions
 
-- Crear keys se mantiene en la CLI: el plaintext se imprime una sola vez y no se
-  agrega una UI ni endpoint de creación.
-- Revocar opera sobre un `id` individual, no sobre el nombre del agente, para no
-  invalidar keys hermanas.
-- El historial vive detrás de un icono de log, en vez de una segunda tabla siempre
-  visible, para separar keys vivas de las revocadas.
-- Los ids de keys `system` responden 404 al revocar: la API del dashboard nunca
-  las muta ni las lista.
-- `keysActive` y `keysRevoked` cuentan únicamente keys `human`, de modo que
-  Overview y Settings reflejan la misma población que `/keys`.
-- El bloque live one-shot y el hard-delete quedan fuera de este slice; pertenecen
-  al futuro pipeline one-shot.
+- Key creation remains in CLI: plaintext is printed once and no UI or creation
+  endpoint was added.
+- Revocation operates on an individual `id`, not on agent name, avoiding
+  invalidating sibling keys.
+- History lives behind a log icon rather than a second permanently visible table,
+  separating active keys from revoked ones.
+- `system` key IDs return 404 on revoke: the dashboard API never mutates or lists
+  them.
+- `keysActive` and `keysRevoked` count only `human` keys, ensuring Overview and
+  Settings reflect the same population as `/keys`.
+- The live one-shot block and hard-delete are excluded from this slice; they
+  belong to the future one-shot pipeline.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Crear keys desde el dashboard:** descartado — aumentaría la superficie que
-  puede mostrar plaintext y contradice el flujo de impresión única de la CLI.
-- **Revocar por nombre de agente:** descartado — revocaría todas sus keys activas,
-  cuando la acción del dashboard debe ser granular.
-- **Mostrar las revocadas junto con las activas:** descartado — dificulta leer el
-  estado operativo; el historial bajo demanda mantiene la lista principal limpia.
-- **Exponer o revocar keys system desde `/keys`:** descartado — son responsabilidad
-  del pipeline one-shot y no de la administración humana.
+- **Create keys from dashboard:** rejected — would increase the surface that can
+  display plaintext and contradicts the CLI's single-print flow.
+- **Revoke by agent name:** rejected — would revoke all its active keys when the
+  dashboard action must be granular.
+- **Show revoked keys alongside active keys:** rejected — obscures operational
+  state; on-demand history keeps the primary list clean.
+- **Expose or revoke system keys from `/keys`:** rejected — they belong to the
+  one-shot pipeline rather than human management.
 
-## Archivos
+## Files
 
-- Creados: `backend/src/api/keys.ts`, `backend/src/api/keys.test.ts`,
+- Created: `backend/src/api/keys.ts`, `backend/src/api/keys.test.ts`,
   `frontend/src/pages/Keys.tsx`,
   `docs/features/2026-08-21-keys-dashboard.md`.
-- Modificados: `packages/db/src/repos.ts`, `packages/db/src/index.ts`,
+- Modified: `packages/db/src/repos.ts`, `packages/db/src/index.ts`,
   `packages/db/src/db.test.ts`, `backend/src/server.ts`,
   `backend/src/server.test.ts`, `frontend/src/App.tsx`,
   `frontend/src/components/Layout.tsx`, `frontend/src/lib/types.ts`,
@@ -61,9 +61,9 @@ las keys persistentes administradas por humanos con las keys one-shot del sistem
   `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`,
   `package.json`.
 
-## Verificación
+## Verification
 
 - `podman exec cardinal-backend bun test --timeout 30000 packages/*/src backend/src`
-  → 283 pass / 0 fail, 840 `expect()` calls en 15 archivos.
-- `podman exec cardinal-frontend bun run build` → build de producción Vite 8.1.5
-  exitoso (34 módulos; `dist/` generado).
+  -> 283 pass / 0 fail, 840 `expect()` calls across 15 files.
+- `podman exec cardinal-frontend bun run build` -> Vite 8.1.5 production build
+  succeeded (34 modules; `dist/` generated).

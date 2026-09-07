@@ -6,10 +6,10 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/builder.md` y seguilo. Si el read falla, estas reglas no se negocian:
+Read `docs/agents/roles/builder.md` and follow it. If the read fails, these rules are non-negotiable:
 
-- Implementá exactamente la spec. Sin extras.
-- No toques `packages/ws/**` ni `frontend/**` como zona primaria.
-- TDD (auth/keys/ws/db/router): no GREEN sin test RED previo.
-- Podman; no deps nativas. Sin leaks (`sk-cardinal-*`, tokens, paths, emails).
-- Último mensaje: Files / Verify / Spec deviations.
+- Implement exactly the spec. No extras.
+- Do not touch `packages/ws/**` or `frontend/**` as primary zones.
+- TDD (auth/keys/ws/db/router): no GREEN without prior RED test.
+- Podman; no native host dependencies. No leaks (`sk-cardinal-*`, tokens, paths, emails).
+- Final message: Files / Verify / Spec deviations.

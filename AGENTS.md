@@ -6,10 +6,15 @@
 - [`docs/vision.md`](./docs/vision.md) — goal and principles
 - [`docs/stack.md`](./docs/stack.md) — technical stack
 - [`docs/security.md`](./docs/security.md) — security model
+- [`docs/api.md`](./docs/api.md) — REST, WebSocket, JWT recipe
 - [`docs/roadmap.md`](./docs/roadmap.md) — phases and priorities
 - [`context/ecosystem.md`](./context/ecosystem.md) — knowledge base
 
 ---
+
+## Language
+
+English only: docs, skills, source comments, identifiers, commits, PRs, and agent prompts. Policy: [`AGENTS/docs.md`](./AGENTS/docs.md).
 
 ## Stack
 
@@ -31,7 +36,7 @@
 | `MAJOR.FASE.PATCH` versioning | [`AGENTS/versioning.md`](./AGENTS/versioning.md) |
 | TDD and what to test | [`AGENTS/tdd.md`](./AGENTS/tdd.md) |
 | Quick security rules | [`AGENTS/security.md`](./AGENTS/security.md) |
-| Documentation rules | [`AGENTS/docs.md`](./AGENTS/docs.md) |
+| Documentation and language (English only) | [`AGENTS/docs.md`](./AGENTS/docs.md) |
 | Repo structure | [`AGENTS/structure.md`](./AGENTS/structure.md) |
 
 ## Development workflow
@@ -47,6 +52,7 @@
 | `cardinal-dev` | Index of development rules (this file) |
 | `cardinal-commit` | Commit format and rules (detail) |
 | `cardinal-pr` | Create a PR step by step |
+| `cardinal-system` | Runtime, API, operational quirks |
 
 Planned and pending skills: [`docs/skills.md`](./docs/skills.md).
 

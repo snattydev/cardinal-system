@@ -26,6 +26,7 @@ Repo PR flow. Detailed execution steps live in the `cardinal-pr` skill.
 - [ ] Security Review approved if there were changes in `auth/`, `keys/`, `ws/`, or protocol
 - [ ] Version bump in `package.json` if applicable
 - [ ] `docs/features/<date>-<name>.md` created or updated
+- [ ] PR title, body, and any new comments/docs in English (`AGENTS/docs.md`)
 
 ## Merge strategy
 

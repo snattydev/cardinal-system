@@ -1,110 +1,110 @@
 # Security Review Checklist
 
-Checklist de referencia para el revisor de seguridad. Cada item debe evaluarse contra el diff del PR. Si un item no aplica (ej: no hay nuevas dependencias), se omite con "N/A".
+Reference checklist for the security reviewer. Each item must be evaluated against the PR diff. If an item does not apply (e.g. no new dependencies), omit with "N/A".
 
 ---
 
 ## 1. Secrets & Credentials
 
-- [ ] ¿Hay strings que parezcan API keys, tokens, o passwords hardcodeados?
-  - Patrones: `sk-*`, `ghp_*`, `gho_*`, `xoxb-*`, `-----BEGIN`, `Bearer`, `Authorization:***`
-- [ ] ¿Se modificó `.env.example` sin documentar las nuevas variables?
-- [ ] ¿Archivos `.env`, `.env.local`, `credentials.json` en el diff? (deberían estar en .gitignore)
-- [ ] ¿Config files con secrets en plaintext? (docker-compose env vars, CI configs, etc.)
-- [ ] ¿Hay URLs con credenciales embebidas? (`https://user:pass@...`)
+- [ ] Are there strings that look like hardcoded API keys, tokens, or passwords?
+  - Patterns: `sk-*`, `ghp_*`, `gho_*`, `xoxb-*`, `-----BEGIN`, `Bearer`, `Authorization:***`
+- [ ] Was `.env.example` modified without documenting the new variables?
+- [ ] Are `.env`, `.env.local`, or `credentials.json` files in the diff? (should be in .gitignore)
+- [ ] Config files with plaintext secrets? (docker-compose env vars, CI configs, etc.)
+- [ ] Are there URLs with embedded credentials? (`https://user:pass@...`)
 
 ## 2. Input Validation & Injection
 
-- [ ] ¿Todo input de usuario está sanitizado/validado?
+- [ ] Is all user input sanitized/validated?
   - Query params, body, headers, path params, cookies
-- [ ] ¿Consultas SQL usan parámetros o string interpolation?
-  - Peligro: `db.query(\`SELECT * FROM users WHERE id = ${id}\`)`
-  - Seguro: `db.query('SELECT * FROM users WHERE id = ?', [id])`
-- [ ] ¿Hay comandos de sistema construidos con input de usuario?
-  - Peligro: `exec(\`ffmpeg -i ${userFile}\`)`
-  - Path traversal: `../../../etc/passwd` en file paths
-- [ ] ¿Endpoints que aceptan HTML/markdown sin sanitizar? (XSS)
-- [ ] ¿File uploads con validación de tipo, tamaño, y nombre?
-- [ ] ¿Regex vulnerable a ReDoS? (catastrophic backtracking)
+- [ ] Do SQL queries use parameters or string interpolation?
+  - Danger: `db.query(\`SELECT * FROM users WHERE id = ${id}\`)`
+  - Safe: `db.query('SELECT * FROM users WHERE id = ?', [id])`
+- [ ] Are system commands constructed with user input?
+  - Danger: `exec(\`ffmpeg -i ${userFile}\`)`
+  - Path traversal: `../../../etc/passwd` in file paths
+- [ ] Endpoints that accept unsanitized HTML/markdown? (XSS)
+- [ ] File uploads with type, size, and filename validation?
+- [ ] Regex vulnerable to ReDoS? (catastrophic backtracking)
 
 ## 3. Authentication & Authorization
 
-- [ ] ¿Nuevos endpoints tienen control de acceso? ¿O están abiertos?
-- [ ] ¿JWT tokens validan firma, expiración, issuer, audience?
-- [ ] ¿Tokens revocados efectivamente bloquean acceso?
-- [ ] ¿Rate limiting en endpoints de auth? (previene brute force)
-- [ ] ¿Las operaciones sensibles requieren re-autenticación?
-- [ ] ¿Hay path traversal que permita acceder a rutas no autorizadas?
-- [ ] ¿Role checks son server-side (no confiar en client-side)?
-- [ ] ¿IDOR posible? (acceder a recursos de otro usuario cambiando IDs)
+- [ ] Do new endpoints have access control, or are they unauthenticated?
+- [ ] Do JWT tokens validate signature, expiration, issuer, and audience?
+- [ ] Do revoked tokens effectively block access?
+- [ ] Rate limiting on auth endpoints? (prevents brute force)
+- [ ] Do sensitive operations require re-authentication?
+- [ ] Is path traversal possible to access unauthorized routes?
+- [ ] Are role checks performed server-side (do not trust client-side)?
+- [ ] Is IDOR possible? (accessing other users' resources by tampering with IDs)
 
 ## 4. CORS, CSRF & Headers
 
-- [ ] ¿CORS config permite orígenes específicos o `*`?
-- [ ] ¿Endpoints state-changing (POST/PUT/DELETE) tienen CSRF protection?
-- [ ] ¿Security headers presentes?
+- [ ] Does CORS config allow specific origins or `*`?
+- [ ] Do state-changing endpoints (POST/PUT/DELETE) have CSRF protection?
+- [ ] Are security headers present?
   - `Content-Security-Policy`, `X-Content-Type-Options`, `X-Frame-Options`
   - `Strict-Transport-Security`, `Referrer-Policy`
-- [ ] ¿Cookies con flags: `HttpOnly`, `Secure`, `SameSite`?
+- [ ] Cookies set with proper flags: `HttpOnly`, `Secure`, `SameSite`?
 
 ## 5. Cryptography
 
-- [ ] ¿Algoritmos obsoletos? (MD5, SHA1, DES, RC4)
-- [ ] ¿Random values usan `crypto.randomBytes()` o `Math.random()`?
-- [ ] ¿Keys generadas con suficiente entropía?
-- [ ] ¿Hardcoded salts o IVs?
-- [ ] ¿Password hashing usa bcrypt/argon2 (no SHA, no MD5)?
+- [ ] Obsolete algorithms? (MD5, SHA1, DES, RC4)
+- [ ] Do random values use `crypto.randomBytes()` instead of `Math.random()`?
+- [ ] Are keys generated with sufficient entropy?
+- [ ] Hardcoded salts or IVs?
+- [ ] Does password hashing use bcrypt/argon2 (no SHA, no MD5)?
 
 ## 6. Dependencies & Supply Chain
 
-- [ ] ¿Nuevas dependencias añadidas? (revisar `package.json` diff)
-- [ ] ¿Dependencias con CVEs conocidos? (npm audit / pip audit / cargo audit)
-- [ ] ¿Dependencias de fuentes confiables? (typosquatting: `lodahs` vs `lodash`)
-- [ ] ¿Dependencias pineadas a versiones exactas o rangos amplios?
-- [ ] ¿Scripts post-install sospechosos en dependencias?
+- [ ] New dependencies added? (review `package.json` diff)
+- [ ] Dependencies with known CVEs? (npm audit / pip audit / cargo audit)
+- [ ] Dependencies from trusted sources? (typosquatting: `lodahs` vs `lodash`)
+- [ ] Dependencies pinned to exact versions or broad ranges?
+- [ ] Suspicious post-install scripts in dependencies?
 
 ## 7. Error Handling & Logging
 
-- [ ] ¿Errores exponen información sensible? (stack traces, SQL queries, paths)
-- [ ] ¿Logs incluyen datos sensibles? (passwords, tokens, PII, credit cards)
-- [ ] ¿Errores retornan mensajes genéricos al cliente (no "user not found" vs "wrong password")?
-- [ ] ¿Hay error handling para todos los casos (no silent failures)?
-- [ ] ¿Circuit breakers o retries en llamadas externas?
+- [ ] Do errors expose sensitive information? (stack traces, SQL queries, paths)
+- [ ] Do logs include sensitive data? (passwords, tokens, PII, credit cards)
+- [ ] Do error responses return generic messages to clients (avoid "user not found" vs "wrong password")?
+- [ ] Is error handling present for all paths (no silent failures)?
+- [ ] Circuit breakers or retries on external calls?
 
 ## 8. File & Data Operations
 
-- [ ] ¿Path traversal posible en file reads/writes?
-- [ ] ¿Archivos creados con permisos correctos? (no world-writable)
-- [ ] ¿Uploads almacenados fuera del web root?
-- [ ] ¿User-controlled data en nombres de archivo?
-- [ ] ¿Operaciones de base de datos en transacciones donde corresponde?
-- [ ] ¿Migraciones de DB son reversibles? (tienen `down`)
+- [ ] Is path traversal possible in file reads/writes?
+- [ ] Are files created with proper permissions? (not world-writable)
+- [ ] Are uploads stored outside the web root?
+- [ ] User-controlled data in filenames?
+- [ ] Database operations wrapped in transactions where appropriate?
+- [ ] Are DB migrations reversible? (include `down`)
 
 ## 9. Race Conditions & Concurrency
 
-- [ ] ¿Operaciones check-then-act que puedan tener race conditions?
-- [ ] ¿Rate limiters que puedan bypassearse con requests paralelos?
-- [ ] ¿Locks o semáforos donde hay recursos compartidos?
-- [ ] ¿Transacciones que asuman orden de ejecución?
+- [ ] Check-then-act operations susceptible to race conditions?
+- [ ] Rate limiters that can be bypassed via concurrent requests?
+- [ ] Locks or semaphores where shared resources exist?
+- [ ] Transactions that assume execution ordering?
 
 ## 10. Configuration & Deployment
 
-- [ ] ¿Debug mode desactivado en producción?
-- [ ] ¿Puertos/endpoints internos expuestos?
-- [ ] ¿Config defaults inseguros?
-- [ ] ¿Health check endpoints revelan demasiada información?
-- [ ] ¿CORS permite localhost en producción?
+- [ ] Debug mode disabled in production?
+- [ ] Internal ports/endpoints exposed?
+- [ ] Insecure configuration defaults?
+- [ ] Health check endpoints revealing excessive information?
+- [ ] Does CORS allow localhost in production?
 
 ---
 
 ## Scoring
 
-| Críticos | Acción |
+| Critical | Action |
 |---|---|
-| ≥1 | REQUEST CHANGES — no mergeable |
-| 0 críticos, ≥3 warnings | APPROVE WITH COMMENTS |
-| 0 críticos, <3 warnings | APPROVE |
+| >=1 | REQUEST CHANGES — not mergeable |
+| 0 critical, >=3 warnings | APPROVE WITH COMMENTS |
+| 0 critical, <3 warnings | APPROVE |
 
 ---
 
-> *Guía de uso: este checklist no es exhaustivo ni un reemplazo del criterio del revisor. Es un scaffold para no olvidar categorías. Cada PR tiene su propio threat model.*
+> *Usage note: this checklist is neither exhaustive nor a replacement for reviewer judgment. It is a scaffold to avoid missing categories. Every PR has its own threat model.*

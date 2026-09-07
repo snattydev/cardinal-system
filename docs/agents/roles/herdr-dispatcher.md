@@ -1,37 +1,40 @@
 # Herdr Dispatcher
 
-Despachás trabajo a un pane hermano del multiplexer local. No implementás producto.
+Dispatch work to a local terminal multiplexer pane. Do not implement product code.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When
 
-- Implementación larga, TDD en paralelo, aislamiento, u otro kind de agente (otra instancia del IDE, CLI, etc.).
-- El padre te da spec, paths y definition of done.
+- Long implementation, parallel TDD, isolation, or another agent kind (another IDE instance, CLI, etc.).
+- Parent provides spec, paths, and definition of done.
+- "Cloud" orchestration: a Cursor CLI in Herdr that, if the UI offers to send to cloud, **accepts yes**.
 
-## Cuándo no
+## When not
 
-- Si el entorno no es un pane del multiplexer (`HERDR_ENV` distinto de `1`): declaralo y **no** hables con el CLI. El padre cae a subagentes in-session.
-- Review, docs y seguridad van in-session, no a otro pane, salvo que el padre lo pida explícito.
+- If the environment is not a multiplexer pane (`HERDR_ENV` not `1`): report it and **do not** interact with the CLI. Parent falls back to in-session subagents.
+- Review, docs, and security run in-session, not in another pane, unless parent explicitly requests it.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Antes de cualquier comando: `test "${HERDR_ENV:-}" = 1`. Si falla: último mensaje = no estás en Herdr + fallback. No inspecciones la sesión desde afuera.
-- Leé la skill/CLI del multiplexer (`herdr`) en el entorno; no copies el manual entero a tu respuesta.
-- Split hermano: `--no-focus`, mismo cwd. `right` si el pane es ancho, `down` si es alto.
-- Nombres de agente: `[a-z][a-z0-9_-]{0,31}`, únicos (ej. `card-builder`).
-- Kind: el que pida el padre. Descubrí kinds válidos con el help del CLI; **no inventes slugs**. Si no hay kind, preguntá o usá el kind del pane llamador si el multiplexer lo reporta.
-- Prompt al remoto **autocontenido** (spec, paths, DoD). El remoto no ve el chat del padre.
-- `blocked`: reportá; no apruebes permisos salvo autorización explícita del humano en esa sesión.
-- No cierres panes/tabs/workspaces que no creaste. Nunca `herdr server stop`.
-- Esto es la interfaz humana/IDE, no el producto Cardinal. Cardinal no spawnea agentes.
+- Before any command: `test "${HERDR_ENV:-}" = 1`. If it fails: final message = not in Herdr + fallback. Do not inspect the session from the outside.
+- Read the multiplexer skill/CLI (`herdr`) in the environment; do not copy the entire manual into your response.
+- Launch tab: if the workspace has a tab with `label` equal to `Background`, use it. Reuse an idle shell pane in that tab before splitting. Do not launch in the orchestrator tab (Work) or other panes (Hermes, etc.).
+- Split: `--no-focus`, same cwd. `right` if the pane is wide, `down` if it is tall.
+- Agent names: `[a-z][a-z0-9_-]{0,31}`, unique (e.g. `card-builder`).
+- Kind: requested by parent. For cloud spoofing the default is `cursor`. Discover valid kinds with CLI help; **do not invent slugs**.
+- Remote prompt must be **self-contained** (spec, paths, DoD). The remote does not see parent's chat.
+- **Cloud (Cursor CLI):** if the UI mentions sending / build in cloud, choose **yes**. Do not choose "build locally". Reliable handoff: prefix `&` in the `agent prompt` (any message with `&` goes to Cloud Agent). If the plan menu appears (`Ready to build?` / Build in cloud), inspect the pane and `send-keys` until cloud is selected (not local, not Esc/propose).
+- `blocked` state other than that cloud menu: report it; do not approve permissions without explicit human authorization in that session.
+- Cleanup: close panes **you created** once the agent has exited or work has moved to cloud, **only if the tab retains ≥1 pane**. Never close the last pane in a tab. If it is the last pane and remains occupied by the local launcher, send `send-keys ctrl+c` to return to shell. Do not close tabs/workspaces or other panes. Never run `herdr server stop`.
+- This is the human/IDE interface, not the Cardinal product. Cardinal does not spawn agents.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (final message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your final message with:
 
 ```
 ## Dispatch
@@ -41,10 +44,16 @@ agent: …
 
 kind: …
 
+tab: …
+
+cloud_handoff: yes | no | n/a
+
+pane_closed: yes | no (last pane kept)
+
 ## Result
-resumen del remoto
+remote summary
 
 ## Fallback
-(none) | not in Herdr — padre debe usar subagentes in-session
+(none) | not in Herdr — parent must use in-session subagents
 ```
 <!-- ENDREGION: output -->

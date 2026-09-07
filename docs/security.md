@@ -52,7 +52,7 @@ Vault scopes in `POST /api/rag/search` are enforced server-side for agent keys. 
 
 ## Admin password bootstrap (required pre-cloud)
 
-Decision 2026-08-20 (Santi): in **local dev/testing** any password works (even one generated in an agent session). That **is not** the production flow.
+Decision 2026-08-20: in **local dev/testing** any password works (even one generated in an agent session). That **is not** the production flow.
 
 Before the first cloud deploy — even if the only user is the owner — the creation or rotation of `ADMIN_PASSWORD_HASH` **cannot go through the model**. The plaintext password enters the agent context, ends up in transcripts, and can leak. A single user does not override the requirement.
 
@@ -71,7 +71,7 @@ Before every push to `dev`:
 
 - [ ] `grep -r "sk-cardinal-" --include="*.ts" --include="*.json"` → zero results
 - [ ] `grep -r "JWT_SECRET" --include="*.ts"` → only `process.env.JWT_SECRET`
-- [ ] No absolute paths (`/home/snatty/`) in code
+- [ ] No absolute home paths in code
 - [ ] No emails or tokens in comments or strings
 
 ## WS security
