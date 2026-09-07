@@ -2,7 +2,7 @@
 
 > Spec: [`../superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](../superpowers/specs/2026-08-12-cardinal-v2-architecture.md)
 > Plan de ejecución: [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md)
-> Estado: En curso (v0.2.5, actualizado 2026-09-03).
+> Estado: En curso (v0.2.6, actualizado 2026-09-07).
 > Sprint superficie router: [`../sprints/2026-09-03-router-surface.md`](../sprints/2026-09-03-router-surface.md)
 > Índice: [`../features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md)
 
@@ -21,7 +21,7 @@ Cuatro pilares:
 | 4 | Identidad `sk-cardinal-*` | ✅ Fase 0 |
 | 3 | Blackboard + mailbox | ✅ (mailbox MCP 2026-08-31) |
 | 1 | MCP context hub multi-vault | ✅ memory + board + mailbox tools en `packages/mcp` |
-| 2 | Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA (v0.2.5) |
+| 2 | Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA + catálogo vivo + picker de modelo (v0.2.6) |
 
 ## Lo que se mantiene del diseño original
 
@@ -35,7 +35,7 @@ herdr/MCP — no reimplementar orquestación.
 ```
 Pilar 3 (blackboard): tasks CRUD ✅ · WS broadcast ✅ · mailbox API ✅ · UI /tasks ✅ · MCP board tools ✅ · mailbox MCP ✅
 Pilar 1 (MCP):        memory tools ✅ · board tools ✅ · mailbox tools ✅ · compose :8789 ✅
-Pilar 2 (pool):       router ✅ · key factory ✅ · `/keys` create+limits ✅ · `/router` dashboard JWT ✅ · fusion/MoA ✅ · pool opencode-go spike-003 ░
+Pilar 2 (pool):       router ✅ · key factory ✅ · `/keys` create+limits ✅ · `/router` dashboard JWT ✅ · fusion/MoA ✅ · catálogo vivo + picker ✅ · pool opencode-go spike-003 ░
 ```
 
 Detalle del backlog y orden de ejecución en

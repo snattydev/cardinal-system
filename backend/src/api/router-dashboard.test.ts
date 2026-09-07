@@ -1,19 +1,23 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import {
   addProviderModel,
   createDb,
   getProviderByName,
+  setProviderStatus,
   upsertModelRoute,
   upsertProvider,
 } from "@cardinal/db";
-import { decryptSecret } from "@cardinal/keys";
+import { decryptSecret, encryptSecret } from "@cardinal/keys";
 import {
   handleCreateRouterProvider,
+  handleDeleteRouterProvider,
+  handleListRouterCatalog,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
   handlePutRouterRoute,
+  handleSyncRouterProviderModels,
 } from "./router-dashboard";
 
 type ProviderPublic = {
@@ -44,6 +48,20 @@ type RoutePublic = {
 };
 
 const POOL = "test-pool-secret";
+const originalFetch = globalThis.fetch;
+const DEFAULT_FETCH_MODELS = ["test-model", "moonshotai/kimi-k2.5"];
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
+
+function mockFetchModels(modelIds: string[] = DEFAULT_FETCH_MODELS): void {
+  globalThis.fetch = (async () =>
+    new Response(
+      JSON.stringify({ object: "list", data: modelIds.map((id) => ({ id, object: "model" })) }),
+      { status: 200 },
+    )) as typeof fetch;
+}
 
 function jsonReq(url: string, method: string, body: string): Request {
   return new Request(url, {
@@ -58,7 +76,7 @@ function seedRouter(db: Database): { mockId: number; deepseekId: number } {
   upsertProvider(db, {
     name: "mock-local",
     baseUrl: "http://localhost:18999/v1",
-    apiKeyEnc: "secret-should-not-leak",
+    apiKeyEnc: encryptSecret("secret-should-not-leak", POOL),
   });
   const deepseek = getProviderByName(db, "deepseek")!;
   const mock = getProviderByName(db, "mock-local")!;
@@ -192,13 +210,15 @@ describe("handlePatchRouterProvider", () => {
       db,
       String(mockId),
       jsonReq(`http://localhost/api/router/providers/${mockId}`, "PATCH", JSON.stringify({ status: "disabled" })),
+      POOL,
     );
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { provider: ProviderPublic };
+    const body = (await res.json()) as { provider: ProviderPublic; models: ModelPublic[] };
     expect(body.provider.id).toBe(mockId);
     expect(body.provider.name).toBe("mock-local");
     expect(body.provider.status).toBe("disabled");
     expect("api_key_enc" in body.provider).toBe(false);
+    expect(body.models.some((m) => m.provider_id === mockId)).toBe(true);
 
     const listed = (await handleListRouterProviders(db).json()) as {
       providers: ProviderPublic[];
@@ -214,6 +234,7 @@ describe("handlePatchRouterProvider", () => {
       db,
       "99999",
       jsonReq("http://localhost/api/router/providers/99999", "PATCH", JSON.stringify({ status: "disabled" })),
+      POOL,
     );
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
@@ -226,6 +247,7 @@ describe("handlePatchRouterProvider", () => {
       db,
       "abc",
       jsonReq("http://localhost/api/router/providers/abc", "PATCH", JSON.stringify({ status: "disabled" })),
+      POOL,
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_id" });
@@ -239,6 +261,7 @@ describe("handlePatchRouterProvider", () => {
       db,
       String(mockId),
       jsonReq(`http://localhost/api/router/providers/${mockId}`, "PATCH", JSON.stringify({ status: "nope" })),
+      POOL,
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_status" });
@@ -252,9 +275,163 @@ describe("handlePatchRouterProvider", () => {
       db,
       String(mockId),
       jsonReq(`http://localhost/api/router/providers/${mockId}`, "PATCH", "not-json"),
+      POOL,
     );
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "bad_request" });
+    db.close();
+  });
+
+  test("empty body → 400 invalid_payload", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    const res = await handlePatchRouterProvider(
+      db,
+      String(mockId),
+      jsonReq(`http://localhost/api/router/providers/${mockId}`, "PATCH", JSON.stringify({})),
+      POOL,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_payload" });
+    db.close();
+  });
+
+  test("updates base_url, wire_format, cost without rotating api_key", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    const before = getProviderByName(db, "mock-local")!;
+    mockFetchModels(["fetched-model"]);
+
+    const res = await handlePatchRouterProvider(
+      db,
+      String(mockId),
+      jsonReq(
+        `http://localhost/api/router/providers/${mockId}`,
+        "PATCH",
+        JSON.stringify({
+          base_url: "http://127.0.0.1:19999/v1",
+          wire_format: "anthropic",
+          cost_per_mtok: 0.42,
+        }),
+      ),
+      POOL,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { provider: ProviderPublic; models: ModelPublic[] };
+    expect(body.provider.base_url).toBe("http://127.0.0.1:19999/v1");
+    expect(body.provider.wire_format).toBe("anthropic");
+    expect(body.provider.cost_per_mtok).toBe(0.42);
+    expect(body.models.map((m) => m.model_id)).toEqual(["fetched-model"]);
+
+    const after = getProviderByName(db, "mock-local")!;
+    expect(after.api_key_enc).toBe(before.api_key_enc);
+    db.close();
+  });
+
+  test("rotates api_key when provided", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    mockFetchModels(["test-model"]);
+    const res = await handlePatchRouterProvider(
+      db,
+      String(mockId),
+      jsonReq(
+        `http://localhost/api/router/providers/${mockId}`,
+        "PATCH",
+        JSON.stringify({ api_key: "rotated-secret" }),
+      ),
+      POOL,
+    );
+    expect(res.status).toBe(200);
+    const row = getProviderByName(db, "mock-local")!;
+    expect(decryptSecret(row.api_key_enc!, POOL)).toBe("rotated-secret");
+    expect(JSON.stringify(await res.json())).not.toContain("rotated-secret");
+    db.close();
+  });
+
+  test("sync_models refetches from upstream", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    mockFetchModels(["alpha", "beta"]);
+    const res = await handlePatchRouterProvider(
+      db,
+      String(mockId),
+      jsonReq(
+        `http://localhost/api/router/providers/${mockId}`,
+        "PATCH",
+        JSON.stringify({ sync_models: true }),
+      ),
+      POOL,
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: ModelPublic[] };
+    expect(body.models.map((m) => m.model_id)).toEqual(["alpha", "beta"]);
+    db.close();
+  });
+
+  test("rejects manual models payload", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    const res = await handlePatchRouterProvider(
+      db,
+      String(mockId),
+      jsonReq(
+        `http://localhost/api/router/providers/${mockId}`,
+        "PATCH",
+        JSON.stringify({ models: ["only-one"] }),
+      ),
+      POOL,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_payload" });
+    db.close();
+  });
+});
+
+describe("handleSyncRouterProviderModels", () => {
+  test("POST sync-models refetches catalog", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    mockFetchModels(["sync-a", "sync-b"]);
+    const res = await handleSyncRouterProviderModels(db, String(mockId), POOL);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { models: ModelPublic[] };
+    expect(body.models.map((m) => m.model_id)).toEqual(["sync-a", "sync-b"]);
+    db.close();
+  });
+});
+
+describe("handleDeleteRouterProvider", () => {
+  test("DELETE existing provider → 200 and list no longer includes it", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    const res = handleDeleteRouterProvider(db, String(mockId));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ ok: true });
+
+    const listed = (await handleListRouterProviders(db).json()) as {
+      providers: ProviderPublic[];
+      models: ModelPublic[];
+    };
+    expect(listed.providers.some((p) => p.id === mockId)).toBe(false);
+    expect(listed.models.some((m) => m.provider_id === mockId)).toBe(false);
+    db.close();
+  });
+
+  test("unknown id → 404 not_found", async () => {
+    const db = createDb(":memory:");
+    seedRouter(db);
+    const res = handleDeleteRouterProvider(db, "99999");
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("non-numeric id → 400 invalid_id", async () => {
+    const db = createDb(":memory:");
+    const res = handleDeleteRouterProvider(db, "abc");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_id" });
     db.close();
   });
 });
@@ -414,14 +591,14 @@ function createProviderBody(overrides: Record<string, unknown> = {}): string {
     name: "openrouter",
     base_url: "https://openrouter.ai/api/v1",
     api_key: "sk-or-live-secret-xyz",
-    models: ["moonshotai/kimi-k2.5"],
     ...overrides,
   });
 }
 
 describe("handleCreateRouterProvider", () => {
-  test("creates provider, encrypts api_key, never returns the secret", async () => {
+  test("creates provider, fetches models, encrypts api_key, never returns the secret", async () => {
     const db = createDb(":memory:");
+    mockFetchModels(["moonshotai/kimi-k2.5"]);
     const plaintext = "sk-or-live-secret-xyz";
     const res = await handleCreateRouterProvider(
       db,
@@ -460,8 +637,6 @@ describe("handleCreateRouterProvider", () => {
       createProviderBody({ name: "" }),
       createProviderBody({ base_url: "" }),
       createProviderBody({ api_key: "" }),
-      createProviderBody({ models: [] }),
-      JSON.stringify({ name: "x", base_url: "http://x", api_key: "k" }),
       "not-json",
     ];
     for (const body of payloads) {
@@ -492,8 +667,9 @@ describe("handleCreateRouterProvider", () => {
     db.close();
   });
 
-  test("upserts by name and rotates the encrypted key", async () => {
+  test("upserts by name, rotates key, and replaces fetched models", async () => {
     const db = createDb(":memory:");
+    mockFetchModels(["moonshotai/kimi-k2.5"]);
     const first = await handleCreateRouterProvider(
       db,
       jsonReq(
@@ -504,12 +680,13 @@ describe("handleCreateRouterProvider", () => {
       POOL,
     );
     expect(first.status).toBe(200);
+    mockFetchModels(["other"]);
     const second = await handleCreateRouterProvider(
       db,
       jsonReq(
         "http://localhost/api/router/providers",
         "POST",
-        createProviderBody({ api_key: "key-two", models: ["other"] }),
+        createProviderBody({ api_key: "key-two" }),
       ),
       POOL,
     );
@@ -521,7 +698,81 @@ describe("handleCreateRouterProvider", () => {
       .filter((m) => m.provider_id === row.id)
       .map((m) => m.model_id)
       .sort();
-    expect(ids).toEqual(["moonshotai/kimi-k2.5", "other"]);
+    expect(ids).toEqual(["other"]);
+    db.close();
+  });
+
+  test("rolls back provider when model fetch fails", async () => {
+    const db = createDb(":memory:");
+    globalThis.fetch = (async () => new Response("nope", { status: 503 })) as typeof fetch;
+    const res = await handleCreateRouterProvider(
+      db,
+      jsonReq("http://localhost/api/router/providers", "POST", createProviderBody()),
+      POOL,
+    );
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "model_fetch_failed", detail: "upstream 503" });
+    const listed = (await handleListRouterProviders(db).json()) as { providers: ProviderPublic[] };
+    expect(listed.providers).toHaveLength(0);
+    db.close();
+  });
+});
+
+type CatalogItem = { id: string; kind: "model" | "alias" | "fusion" };
+
+describe("handleListRouterCatalog", () => {
+  test("empty db → { items: [] }", async () => {
+    const db = createDb(":memory:");
+    const res = handleListRouterCatalog(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ items: [] });
+    db.close();
+  });
+
+  test("lists unique models from active providers plus alias and fusion routes", async () => {
+    const db = createDb(":memory:");
+    const { deepseekId } = seedRouter(db);
+    addProviderModel(db, { providerId: deepseekId, modelId: "test-model" });
+    db.run("INSERT INTO model_routes (alias, fallback_chain) VALUES (?, ?)", [
+      "mix",
+      JSON.stringify({
+        mode: "fusion",
+        panel: [{ provider: "mock-local", model: "test-model" }],
+        judge: { provider: "deepseek", model: "deepseek-chat" },
+        strategy: "synthesize",
+      }),
+    ]);
+
+    const res = handleListRouterCatalog(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: CatalogItem[] };
+    expect(body.items).toEqual([
+      { id: "deepseek-chat", kind: "model" },
+      { id: "test-model", kind: "model" },
+      { id: "fast", kind: "alias" },
+      { id: "mix", kind: "fusion" },
+    ]);
+    db.close();
+  });
+
+  test("skips models from disabled providers", async () => {
+    const db = createDb(":memory:");
+    seedRouter(db);
+    setProviderStatus(db, "deepseek", "disabled");
+
+    const body = (await handleListRouterCatalog(db).json()) as { items: CatalogItem[] };
+    expect(body.items.map((item) => item.id)).toEqual(["test-model", "fast"]);
+    expect(body.items.find((item) => item.id === "deepseek-chat")).toBeUndefined();
+    db.close();
+  });
+
+  test("alias that collides with a model id keeps kind model", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    addProviderModel(db, { providerId: mockId, modelId: "fast" });
+
+    const body = (await handleListRouterCatalog(db).json()) as { items: CatalogItem[] };
+    expect(body.items.filter((item) => item.id === "fast")).toEqual([{ id: "fast", kind: "model" }]);
     db.close();
   });
 });

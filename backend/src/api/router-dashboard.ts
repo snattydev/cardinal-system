@@ -3,17 +3,20 @@ import type { ModelRouteRow, ProviderModelRow, ProviderRow, ProviderStatus, Wire
 import { json } from "@cardinal/core";
 import type { ModelRouteHop } from "@cardinal/db";
 import {
-  addProviderModel,
+  deleteProvider,
   getModelRoute,
+  getProviderById,
   getProviderByName,
   listModelRoutes,
   listProviderModels,
   listProviders,
-  setProviderStatus,
+  replaceProviderModels,
+  updateProviderConfig,
   upsertModelRoute,
   upsertProvider,
 } from "@cardinal/db";
-import { encryptSecret } from "@cardinal/keys";
+import { decryptSecret, encryptSecret } from "@cardinal/keys";
+import { fetchProviderModels, ModelFetchError } from "@cardinal/router";
 
 type Hop = { provider: string; model: string };
 
@@ -97,6 +100,48 @@ export function handleListRouterRoutes(db: Database): Response {
   return json({ routes: listModelRoutes(db).map(toPublicRoute) });
 }
 
+export type CatalogKind = "model" | "alias" | "fusion";
+
+export type CatalogItem = { id: string; kind: CatalogKind };
+
+function classifyRouteChain(raw: string): Exclude<CatalogKind, "model"> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(parsed)) return "alias";
+  if (parsed !== null && typeof parsed === "object" && (parsed as { mode?: unknown }).mode === "fusion") {
+    return "fusion";
+  }
+  return null;
+}
+
+export function handleListRouterCatalog(db: Database): Response {
+  const items: CatalogItem[] = [];
+  const seen = new Set<string>();
+
+  for (const provider of listProviders(db)) {
+    if (provider.status !== "active") continue;
+    for (const model of listProviderModels(db, provider.id)) {
+      if (seen.has(model.model_id)) continue;
+      seen.add(model.model_id);
+      items.push({ id: model.model_id, kind: "model" });
+    }
+  }
+
+  for (const route of listModelRoutes(db)) {
+    if (seen.has(route.alias)) continue;
+    const kind = classifyRouteChain(route.fallback_chain);
+    if (kind === null) continue;
+    seen.add(route.alias);
+    items.push({ id: route.alias, kind });
+  }
+
+  return json({ items });
+}
+
 const WIRE_FORMATS: WireFormat[] = ["openai", "anthropic", "gemini"];
 
 function isNonEmptyString(value: unknown): value is string {
@@ -105,6 +150,40 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isNonNegativeFinite(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+
+function providerApiKey(provider: ProviderRow, poolSecret: string): string | null {
+  if (provider.api_key_enc === null || provider.api_key_enc.length === 0) return null;
+  try {
+    return decryptSecret(provider.api_key_enc, poolSecret);
+  } catch {
+    return null;
+  }
+}
+
+async function syncProviderModels(
+  db: Database,
+  providerId: number,
+  poolSecret: string,
+): Promise<Response | null> {
+  const provider = getProviderById(db, providerId);
+  if (!provider) return json({ error: "not_found" }, 404);
+
+  try {
+    const modelIds = await fetchProviderModels(
+      provider.base_url,
+      providerApiKey(provider, poolSecret),
+      provider.wire_format,
+    );
+    if (modelIds.length === 0) {
+      return json({ error: "model_fetch_empty" }, 502);
+    }
+    replaceProviderModels(db, providerId, modelIds);
+    return null;
+  } catch (err) {
+    const detail = err instanceof ModelFetchError ? err.message : "unknown";
+    return json({ error: "model_fetch_failed", detail }, 502);
+  }
 }
 
 export async function handleCreateRouterProvider(
@@ -124,9 +203,6 @@ export async function handleCreateRouterProvider(
   const payload = body as Record<string, unknown>;
 
   if (!isNonEmptyString(payload.name) || !isNonEmptyString(payload.base_url) || !isNonEmptyString(payload.api_key)) {
-    return json({ error: "invalid_payload" }, 400);
-  }
-  if (!Array.isArray(payload.models) || payload.models.length === 0 || !payload.models.every(isNonEmptyString)) {
     return json({ error: "invalid_payload" }, 400);
   }
 
@@ -158,12 +234,15 @@ export async function handleCreateRouterProvider(
   const provider = getProviderByName(db, name);
   if (!provider) return json({ error: "not_found" }, 500);
 
-  for (const modelId of payload.models) {
-    addProviderModel(db, { providerId: provider.id, modelId: modelId.trim() });
+  const syncError = await syncProviderModels(db, provider.id, poolSecret);
+  if (syncError) {
+    deleteProvider(db, provider.id);
+    return syncError;
   }
 
+  const synced = getProviderById(db, provider.id)!;
   return json({
-    provider: toPublicProvider(provider),
+    provider: toPublicProvider(synced),
     models: listProviderModels(db, provider.id).map(toPublicModel),
   });
 }
@@ -172,6 +251,7 @@ export async function handlePatchRouterProvider(
   db: Database,
   idRaw: string,
   req: Request,
+  poolSecret?: string,
 ): Promise<Response> {
   if (!/^\d+$/.test(idRaw)) return json({ error: "invalid_id" }, 400);
 
@@ -183,19 +263,116 @@ export async function handlePatchRouterProvider(
   }
 
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    return json({ error: "invalid_status" }, 400);
+    return json({ error: "invalid_payload" }, 400);
   }
-  const status = (body as { status?: unknown }).status;
-  if (status !== "active" && status !== "disabled") {
-    return json({ error: "invalid_status" }, 400);
-  }
+  const payload = body as Record<string, unknown>;
 
-  const provider = listProviders(db).find((p) => p.id === Number(idRaw));
+  const provider = getProviderById(db, Number(idRaw));
   if (!provider) return json({ error: "not_found" }, 404);
 
-  setProviderStatus(db, provider.name, status as ProviderStatus);
-  const updated = listProviders(db).find((p) => p.id === Number(idRaw))!;
-  return json({ provider: toPublicProvider(updated) });
+  const config: Parameters<typeof updateProviderConfig>[2] = {};
+  let hasUpdate = false;
+
+  if (payload.status !== undefined) {
+    if (payload.status !== "active" && payload.status !== "disabled") {
+      return json({ error: "invalid_status" }, 400);
+    }
+    config.status = payload.status as ProviderStatus;
+    hasUpdate = true;
+  }
+
+  if (payload.base_url !== undefined) {
+    if (!isNonEmptyString(payload.base_url)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    config.baseUrl = payload.base_url.trim();
+    hasUpdate = true;
+  }
+
+  if (payload.wire_format !== undefined) {
+    if (
+      typeof payload.wire_format !== "string" ||
+      !WIRE_FORMATS.includes(payload.wire_format as WireFormat)
+    ) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    config.wireFormat = payload.wire_format as WireFormat;
+    hasUpdate = true;
+  }
+
+  if (payload.cost_per_mtok !== undefined) {
+    if (!isNonNegativeFinite(payload.cost_per_mtok)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    config.costPerMtok = payload.cost_per_mtok;
+    hasUpdate = true;
+  }
+
+  if (payload.api_key !== undefined) {
+    if (!isNonEmptyString(payload.api_key)) {
+      return json({ error: "invalid_payload" }, 400);
+    }
+    if (!poolSecret) return json({ error: "server_misconfigured" }, 500);
+    config.apiKeyEnc = encryptSecret(payload.api_key, poolSecret);
+    hasUpdate = true;
+  }
+
+  let shouldSyncModels =
+    payload.base_url !== undefined ||
+    payload.wire_format !== undefined ||
+    payload.api_key !== undefined ||
+    payload.sync_models === true;
+
+  if (payload.models !== undefined) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+
+  if (!hasUpdate && !shouldSyncModels) {
+    return json({ error: "invalid_payload" }, 400);
+  }
+
+  if (hasUpdate) {
+    updateProviderConfig(db, provider.id, config);
+  }
+
+  if (shouldSyncModels) {
+    if (!poolSecret) return json({ error: "server_misconfigured" }, 500);
+    const syncError = await syncProviderModels(db, provider.id, poolSecret);
+    if (syncError) return syncError;
+  }
+
+  const updated = getProviderById(db, provider.id)!;
+  return json({
+    provider: toPublicProvider(updated),
+    models: listProviderModels(db, provider.id).map(toPublicModel),
+  });
+}
+
+export function handleDeleteRouterProvider(db: Database, idRaw: string): Response {
+  if (!/^\d+$/.test(idRaw)) return json({ error: "invalid_id" }, 400);
+  const id = Number(idRaw);
+  if (!getProviderById(db, id)) return json({ error: "not_found" }, 404);
+  deleteProvider(db, id);
+  return json({ ok: true });
+}
+
+export async function handleSyncRouterProviderModels(
+  db: Database,
+  idRaw: string,
+  poolSecret: string,
+): Promise<Response> {
+  if (!/^\d+$/.test(idRaw)) return json({ error: "invalid_id" }, 400);
+  const id = Number(idRaw);
+  if (!getProviderById(db, id)) return json({ error: "not_found" }, 404);
+
+  const syncError = await syncProviderModels(db, id, poolSecret);
+  if (syncError) return syncError;
+
+  const updated = getProviderById(db, id)!;
+  return json({
+    provider: toPublicProvider(updated),
+    models: listProviderModels(db, id).map(toPublicModel),
+  });
 }
 
 export async function handlePutRouterRoute(

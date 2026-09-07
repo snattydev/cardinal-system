@@ -4,8 +4,9 @@ Router interno de LLM del Cardinal: pool de providers configurables + endpoints
 OpenAI-compatible con failover transparente, scopes por key y metering.
 
 > Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (sección 6).
-> Estado: v0.2.5 (2026-09-03). Índice:
+> Estado: v0.2.6 (2026-09-07). Índice:
 > [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
+> Catálogo + picker: [`docs/features/2026-09-07-router-catalog-key-scope.md`](../features/2026-09-07-router-catalog-key-scope.md).
 
 ---
 
@@ -46,9 +47,12 @@ POST http://127.0.0.1:8787/v1/chat/completions
 | `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | Completion OpenAI-compatible (streaming, no-streaming, Fusion) |
 | `GET /v1/models` | — | Lista de modelos y aliases disponibles (formato OpenAI) |
 | `GET /api/router/providers` | cookie JWT | Dashboard: providers + modelos (sin `api_key_enc`) |
-| `POST /api/router/providers` | cookie JWT | Alta/rotación de provider: `name`, `base_url`, `api_key`, `models[]`. La key se cifra (AES-256-GCM) y **nunca** vuelve en la respuesta |
+| `POST /api/router/providers` | cookie JWT | Alta/rotación de provider: `name`, `base_url`, `api_key`. Modelos se descubren del upstream. La key se cifra (AES-256-GCM) y **nunca** vuelve en la respuesta |
+| `GET /api/router/catalog` | cookie JWT | Dashboard: ids confirmados `{ id, kind }` (`model` \| `alias` \| `fusion`) |
 | `GET /api/router/routes` | cookie JWT | Dashboard: aliases y `fallback_chain` (arrays; Fusion se ve vacío) |
-| `PATCH /api/router/providers/:id` | cookie JWT | `active` \| `disabled` |
+| `PATCH /api/router/providers/:id` | cookie JWT | status, base_url, wire_format, cost, api_key, `sync_models` |
+| `POST /api/router/providers/:id/sync-models` | cookie JWT | Re-fetch del catálogo del provider |
+| `DELETE /api/router/providers/:id` | cookie JWT | Borra provider + sus modelos (no limpia aliases) |
 | `PUT /api/router/routes/:alias` | cookie JWT | Upsert de cadena de hops (solo arrays) |
 | `POST /api/keys` | cookie JWT | Crear key (plaintext una vez). Ver `/keys` |
 | `GET /api/health` | — | Health check del backend |
@@ -63,7 +67,7 @@ Base URL API: `http://127.0.0.1:8787/v1` (completions) y `http://127.0.0.1:8787/
 ```bash
 cd ~/Data/Projects/ai-agents/cardinal-system
 podman-compose up -d        # backend :8787 + frontend :5173
-curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.5"}
+curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.6"}
 ```
 
 Requisitos en `.env` (crear desde `deploy/env.example` si no existe):
@@ -88,8 +92,9 @@ El router es **agnóstico**: cualquier upstream OpenAI-compatible sirve.
 ### 4.1 Agregar un provider real
 
 Desde el dashboard: **Router → Catalog** (`/router`), formulario ADD PROVIDER KEY
-(name, base url, api key, models, wire format, cost/mtok). `POST /api/router/providers`
-cifra la key y no la devuelve.
+(name, base url, api key, wire format, cost/mtok). Al guardar, Cardinal pega
+`GET …/models` del upstream y persiste el catálogo. `POST /api/router/providers`
+cifra la key y no la devuelve. Sync manual: **sync models** en la fila.
 
 Sigue existiendo el camino CLI para e2e/scripts:
 
@@ -178,9 +183,10 @@ En `/router` esa fila se ve con hops `—` (el GET parsea solo arrays). Follow-u
 
 ## 5. Gestión de keys (identidad del cliente)
 
-Desde el dashboard (`/keys`, cookie JWT) se crea una key con scopes, budget de
-tokens, expiración y tope USD. El plaintext se muestra **una sola vez**. CLI
-sigue existiendo:
+Desde el dashboard (`/keys`, cookie JWT) se crea una key eligiendo **un** id
+del catálogo (modelo, alias o Fusion), más budget de tokens, expiración y tope
+USD. El plaintext se muestra **una sola vez**. No hay `*` en la UI; el CLI
+sigue aceptando `*` y scopes libres:
 
 ```bash
 # Key con autorouter libre (scope "*")

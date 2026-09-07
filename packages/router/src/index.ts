@@ -4,3 +4,4 @@ export { resolveModelChain } from "./resolve";
 export type { ResolvedHop } from "./resolve";
 export { callUpstream, chatCompletionsUrl } from "./upstream";
 export type { UpstreamBody, UpstreamResult } from "./upstream";
+export { fetchProviderModels, modelsUrl, ModelFetchError } from "./discover";

@@ -1,7 +1,7 @@
 # Cardinal v2 — Backlog & Plan de Ejecución
 
 > Complementa la spec viva `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
-> Estado al momento: v0.2.5 (2026-09-03). Fase 1 completa. Fase 2 avanzada en `dev`.
+> Estado al momento: v0.2.6 (2026-09-07). Fase 1 completa. Fase 2 avanzada en `dev`.
 > Re-priorizado 2026-08-20: router + key pool primero; luego blackboard/MCP.
 > Superficie router 2026-09-03: dashboard `/router` + key create/limits + fusion.
 
@@ -10,7 +10,7 @@
 | Pilar | Estado |
 |-------|--------|
 | 4 — Identidad (`sk-cardinal-*`) | ✅ Fase 0 |
-| 2 — Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA (v0.2.5) |
+| 2 — Key pool + router | ✅ router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA + catálogo vivo (v0.2.6) |
 | 3 — Blackboard | ✅ tasks CRUD + WS + mailbox API + UI `/tasks` + MCP board + MCP mailbox |
 | 1 — MCP multi-vault | ✅ memory + board + mailbox tools (`packages/mcp`, compose `:8789`) |
 
@@ -35,6 +35,17 @@
 | 15 | ✅ Dashboard JWT `/router` + API providers/routes (2026-09-03) | feature | Sí | 6 |
 | 16 | ✅ `POST /api/keys` create + expiry + tope USD (2026-09-03) | feature | Sí | 7, 12 |
 | 17 | ✅ Fusion / MoA (`model=fusion`, judge synthesize) (2026-09-03) | feature | Sí | 6 |
+| 18 | ✅ Catálogo vivo + modelo obligatorio al crear key (2026-09-07) | feature | Sí | 15, 16 |
+| 19 | UX `/router`: no listar el catálogo completo en Providers | frontend | No | 18 |
+| 20 | UX `/router`: sacar `cost / mtok` del form ADD PROVIDER | frontend | No | 18 |
+| 21 | Validar `base_url` usable + API key (formato + probe) | feature | Sí | 18 |
+| 22 | Editar cadenas de failover desde `/router` | frontend | No | 15 |
+| 23 | Mostrar y sembrar Fusion en `/router` (hoy hops `—`) | feature | Sí | 17 |
+| 24 | Metering USD por hop en Fusion | feature | Sí | 16, 17 |
+| 25 | Streaming Fusion y `strategy: best_of` | feature | Sí | 17 |
+| 26 | `*` / multi-scope desde la UI de `/keys` | frontend | No | 18 |
+| 27 | DELETE provider limpia `model_routes` colgantes | feature | Sí | 18 |
+| 28 | rpm/tpm editables en UI | frontend | No | 15 |
 
 ## Decisiones
 
@@ -156,11 +167,25 @@
 - `fallback_chain` objeto `{mode:fusion, panel, judge}`. v1: `synthesize`, no
   stream. Seed por SQL (`upsertModelRoute` sigue siendo arrays).
 
+### 18 — Catálogo vivo + modelo al crear key
+- ✅ 2026-09-07. Doc: [`2026-09-07-router-catalog-key-scope.md`](../../features/2026-09-07-router-catalog-key-scope.md).
+- Discover de modelos al alta/rotación/sync. `GET /api/router/catalog`
+  (`model` \| `alias` \| `fusion`). `/keys` obliga a elegir un id.
+
+### 19–28 — Pulimiento router (backlog, no ahora)
+- **19–20** ruido visual: lista de modelos en Providers y `cost / mtok` en el
+  alta manual.
+- **21** validar URL/key más allá del rollback si `fetchProviderModels` falla.
+- **22–23** UI de cadenas y Fusion (PUT arrays ya existe; Fusion seed SQL).
+- **24–25** Fusion: USD por hop, streaming, `best_of`.
+- **26** `*` / varios scopes en `/keys` (18 es un modelo obligatorio).
+- **27** DELETE provider deja aliases colgando.
+- **28** rpm/tpm en UI.
+
 ## Próximo paso
 
-Superficie router (15–17) y mailbox MCP (14) están en el working tree (`dev`).
-Siguiente: item **5** (seed providers/routes + e2e zen free), item **11**
-(bootstrap admin password TTY, blocker cloud), item **10** (PR `dev→main`
-cuando se freeze). Follow-ups de 15–17 (no ahora): UI mutar cadenas, mostrar
-Fusion en `/router`, USD hop-level en Fusion. El item 13 sigue diferido hasta
-el pipeline one-shot; **no implementarlo**.
+Item **18** cierra el flujo operativo (provider real → catálogo → key con
+modelo). Siguiente: **19–21** (UX/validación del alta), **22–23** (cadenas y
+Fusion en UI), item **5** (e2e zen free), item **11** (bootstrap admin TTY),
+item **10** (`dev→main` cuando se freeze). El item 13 sigue diferido; **no
+implementarlo**.
