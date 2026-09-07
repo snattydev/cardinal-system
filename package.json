@@ -8,10 +8,11 @@
     "dev:frontend": "bun run --cwd frontend dev",
     "build": "bun run --cwd frontend build",
     "start": "bun backend/src/index.ts",
-    "test": "bun test --timeout 30000 packages/*/src backend/src",
+    "test": "bun test --timeout 30000 packages/*/src backend/src scripts/*.test.ts",
     "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
     "keygen": "bun packages/keys/src/cli.ts",
-    "cloud-agent": "bun scripts/cloud-agent.ts"
+    "cloud-agent": "bun scripts/cloud-agent.ts",
+    "bootstrap:password": "bash scripts/bootstrap-admin-password.sh"
   },
   "devDependencies": {
     "@cursor/sdk": "1.0.31"

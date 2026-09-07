@@ -56,15 +56,14 @@ Decision 2026-08-20: in **local dev/testing** any password works (even one gener
 
 Before the first cloud deploy — even if the only user is the owner — the creation or rotation of `ADMIN_PASSWORD_HASH` **cannot go through the model**. The plaintext password enters the agent context, ends up in transcripts, and can leak. A single user does not override the requirement.
 
-**Required flow (not yet implemented — cloud deploy blocker):**
+**Canonical flow (`scripts/bootstrap-admin-password.sh` or `bun run bootstrap:password`):**
 
-1. Interactive script in human TTY (`read -s` or equivalent): asks for the password, does not print it, does not log it.
-2. Hashes with `Bun.password.hash` **on that same machine**.
-3. Writes **only the hash** to `~/.config/cardinal/env` or a Podman secret.
-4. The agent can know that the bootstrap ran (ok/fail). Never sees or generates the plaintext. Does not ask for it "pass it in chat" either.
+1. Interactive script in human TTY (`read -s`): prompts for password silently, never echoed or logged.
+2. Hashes with `Bun.password.hash` (Argon2id) on that same machine via stdin pipe (never in CLI args).
+3. Writes **only the hash** to `.env` or `~/.config/cardinal/env` (`--cloud`).
+4. The agent can verify that the bootstrap ran (exit 0). Never sees or generates the plaintext.
 
-Until that script exists, the cloud deploy is not considered ready. Tracking detail: item 11 of the [v2 backlog plan](superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
-
+Implemented in `scripts/bootstrap-admin-password.sh` (item 11 of the v2 backlog plan).
 ## Pre-push audit
 
 Before every push to `dev`:
