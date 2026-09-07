@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database, SQLQueryBindings } from "bun:sqlite";
 import type {
   AgentKind,
   AgentRow,
@@ -485,7 +485,7 @@ export function updateProviderConfig(db: Database, id: number, args: ProviderCon
   if (!existing) return false;
 
   const sets: string[] = [];
-  const values: unknown[] = [];
+  const values: SQLQueryBindings[] = [];
 
   if (args.baseUrl !== undefined) {
     sets.push("base_url = ?");

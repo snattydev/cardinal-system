@@ -100,6 +100,48 @@ export function handleListRouterRoutes(db: Database): Response {
   return json({ routes: listModelRoutes(db).map(toPublicRoute) });
 }
 
+export type CatalogKind = "model" | "alias" | "fusion";
+
+export type CatalogItem = { id: string; kind: CatalogKind };
+
+function classifyRouteChain(raw: string): Exclude<CatalogKind, "model"> | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (Array.isArray(parsed)) return "alias";
+  if (parsed !== null && typeof parsed === "object" && "mode" in parsed && parsed.mode === "fusion") {
+    return "fusion";
+  }
+  return null;
+}
+
+export function handleListRouterCatalog(db: Database): Response {
+  const items: CatalogItem[] = [];
+  const seen = new Set<string>();
+
+  for (const provider of listProviders(db)) {
+    if (provider.status !== "active") continue;
+    for (const model of listProviderModels(db, provider.id)) {
+      if (seen.has(model.model_id)) continue;
+      seen.add(model.model_id);
+      items.push({ id: model.model_id, kind: "model" });
+    }
+  }
+
+  for (const route of listModelRoutes(db)) {
+    if (seen.has(route.alias)) continue;
+    const kind = classifyRouteChain(route.fallback_chain);
+    if (kind === null) continue;
+    seen.add(route.alias);
+    items.push({ id: route.alias, kind });
+  }
+
+  return json({ items });
+}
+
 const WIRE_FORMATS: WireFormat[] = ["openai", "anthropic", "gemini"];
 
 function isNonEmptyString(value: unknown): value is string {

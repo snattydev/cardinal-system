@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { api, ApiError } from "../lib/api";
 import { useRoster } from "../hooks/useRoster";
-import type { KeyItem } from "../lib/types";
+import type { KeyItem, RouterCatalogItem } from "../lib/types";
 
 const inputClass =
   "rounded border border-sao-accent/20 bg-sao-bg px-3 py-2 font-mono text-sm outline-none focus:border-sao-accent";
@@ -18,10 +18,6 @@ function fmtExpiry(value: string | null): string {
   return value ?? "∞";
 }
 
-function parseScopes(raw: string): string[] {
-  const parts = raw.split(",").map((s) => s.trim()).filter((s) => s.length > 0);
-  return parts.length === 0 ? ["*"] : parts;
-}
 
 function parseOptionalNumber(raw: string): number | undefined {
   const t = raw.trim();
@@ -42,7 +38,9 @@ export default function Keys() {
   const [error, setError] = useState<string | null>(null);
 
   const [agentName, setAgentName] = useState("");
-  const [scopes, setScopes] = useState("*");
+  const [catalog, setCatalog] = useState<RouterCatalogItem[]>([]);
+  const [catalogStatus, setCatalogStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [selectedModel, setSelectedModel] = useState("");
   const [budgetTokens, setBudgetTokens] = useState("");
   const [expires, setExpires] = useState("");
   const [usdCap, setUsdCap] = useState("");
@@ -52,18 +50,22 @@ export default function Keys() {
 
   useEffect(() => {
     let cancelled = false;
-    api<{ keys: KeyItem[] }>("/api/keys")
-      .then((res) => {
-        if (!cancelled) {
-          setKeys(res.keys);
-          setLoadStatus("ready");
-        }
+    Promise.all([
+      api<{ keys: KeyItem[] }>("/api/keys"),
+      api<{ items: RouterCatalogItem[] }>("/api/router/catalog"),
+    ])
+      .then(([keysRes, catalogRes]) => {
+        if (cancelled) return;
+        setKeys(keysRes.keys);
+        setCatalog(catalogRes.items);
+        setCatalogStatus("ready");
+        setLoadStatus("ready");
       })
       .catch(() => {
-        if (!cancelled) {
-          setError("failed to load keys");
-          setLoadStatus("error");
-        }
+        if (cancelled) return;
+        setError("failed to load keys");
+        setLoadStatus("error");
+        setCatalogStatus("error");
       });
     return () => {
       cancelled = true;
@@ -122,7 +124,7 @@ export default function Keys() {
     setCopied(false);
 
     const name = agentName.trim();
-    if (name.length === 0) return;
+    if (name.length === 0 || selectedModel.length === 0) return;
 
     const body: {
       agentName: string;
@@ -132,7 +134,7 @@ export default function Keys() {
       budgetUsdLimit?: number | null;
     } = {
       agentName: name,
-      scopes: parseScopes(scopes),
+      scopes: [selectedModel],
     };
 
     const tokens = parseOptionalNumber(budgetTokens);
@@ -154,7 +156,7 @@ export default function Keys() {
       setCreatedKey(res.key);
       setKeys((prev) => [res.item, ...prev.filter((k) => k.id !== res.item.id)]);
       setAgentName("");
-      setScopes("*");
+      setSelectedModel("");
       setBudgetTokens("");
       setExpires("");
       setUsdCap("");
@@ -219,15 +221,12 @@ export default function Keys() {
               ))}
             </datalist>
           </label>
-          <label className="flex min-w-40 flex-1 flex-col gap-1">
-            <span className="font-mono text-xs tracking-widest text-slate-500">scopes</span>
-            <input
-              value={scopes}
-              onChange={(e) => setScopes(e.target.value)}
-              placeholder="*"
-              className={inputClass}
-            />
-          </label>
+          <CatalogSearcher
+            items={catalog}
+            value={selectedModel}
+            onChange={setSelectedModel}
+            status={catalogStatus}
+          />
           <label className="flex min-w-32 flex-col gap-1">
             <span className="font-mono text-xs tracking-widest text-slate-500">budget tokens</span>
             <input
@@ -261,7 +260,7 @@ export default function Keys() {
         </div>
         <button
           type="submit"
-          disabled={creating}
+          disabled={creating || selectedModel.length === 0 || catalog.length === 0}
           className="w-fit rounded border border-sao-accent bg-sao-accent/10 px-3 py-2 font-mono text-sm text-sao-accent transition-colors hover:bg-sao-accent/20 disabled:opacity-50"
         >
           crear
@@ -360,5 +359,96 @@ export default function Keys() {
         </section>
       )}
     </div>
+  );
+}
+
+function CatalogSearcher({
+  items,
+  value,
+  onChange,
+  status,
+}: {
+  items: RouterCatalogItem[];
+  value: string;
+  onChange: (id: string) => void;
+  status: "loading" | "ready" | "error";
+}) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onDocMouseDown(event: MouseEvent): void {
+      if (rootRef.current === null) return;
+      if (!rootRef.current.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocMouseDown);
+    return () => document.removeEventListener("mousedown", onDocMouseDown);
+  }, []);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (q.length === 0) return items;
+    return items.filter(
+      (item) => item.id.toLowerCase().includes(q) || item.kind.toLowerCase().includes(q),
+    );
+  }, [items, query]);
+
+  const selected = items.find((item) => item.id === value) ?? null;
+
+  return (
+    <label className="flex min-w-56 flex-1 flex-col gap-1">
+      <span className="font-mono text-xs tracking-widest text-slate-500">model</span>
+      <div ref={rootRef} className="relative">
+        <input
+          value={open ? query : (selected?.id ?? "")}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+            if (value.length > 0) onChange("");
+          }}
+          onFocus={() => {
+            setQuery("");
+            setOpen(true);
+          }}
+          placeholder={status === "loading" ? "loading catalog" : "search model, alias, fusion"}
+          autoComplete="off"
+          className={`${inputClass} w-full`}
+        />
+        {open && (
+          <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-auto rounded border border-sao-accent/20 bg-sao-panel">
+            {status === "error" && (
+              <li className="px-3 py-2 font-mono text-xs text-red-400">failed to load catalog</li>
+            )}
+            {status === "ready" && items.length === 0 && (
+              <li className="px-3 py-2 font-mono text-xs text-slate-500">
+                no catalog — add a provider on /router
+              </li>
+            )}
+            {status === "ready" && items.length > 0 && filtered.length === 0 && (
+              <li className="px-3 py-2 font-mono text-xs text-slate-500">no matching models</li>
+            )}
+            {filtered.map((item) => (
+              <li key={`${item.kind}:${item.id}`}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(item.id);
+                    setQuery("");
+                    setOpen(false);
+                  }}
+                  className={`flex w-full items-center justify-between gap-3 px-3 py-2 text-left font-mono text-xs hover:bg-sao-accent/10 ${
+                    item.id === value ? "text-sao-accent" : "text-slate-300"
+                  }`}
+                >
+                  <span>{item.id}</span>
+                  <span className="tracking-widest text-slate-500">{item.kind}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </label>
   );
 }

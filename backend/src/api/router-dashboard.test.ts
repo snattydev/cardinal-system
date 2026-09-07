@@ -4,6 +4,7 @@ import {
   addProviderModel,
   createDb,
   getProviderByName,
+  setProviderStatus,
   upsertModelRoute,
   upsertProvider,
 } from "@cardinal/db";
@@ -11,6 +12,7 @@ import { decryptSecret, encryptSecret } from "@cardinal/keys";
 import {
   handleCreateRouterProvider,
   handleDeleteRouterProvider,
+  handleListRouterCatalog,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
@@ -58,7 +60,7 @@ function mockFetchModels(modelIds: string[] = DEFAULT_FETCH_MODELS): void {
     new Response(
       JSON.stringify({ object: "list", data: modelIds.map((id) => ({ id, object: "model" })) }),
       { status: 200 },
-    )) as typeof fetch;
+    )) as unknown as typeof fetch;
 }
 
 function jsonReq(url: string, method: string, body: string): Request {
@@ -702,7 +704,7 @@ describe("handleCreateRouterProvider", () => {
 
   test("rolls back provider when model fetch fails", async () => {
     const db = createDb(":memory:");
-    globalThis.fetch = (async () => new Response("nope", { status: 503 })) as typeof fetch;
+    globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch;
     const res = await handleCreateRouterProvider(
       db,
       jsonReq("http://localhost/api/router/providers", "POST", createProviderBody()),
@@ -712,6 +714,65 @@ describe("handleCreateRouterProvider", () => {
     expect(await res.json()).toEqual({ error: "model_fetch_failed", detail: "upstream 503" });
     const listed = (await handleListRouterProviders(db).json()) as { providers: ProviderPublic[] };
     expect(listed.providers).toHaveLength(0);
+    db.close();
+  });
+});
+
+type CatalogItem = { id: string; kind: "model" | "alias" | "fusion" };
+
+describe("handleListRouterCatalog", () => {
+  test("empty db → { items: [] }", async () => {
+    const db = createDb(":memory:");
+    const res = handleListRouterCatalog(db);
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ items: [] });
+    db.close();
+  });
+
+  test("lists unique models from active providers plus alias and fusion routes", async () => {
+    const db = createDb(":memory:");
+    const { deepseekId } = seedRouter(db);
+    addProviderModel(db, { providerId: deepseekId, modelId: "test-model" });
+    db.run("INSERT INTO model_routes (alias, fallback_chain) VALUES (?, ?)", [
+      "mix",
+      JSON.stringify({
+        mode: "fusion",
+        panel: [{ provider: "mock-local", model: "test-model" }],
+        judge: { provider: "deepseek", model: "deepseek-chat" },
+        strategy: "synthesize",
+      }),
+    ]);
+
+    const res = handleListRouterCatalog(db);
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { items: CatalogItem[] };
+    expect(body.items).toEqual([
+      { id: "deepseek-chat", kind: "model" },
+      { id: "test-model", kind: "model" },
+      { id: "fast", kind: "alias" },
+      { id: "mix", kind: "fusion" },
+    ]);
+    db.close();
+  });
+
+  test("skips models from disabled providers", async () => {
+    const db = createDb(":memory:");
+    seedRouter(db);
+    setProviderStatus(db, "deepseek", "disabled");
+
+    const body = (await handleListRouterCatalog(db).json()) as { items: CatalogItem[] };
+    expect(body.items.map((item) => item.id)).toEqual(["test-model", "fast"]);
+    expect(body.items.find((item) => item.id === "deepseek-chat")).toBeUndefined();
+    db.close();
+  });
+
+  test("alias that collides with a model id keeps kind model", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    addProviderModel(db, { providerId: mockId, modelId: "fast" });
+
+    const body = (await handleListRouterCatalog(db).json()) as { items: CatalogItem[] };
+    expect(body.items.filter((item) => item.id === "fast")).toEqual([{ id: "fast", kind: "model" }]);
     db.close();
   });
 });

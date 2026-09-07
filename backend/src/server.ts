@@ -29,6 +29,7 @@ import { handleChatCompletions, handleListModels } from "./api/router";
 import {
   handleCreateRouterProvider,
   handleDeleteRouterProvider,
+  handleListRouterCatalog,
   handleListRouterProviders,
   handleListRouterRoutes,
   handlePatchRouterProvider,
@@ -331,6 +332,12 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const user = await getSessionUser(req, config.jwtSecret);
         if (!user) return json({ error: "unauthorized" }, 401);
         return handleListRouterRoutes(db);
+      }
+
+      if (pathname === "/api/router/catalog" && method === "GET") {
+        const user = await getSessionUser(req, config.jwtSecret);
+        if (!user) return json({ error: "unauthorized" }, 401);
+        return handleListRouterCatalog(db);
       }
 
       const routerProviderMatch = pathname.match(/^\/api\/router\/providers\/([^/]+)$/);

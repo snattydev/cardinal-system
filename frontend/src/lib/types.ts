@@ -93,6 +93,14 @@ export interface RouterRoute {
   created_at: string;
 }
 
+/** Raw shape from GET /api/router/catalog */
+export type RouterCatalogKind = "model" | "alias" | "fusion";
+
+export interface RouterCatalogItem {
+  id: string;
+  kind: RouterCatalogKind;
+}
+
 export function fmtUptime(s: number): string {
   if (s < 60) return `${Math.floor(s)}s`;
   const m = Math.floor(s / 60);
