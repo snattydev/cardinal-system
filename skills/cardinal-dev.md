@@ -1,154 +1,114 @@
 ---
 name: cardinal-dev
-description: Workflow de desarrollo para Cardinal System — PRs, commits, branching, versionado y documentación. Usar al trabajar en snattydev/cardinal-system.
+description: Development workflow for Cardinal System — branching, commits, PRs, versioning, TDD, roles, documentation. Use when working on the repo.
 category: development
 ---
 
 # Cardinal System — Development Workflow
 
-## 🌿 Branching
+Index of rules. Live rules live in `AGENTS.md` and are delegated to specific skills:
+
+- Commit format → `cardinal-commit`
+- Create a PR → `cardinal-pr`
+
+This skill keeps only **repo conventions** that no other file declares.
+
+---
+
+## Branching
 
 ```
-feature/* ──→ dev ──→ main
-chore/*  ──→ dev ──→ main
-fix/*    ──→ dev ──→ main
+feature/* ──→ PR ──→ dev ──→ PR ──→ main
+fix/*      ──→ PR ──→ dev ──→ PR ──→ main
+chore/*    ──→ PR ──→ dev ──→ PR ──→ main
+docs/*     ──→ PR ──→ dev ──→ PR ──→ main
 ```
 
-| Rama | Rol | Protección |
-|------|-----|------------|
-| `main` | Producción | PR + review requerido |
-| `dev` | Integración | Push/merge directo, sin PR |
-
-1. Commits y merges van **directo a `dev`** — sin PR, sin review
-2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
-3. **PRs solo existen para `dev → main`**
-4. `main` jamás recibe commits directos
+- Work is done in `feature/*`, `fix/*`, `chore/*`, or `docs/*` from `dev`.
+- Each branch is opened as a PR to `dev`. No direct merges to `dev`.
+- The merge to `dev` is done by the same agent that implemented the feature, after green.
+- When `dev` is stable → a single PR from `dev` to `main` with review.
+- `main` never receives direct commits.
+- **Merge strategy:** merge commit. No squash. `dev` and `main` never diverge.
 
 ---
 
-## 📋 PR Template
+## Commits
 
-Resumen ejecutivo (el detalle completo va en doc de vault):
+Conventional Commits. Rules and examples: see `cardinal-commit`.
 
-```markdown
-## 📋 Resumen
-<!-- Qué hace y por qué. Una o dos frases. -->
-
-## 🔍 Cambios
-- 
-- 
-
-## ⚠️ Breaking
-<!-- ¿Algo se rompe? Si no, "Ninguno". -->
-
-## 🧪 Cómo probar
-1. 
-2. 
-
-## 🗂️ Documentación
-- 
-
-## ✅ Checklist
-- [ ] Versión bump en `package.json` (solo FASE en PR `dev → main`, PATCH en `dev`)
-- [ ] Documentado en `docs/features/<fecha>-<nombre>.md` (qué, por qué, decisiones, archivos)
-- [ ] Sin leaks (keys, tokens, paths, emails)
-- [ ] Probado localmente
-```
+Summary:
+- First line ≤ 72 chars, in English.
+- Body in Spanish — explain *what* and *why*, not *how*.
+- Authorship: the commit uses the name and email of the GitHub user, not the agent's.
 
 ---
 
-## 📋 Commits
+## Versioning
 
-**Formato:** Conventional Commits
-
-```
-<type>(<scope>): <descripción breve en inglés>
-
-<cuerpo en español: qué y por qué>
-```
-
-**Tipos:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`
-
-**Reglas:**
-- Primera línea ≤ 72 chars, **en inglés**
-- Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
-- Si cierra un issue: `Closes #N` al final
-- **Autoría:** el commit debe usar el nombre y email del usuario de GitHub (`git config user.name` / `user.email`), no el del agente. Todos los agentes heredan la identidad del owner.
-
-**Ejemplos:**
-```
-feat(ws): add agent heartbeat with ping/pong protocol
-
-Implementación del keep-alive sobre WebSocket. 30s de intervalo,
-2 pings perdidos = desconexión. Evento emitido al dashboard.
-
-fix(auth): reject expired JWT with 401 instead of 500
-chore: bump version to 0.1.0 — model router MVP
-```
+- Source of truth: `version` in root `package.json`.
+- Format: `MAJOR.FASE.PATCH`.
+  - **MAJOR**: `0` until stable → `1.0.0`.
+  - **FASE**: roadmap phase. Bumped only in the PR `dev → main`.
+  - **PATCH**: incremental per feature/fix/chore within the phase.
 
 ---
 
-## 🔢 Versionado
+## TDD — when is it mandatory
 
-- Source of truth: `version` en `package.json` raíz
-- Formato: `MAJOR.FASE.PATCH` — ej: `0.0.2`
-  - **MAJOR**: `0` hasta estable → `1.0.0`
-  - **FASE**: roadmap actual, se bump ea solo en PR `dev → main`
-  - **PATCH**: incremental por feature/fix/chore en `dev`
-
----
-
-## 🤖 Agentes de Desarrollo
-
-- **Cada feature o task se delega a un subagente one-shot** — el orquestador coordina, no implementa
-- Un subagente = una responsabilidad concreta
-- Subagentes son **efímeros**: sin estado entre runs
-- Tasks complejas → múltiples subagentes secuenciales o paralelos
-- El orquestador verifica, commitea y documenta el resultado
+| Scope | TDD mandatory | Verification |
+|-------|---------------|--------------|
+| Auth, keys, ws, db, router | Yes (RED → GREEN → REFACTOR → COMMIT) | `bun test` |
+| Frontend components | No | `bun run build` |
+| CSS / styles | No | Visual review |
+| Docs, configs, deploy | No | Human review |
 
 ---
 
-## 👁️ Roles de Revisión
+## Review roles
 
-| Rol | Scope | Trigger |
-|-----|-------|---------|
-| Standard Review | Código, claridad, mantenibilidad | Todo PR a `main` |
-| Security Review | Secrets, inyección, arquitectura | Bajo demanda en PR |
-| Pentest | Recon, vulnerabilidades, PoC | One-shot
+Reviewers are **roles**, not fixed identities. Specific names are assigned outside the repo.
 
----
+| Role | Trigger | Scope |
+|------|---------|-------|
+| Standard Review | Every PR to `main` | Code, clarity, maintainability, tests |
+| Security Review | Changes in `auth/`, `keys/`, `ws/`, protocol | Secrets, injection, architecture |
+| Pentest | One-shot, on demand | Recon, vulnerabilities, PoC |
 
-## 📝 Documentación
-
-- **Cada feature, fix o patch debe tener doc completo en el repo**
-- Ruta: `docs/features/<fecha>-<nombre>.md`
-- Incluir: qué, por qué, decisiones, alternativas, archivos creados/modificados
-- La PR template es solo resumen — el detalle vive en el doc de la feature
-- No documentar bumps de versión ni cambios triviales de una línea
-
-### Workflow por feature
-
-1. **Delegar** — subagente(s) implementan
-2. **Verificar** — build, tests, revisión
-3. **Documentar** — `docs/features/<fecha>-<nombre>.md`
-4. **Commit + push** — conventional commit a `dev` incluyendo el doc
+Templates: `docs/agents/prompts/standard-review.md` and `docs/agents/prompts/security-review-checklist.md`.
 
 ---
 
-## 🔒 Seguridad
+## Per-feature documentation
 
-- Auditar leaks antes de push: keys, tokens, paths absolutos, emails
-- `.env` y secretos **nunca committeados**
-- API keys: formato `sk-cardinal-*`, SHA-256 en DB
-- Nada expuesto sin auth layer
+- Each significant feature, fix, or patch must have a doc at `docs/features/<date>-<name>.md`.
+- Include: what was done, why, decisions, alternatives, files created/modified.
+- The PR template is only a summary. The detail lives in the feature doc.
+- Do not document version bumps or trivial one-line changes.
+
+### Feature workflow
+
+1. **Delegate** — subagent(s) implement.
+2. **Verify** — `bun test`, `bun run build`, review if applicable.
+3. **Document** — `docs/features/<date>-<name>.md`.
+4. **Commit + push** — conventional commit to `dev` including the doc.
 
 ---
 
-## 🧱 Stack
+## Security
 
-- Backend: TypeScript + Bun (`Bun.serve`, `bun:sqlite`)
-- Frontend: React + TypeScript + Vite + Tailwind
-- DB: SQLite
-- Real-time: WebSocket nativo
-- Runtime: siempre containerizado con Podman
-- Dev: `compose.yaml`, Prod: Podman Quadlet
+- Audit leaks before push: keys, tokens, absolute paths, emails.
+- `.env` and secrets **never committed** — use `.env.example` as template.
+- API keys: format `sk-cardinal-*`, SHA-256 in DB.
+- Nothing exposed without auth layer.
+
+---
+
+## Stack
+
+- Backend: TypeScript + Bun (`Bun.serve`, `bun:sqlite`).
+- Frontend: React + TypeScript + Vite + Tailwind.
+- DB: SQLite.
+- Real-time: native WebSocket.
+- Runtime: always containerized with Podman.
+- Dev: `compose.yaml`. Prod: Podman Quadlet.

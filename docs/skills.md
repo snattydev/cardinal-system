@@ -1,32 +1,32 @@
-# Skills Planeadas
+# Planned Skills
 
-> Skills a implementar cuando las integraciones correspondientes estén listas.
-
----
-
-## 🟢 Ya creadas
-
-| Skill | Archivo | Qué cubre |
-|-------|---------|-----------|
-| `cardinal-dev` | `skills/cardinal-dev.md` | Workflow completo: branching, commits, versionado, doc, seguridad |
-| `cardinal-pr` | `skills/cardinal-pr.md` | Crear PR paso a paso: branch → bump → commit → push → template → revisores |
-| `cardinal-commit` | `skills/cardinal-commit.md` | Formato de commits: conventional commits, tipos, scope, ejemplos |
+> Skills to implement when the corresponding integrations are ready.
 
 ---
 
-## 🟡 Pendientes (próximas)
+## Already created
 
-| Skill | Dependencia | Qué cubrirá |
-|-------|-------------|-------------|
-| `cardinal-container` | Podman + compose funcional | Build, run, debug del pod local (`compose up/down`, logs, rebuild) |
-| `cardinal-review` | Standard + Security reviewers | Flujo unificado: correr standard review + security review |
-| `cardinal-api` | Endpoints estables | Referencia rápida de REST + WS para testear y debuggear |
-| `cardinal-vault-doc` | — | Template fijo para docs de vault (qué incluir, formato, ejemplos) |
+| Skill | File | What it covers |
+|-------|------|----------------|
+| `cardinal-dev` | `skills/cardinal-dev.md` | Full workflow: branching, commits, versioning, docs, security |
+| `cardinal-pr` | `skills/cardinal-pr.md` | Create PR step by step: branch → bump → commit → push → template → reviewers |
+| `cardinal-commit` | `skills/cardinal-commit.md` | Commit format: conventional commits, types, scope, examples |
 
-## 🔵 Futuras (Fase 2+)
+---
 
-| Skill | Dependencia | Qué cubrirá |
-|-------|-------------|-------------|
-| `cardinal-keygen` | Key Factory | Crear, revocar, listar API keys vía CLI del Cardinal |
-| `cardinal-deploy` | VPS lista | Deploy a producción: build imágenes, push, quadlet, verificar |
-| `cardinal-pentest` | Pentester integrado | Disparar pentest one-shot y leer reporte |
+## Pending (next)
+
+| Skill | Dependency | What it will cover |
+|-------|------------|--------------------|
+| `cardinal-container` | Podman + compose working | Build, run, debug local pod (`compose up/down`, logs, rebuild) |
+| `cardinal-review` | Standard + Security reviewers | Unified flow: run standard review + security review |
+| `cardinal-api` | Stable endpoints | Quick REST + WS reference for testing and debugging |
+| `cardinal-vault-doc` | — | Fixed template for vault docs (what to include, format, examples) |
+
+## Future (Phase 2+)
+
+| Skill | Dependency | What it will cover |
+|-------|------------|--------------------|
+| `cardinal-keygen` | Key Factory | Create, revoke, list API keys via Cardinal CLI |
+| `cardinal-deploy` | VPS ready | Deploy to production: build images, push, quadlet, verify |
+| `cardinal-pentest` | Integrated pentester | Trigger one-shot pentest and read report |

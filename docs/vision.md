@@ -1,70 +1,70 @@
-# Cardinal System — Visión y Objetivos
+# Cardinal System — Vision and Goals
 
-> Por qué existe este proyecto. Para agentes nuevos que necesitan el "big picture".
-
----
-
-## 🌐 Qué es
-
-**Cardinal System** es el backend central del ecosistema SAO — un monolito TypeScript + Bun que:
-
-- Conecta agentes sin importar dónde vivan (PC, laptop, celular)
-- Provee contexto centralizado (memoria, RAG, historial)
-- Emite API keys con scopes, budgets y failsafes
-- Maneja autenticación y acceso humano
-- Expone un dashboard web con estética Sword Art Online
-- Eventualmente: grafo de conocimiento, automatizaciones, cron
+> Why this project exists. For new agents that need the "big picture."
 
 ---
 
-## 🎯 Objetivo final
+## What it is
 
-Que cualquier agente SAO — nuevo o existente — haga onboarding automático:
+**Cardinal System** is the central backend of the SAO ecosystem — a TypeScript + Bun monolith that:
+
+- Connects agents regardless of where they live (PC, laptop, phone)
+- Provides centralized context (memory, RAG, history)
+- Issues API keys with scopes, budgets, and failsafes
+- Handles human authentication and access
+- Exposes a web dashboard with Sword Art Online aesthetic
+- Eventually: knowledge graph, automations, cron
+
+---
+
+## Final goal
+
+That any SAO agent — new or existing — does automatic onboarding:
 
 ```
-Agente nuevo → se conecta al Cardinal → recibe:
-  ├── Su SOUL (personalidad)
-  ├── Sus skills (capacidades)
-  ├── Su memoria (contexto histórico)
-  ├── Acceso al RAG del vault
-  └── Una API key con presupuesto
+New agent → connects to Cardinal → receives:
+  ├── Its SOUL (personality)
+  ├── Its skills (capabilities)
+  ├── Its memory (historical context)
+  ├── Access to vault RAG
+  └── An API key with budget
 ```
 
-Sin configurar nada a mano. El Cardinal es el source of truth.
+Without configuring anything by hand. Cardinal is the source of truth.
 
 ---
 
-## 🧭 Principios
+## Principles
 
-- **Modular** — cada pieza intercambiable, sin acoplamiento forzado
-- **Human-in-the-loop** — la palabra final es siempre del humano
-- **Agent-less core** — el Cardinal no necesita saber qué es un agente; solo sirve contexto
-- **Estética SAO** — identidad visual consistente en todo el dashboard
-- **Seguridad primero** — nada expuesto sin auth, keys con límites
-
----
-
-## 📐 No-objetivos (lo que NO es)
-
-- ❌ Un router de modelos (aunque incluye uno)
-- ❌ Un dashboard de monitoreo (aunque tiene uno)
-- ❌ Un orquestador de tareas (los agentes se autogestionan)
-- ❌ Un reemplazo de Hermes Agent
-- ❌ Un producto SaaS — es infraestructura personal
+- **Modular** — each piece interchangeable, without forced coupling
+- **Human-in-the-loop** — the final word is always the human's
+- **Agent-less core** — Cardinal does not need to know what an agent is; it just serves context
+- **SAO aesthetic** — consistent visual identity across the dashboard
+- **Security first** — nothing exposed without auth, keys with limits
 
 ---
 
-## 🔗 Dónde está todo
+## Non-goals (what it is NOT)
 
-| Recurso | Ubicación |
-|---------|-----------|
-| Reglas de desarrollo | [`AGENTS.md`](../AGENTS.md) |
-| Stack técnico | [`docs/stack.md`](stack.md) |
-| Seguridad | [`docs/security.md`](security.md) |
+- A model router (although it includes one)
+- A monitoring dashboard (although it has one)
+- A task orchestrator (agents self-manage)
+- A replacement for Hermes Agent
+- A SaaS product — it is personal infrastructure
+
+---
+
+## Where everything is
+
+| Resource | Location |
+|----------|----------|
+| Development rules | [`AGENTS.md`](../AGENTS.md) |
+| Technical stack | [`docs/stack.md`](stack.md) |
+| Security | [`docs/security.md`](security.md) |
 | Roadmap | [`docs/roadmap.md`](roadmap.md) |
-| Ecosistema SAO | [`context/ecosystem.md`](../context/ecosystem.md) |
-| Specs por fase | [`docs/superpowers/specs/`](superpowers/specs/) |
+| SAO ecosystem | [`context/ecosystem.md`](../context/ecosystem.md) |
+| Specs per phase | [`docs/superpowers/specs/`](superpowers/specs/) |
 
 ---
 
-*Actualizado: 2026-07-28.*
+*Updated: 2026-07-28.*

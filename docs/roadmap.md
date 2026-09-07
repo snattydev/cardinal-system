@@ -1,64 +1,57 @@
 # Cardinal System — Roadmap
 
-> Actualizado: 2026-09-03. Single source of truth de prioridades.
+> Updated: 2026-09-03. Single source of truth for priorities.
 
 ---
 
-## Ahora: Fase 2 — Cardinal v2 (🚧 en curso — v0.2.5)
+## Now: Phase 2 — Cardinal v2 (in progress — v0.2.5)
 
-Fase 1 (Context Store) completa en `dev` desde v0.2.0. Fase 2 en progreso:
-blackboard + MCP hub + router/keys (`/router`, create keys, fusion). Ver
+Phase 1 (Context Store) complete in `dev` since v0.2.0. Phase 2 in progress:
+blackboard + MCP hub + router/keys (`/router`, create keys, fusion). See
 [`roadmap/fase-2.md`](roadmap/fase-2.md). Sprint:
 [`sprints/2026-09-03-router-surface.md`](sprints/2026-09-03-router-surface.md).
 
-Pendiente de estabilización: PR `dev → main` cuando se decida freeze (Fase 1 + 2
-parciales acumuladas en `dev`).
+Pending stabilization: PR `dev → main` when freeze is decided (Phase 1 + 2
+partial accumulated in `dev`).
 
 ---
 
-## Fases
+## Phases
 
-| Fase | Nombre | Estado | Roadmap |
-|------|--------|--------|---------|
-| 0 | Esqueleto Vivo | ✅ Completa | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
-| 1 | Context Store | ✅ Completa (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
-| 2 | Cardinal v2 (Blackboard + MCP + Pool) | 🚧 En curso | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
-| 3 | Grafo de Conocimiento | 🔮 Futuro | — |
-| 4 | Automations | 🔮 Futuro | — |
+| Phase | Name | Status | Roadmap |
+|-------|------|--------|---------|
+| 0 | Living Skeleton | Complete | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
+| 1 | Context Store | Complete (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
+| 2 | Cardinal v2 (Blackboard + MCP + Pool) | In progress | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
+| 3 | Knowledge Graph | Future | — |
+| 4 | Automations | Future | — |
 
-### Fase 2 — estado (2026-09-03)
+### Phase 2 — state (2026-09-03)
 
-| Pilar | Hecho | Falta |
-|-------|-------|-------|
+| Pillar | Done | Pending |
+|--------|------|---------|
 | 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools, mailbox MCP | — |
 | 1 MCP hub | `packages/mcp` memory + board + mailbox, compose `:8789` | — |
-| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | spike-003 opencode-go (opcional); e2e zen free (#5); UI mutar cadenas / mostrar Fusion |
+| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | spike-003 opencode-go (optional); e2e zen free (#5); UI mutate chains / show Fusion |
 
-Tesis: orquestación es commodity; Cardinal es cerebro (identidad + contexto +
-blackboard); herdr/Hermes/CLIs son las manos.
+Thesis: orchestration is commodity; Cardinal is the brain (identity + context +
+blackboard); herdr/Hermes/CLIs are the hands.
 
 ---
 
 ## Arsenal
 
-| Herramienta | Hasta | Rol |
-|-------------|-------|-----|
-| Antigravity Pro | recurrente | Features pesadas, reviews |
-| OpenCode GO | ~20 días | Daily coding |
-| Cursor Pro | 4 meses | Refactors grandes, frontend |
-| DeepSeek API | $4 crédito | Pentesting |
+> Owner-only info (which CLIs and models are paid for and until when). Moved to `README.md` so it does not live in the repo.
 
----
+## Conventions
 
-## Convenciones
-
-- **Versionado:** `MAJOR.FASE.PATCH` (source: `package.json`)
-- **Commits:** Conventional Commits (inglés ≤72 chars, body español)
+- **Versioning:** `MAJOR.FASE.PATCH` (source: `package.json`)
+- **Commits:** Conventional Commits (English ≤72 chars, Spanish body)
 - **Branches:** `feature/* → dev → main` (merge commit)
-- **TDD:** Obligatorio para core. No para frontend/docs
-- **Agentes:** Nombres fuera del repo. Solo roles
-- **Contexto:** `context/` → knowledge base. `AGENTS.md` → dev rules
+- **TDD:** Required for core. Not for frontend/docs
+- **Agents:** Names outside the repo. Roles only
+- **Context:** `context/` → knowledge base. `AGENTS.md` → dev rules
 
 ---
 
-*Se actualiza cuando cambian prioridades o se completa una fase.*
+*Updated when priorities change or a phase completes.*

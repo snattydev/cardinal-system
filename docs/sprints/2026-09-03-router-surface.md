@@ -28,18 +28,18 @@ catálogo público ni Premium.
 | 01:33 | Padre | Estado del router local (motor ✅, UI no, MoA no) |
 | 01:39 | Padre | Confirmación: router vive en `cardinal-backend` |
 | 01:47 | Padre | Scope: las tres features, una sesión Cursor cada una, Herdr Background |
-| 01:49 | `herdr-dispatcher` | Split `w4:pK` → `w4:pM` → `w4:pN`; start `card-router-ui`, `card-keys`, `card-fusion` |
+| 01:49 | orquestador | Split `w4:pK` → `w4:pM` → `w4:pN`; start tres workers en Background |
 | ~02:27 | Tres Cursor | `idle`; no notificaron al padre |
 | 02:27 | Padre | Lectura de panes + suite unificada **417 pass / 0 fail**, frontend build OK |
 | 02:30 | Padre | Unificación docs + bump 0.2.5 |
 
 ## Agentes (Herdr Background `w4:t8`)
 
-| pane | label | agent | kind | DoD |
-|------|-------|-------|------|-----|
-| `w4:pK` | Router UI | `card-router-ui` | cursor | `/router` + JWT `/api/router/*` |
-| `w4:pM` | Keys Factory | `card-keys` | cursor | `POST /api/keys` + expiry/USD |
-| `w4:pN` | Fusion MoA | `card-fusion` | cursor | `fusion.ts` + dispatch |
+| pane | descripción | tipo | DoD |
+|------|-------------|------|-----|
+| `w4:pK` | Router UI | cursor | `/router` + JWT `/api/router/*` |
+| `w4:pM` | Keys Factory | cursor | `POST /api/keys` + expiry/USD |
+| `w4:pN` | Fusion MoA | cursor | `fusion.ts` + dispatch |
 
 Ownership: dashboard no tocó `packages/router/src/router.ts`; keys solo
 pre-loop auth/budget; Fusion en `fusion.ts` + ~10 líneas de dispatch.

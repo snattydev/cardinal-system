@@ -1,40 +1,40 @@
-# Cronjobs Planeados
+# Planned Cronjobs
 
-> Se implementan cuando Cardinal esté vivo en VPS. Mientras tanto, acá llevamos track.
+> Implemented when Cardinal is live on a VPS. Until then, tracking here.
 
 ---
 
-## 🟢 Fase 1+ (con DB y WS)
+## Phase 1+ (with DB and WS)
 
-| # | Cronjob | Trigger | Qué hace |
-|---|---------|---------|----------|
-| 1 | Heartbeat watchdog | Cada 1m | Si un agente no responde 2 pings → alerta al dashboard |
-| 2 | Key expiration check | Cada 6h | Keys near expiry → notificar, expired → revocar |
-| 3 | Session cleanup | Diario | Limpiar sesiones WS cerradas hace > 24h |
-| 4 | DB backup | Diario | `sqlite3 .backup` → volumen persistente |
+| # | Cronjob | Trigger | What it does |
+|---|---------|---------|--------------|
+| 1 | Heartbeat watchdog | Every 1m | If an agent does not respond to 2 pings → alert to dashboard |
+| 2 | Key expiration check | Every 6h | Keys near expiry → notify, expired → revoke |
+| 3 | Session cleanup | Daily | Clean up closed WS sessions older than 24h |
+| 4 | DB backup | Daily | `sqlite3 .backup` → persistent volume |
 
-## 🟡 Fase 2 (con Model Router + Key Factory)
+## Phase 2 (with Model Router + Key Factory)
 
-| # | Cronjob | Trigger | Qué hace |
-|---|---------|---------|----------|
-| 5 | Budget enforcement | Cada 1h | Keys over budget → denegar automáticamente hasta reset |
-| 6 | Usage stats rollup | Cada 6h | Agregar consumo por key → dashboard |
-| 7 | Model health check | Cada 5m | Probar cada provider → marcar caídos en router |
-| 8 | Key audit log | Diario | Reporte de keys creadas/revocadas en 24h |
+| # | Cronjob | Trigger | What it does |
+|---|---------|---------|--------------|
+| 5 | Budget enforcement | Every 1h | Keys over budget → deny automatically until reset |
+| 6 | Usage stats rollup | Every 6h | Aggregate consumption per key → dashboard |
+| 7 | Model health check | Every 5m | Test each provider → mark down in router |
+| 8 | Key audit log | Daily | Report of keys created/revoked in 24h |
 
-## 🔵 Fase 3+ (con Grafo + Automations)
+## Phase 3+ (with Graph + Automations)
 
-| # | Cronjob | Trigger | Qué hace |
-|---|---------|---------|----------|
-| 9 | Graph rebuild | Cada 1h | Reindexar grafo de conocimiento con nuevas relaciones |
-| 10 | Vault sync | Cada 6h | Sincronizar índice de vault con nuevas notas |
-| 11 | Stale agent prune | Semanal | Agentes inactivos > 7 días → archivar en grafo |
-| 12 | Weekly digest | Lunes 9am | Resumen de actividad: PRs, agentes, tokens, errores |
+| # | Cronjob | Trigger | What it does |
+|---|---------|---------|--------------|
+| 9 | Graph rebuild | Every 1h | Reindex knowledge graph with new relations |
+| 10 | Vault sync | Every 6h | Sync vault index with new notes |
+| 11 | Stale agent prune | Weekly | Inactive agents > 7 days → archive in graph |
+| 12 | Weekly digest | Monday 9am | Activity summary: PRs, agents, tokens, errors |
 
-## 🔴 Fase 4+ (Automations avanzadas)
+## Phase 4+ (advanced automations)
 
-| # | Cronjob | Trigger | Qué hace |
-|---|---------|---------|----------|
-| 13 | One-shot cleanup | Cada 1h | Contenedores one-shot muertos → `podman rm` |
-| 14 | Image garbage collect | Semanal | `podman image prune` de imágenes sin tag |
-| 15 | Log rotation | Diario | Rotar logs de contenedores > 100MB |
+| # | Cronjob | Trigger | What it does |
+|---|---------|---------|--------------|
+| 13 | One-shot cleanup | Every 1h | Dead one-shot containers → `podman rm` |
+| 14 | Image garbage collect | Weekly | `podman image prune` for untagged images |
+| 15 | Log rotation | Daily | Rotate container logs > 100MB |

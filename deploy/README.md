@@ -28,7 +28,7 @@ between them.
 
 ## Prerequisites
 
-- Podman ≥ 4.6 (rootless)
+- Podman >= 4.6 (rootless)
 - systemd --user enabled
 - `~/.config/containers/systemd/` directory exists
 
@@ -73,7 +73,7 @@ curl http://localhost:8080/api/health
 
 | File | Purpose |
 |------|---------|
-| `cardinal.pod` | Pod definition, publishes port 8080→80 |
+| `cardinal.pod` | Pod definition, publishes port 8080->80 |
 | `cardinal-backend.container` | Bun backend, AutoUpdate=registry, 256M/50% CPU |
 | `cardinal-frontend.container` | nginx SPA server, 128M/25% CPU |
 | `cardinal-caddy.container` | Caddy reverse proxy, 64M/25% CPU |

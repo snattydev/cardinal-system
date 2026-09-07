@@ -1,336 +1,66 @@
 # Cardinal System — Development Rules
 
-> Reglas de desarrollo. Solo roles, sin nombres.
+> Repo development rules. Just the index. The rules live in `AGENTS/*.md`.
 
-**Referencias:**
-- [`docs/vision.md`](./docs/vision.md) — objetivo y principios
-- [`docs/stack.md`](./docs/stack.md) — stack técnico
-- [`docs/security.md`](./docs/security.md) — modelo de seguridad
-- [`docs/roadmap.md`](./docs/roadmap.md) — fases y prioridades
+**Project references:**
+- [`docs/vision.md`](./docs/vision.md) — goal and principles
+- [`docs/stack.md`](./docs/stack.md) — technical stack
+- [`docs/security.md`](./docs/security.md) — security model
+- [`docs/roadmap.md`](./docs/roadmap.md) — phases and priorities
 - [`context/ecosystem.md`](./context/ecosystem.md) — knowledge base
 
 ---
 
-## 🧱 Stack
+## Stack
 
-- **Backend:** TypeScript + [Bun](https://bun.sh) (`Bun.serve`, `bun:sqlite`)
-- **Frontend:** React + TypeScript + Vite + Tailwind CSS
-- **DB:** SQLite (un solo archivo, cero infra)
-- **Real-time:** WebSocket nativo (ver [`docs/superpowers/specs/`](./docs/superpowers/specs/))
-- **Runtime:** **siempre containerizado** con Podman — no instalar dependencias nativas
-
----
-
-## 🌿 Branching
-
-| Rama | Rol | Protección |
-|------|-----|------------|
-| `main` | Producción | PR + review requerido, merge commit |
-| `dev` | Integración | Push/merge directo permitido |
-
-**Workflow:**
-
-```
-feature/* ──→ dev ──→ main
-chore/*  ──→ dev ──→ main
-fix/*    ──→ dev ──→ main
-```
-
-1. Commits y merges van **directo a `dev`** — sin PR, sin review
-2. Cuando `dev` está estable → **un solo PR de `dev` a `main`** con review
-3. `main` jamás recibe commits directos
-4. **PRs solo existen para `dev → main`** — es el único punto donde hay algo que revisar
-5. **Merge strategy:** merge commit (historia completa, sin squash). `dev` y `main` nunca divergen.
-
-### Estado actual (2026-09-03)
-
-| Fase | Estado | Spec |
-|------|--------|------|
-| **Fase 0** — Esqueleto Vivo | ✅ Completa | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
-| **Fase 1** — Context Store | ✅ Completa (v0.2.0+) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
-| **Fase 2** — Cardinal v2 (Blackboard + MCP + Pool) | 🚧 En curso (v0.2.5; `/router` + key create/USD + fusion ✅) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
-| **Fase 3+** — Graph + Automations | 🔮 Futuro | — |
+- Backend: TypeScript + Bun (`Bun.serve`, `bun:sqlite`).
+- Frontend: React + TypeScript + Vite + Tailwind.
+- DB: SQLite (single file, zero infra).
+- Real-time: native WebSocket (see [`docs/superpowers/specs/`](./docs/superpowers/specs/)).
+- Runtime: always containerized with Podman. Do not install native dependencies on the host.
 
 ---
 
-## 🔢 Versionado
+## Rules (split by topic)
 
-- **Source of truth:** campo `version` en `package.json` raíz
-- **Formato:** `MAJOR.FASE.PATCH` — ej: `0.0.2`
-  - **MAJOR**: `0` hasta que el sistema sea estable → `1.0.0`
-  - **FASE**: fase actual del roadmap (0, 1, 2...), se bupea en el PR `dev → main`
-  - **PATCH**: incrementos incrementales dentro de la fase (features, fixes, docs)
-- **Regla:** en `dev` solo se bupea PATCH; la FASE se bupea una sola vez en el PR `dev → main`
+| Topic | File |
+|-------|------|
+| Branching and merge strategy | [`AGENTS/branching.md`](./AGENTS/branching.md) |
+| Commit format and rules | [`AGENTS/commits.md`](./AGENTS/commits.md) |
+| PR flow and pre-merge checklist | [`AGENTS/prs.md`](./AGENTS/prs.md) |
+| `MAJOR.FASE.PATCH` versioning | [`AGENTS/versioning.md`](./AGENTS/versioning.md) |
+| TDD and what to test | [`AGENTS/tdd.md`](./AGENTS/tdd.md) |
+| Quick security rules | [`AGENTS/security.md`](./AGENTS/security.md) |
+| Documentation rules | [`AGENTS/docs.md`](./AGENTS/docs.md) |
+| Repo structure | [`AGENTS/structure.md`](./AGENTS/structure.md) |
 
----
+## Development workflow
 
-## 📋 Commits
+- Cursor as daily surface → [`docs/agents/cursor-workflow.md`](./docs/agents/cursor-workflow.md)
+- OpenCode as alternative path (legacy) → [`docs/agents/opencode-orchestration.md`](./docs/agents/opencode-orchestration.md)
+- Canonical roles → [`docs/agents/roles/`](./docs/agents/roles/)
 
-**Formato:** [Conventional Commits](https://www.conventionalcommits.org/)
+## Active skills
 
-```
-<type>(<scope>): <descripción breve en inglés>
+| Skill | When |
+|-------|------|
+| `cardinal-dev` | Index of development rules (this file) |
+| `cardinal-commit` | Commit format and rules (detail) |
+| `cardinal-pr` | Create a PR step by step |
 
-<opcional: cuerpo con qué, por qué, y decisiones>
-```
-
-**Tipos:** `feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `style`
-
-**Ejemplos:**
-
-```
-feat(ws): add agent heartbeat with ping/pong protocol
-
-Implementación del keep-alive sobre WebSocket. 30s de intervalo,
-2 pings perdidos = desconexión. Evento emitido al dashboard.
-```
-
-```
-fix(auth): reject expired JWT with 401 instead of 500
-```
-
-```
-chore: bump version to 0.1.0 — model router MVP
-```
-
-```
-docs: add SOULs and review workflow to AGENTS.md
-```
-
-**Reglas:**
-- Primera línea ≤ 72 chars, **en inglés** (estándar conventional commits)
-- Cuerpo **en español** — explicar el *qué* y *por qué*, no el *cómo*
-- Si el commit cierra un issue: `Closes #N` al final del cuerpo
-- **Autoría:** el commit debe usar el nombre y email del usuario de GitHub que tiene acceso al repo (`git config user.name` / `user.email`), no el nombre de ningún agente. Todos los agentes deben heredar la identidad del owner.
+Planned and pending skills: [`docs/skills.md`](./docs/skills.md).
 
 ---
 
-## 📤 Pull Requests
+## Current state (2026-09-03)
 
-### Flujo `dev → main`
-
-1. `dev` acumula features, fixes, docs
-2. Cuando está estable → se abre PR de `dev` a `main`
-3. El orquestador (fuera del repo) abre el PR
-4. El humano (fuera del repo) revisa y mergea
-5. **Nunca auto-merge**
-
-### Pre-merge checklist (obligatorio)
-
-- [ ] `bun test` pasa completo (todos los packages + backend)
-- [ ] `bun run build` pasa (frontend/)
-- [ ] Audit de leaks: keys, tokens, paths absolutos, emails
-- [ ] Standard Review aprobado (código, claridad, mantenibilidad)
-- [ ] Security Review aprobado si hubo cambios en `auth/`, `keys/`, `ws/` o protocolo
-- [ ] Version bump en `package.json` si corresponde
-- [ ] `docs/features/<fecha>-<nombre>.md` creado o actualizado
-
-### Merge strategy
-
-**Merge commit.** Se usa merge estándar (no squash). Todos los commits de `dev` pasan a `main` con un merge commit explícito. `dev` y `main` nunca divergen — no hay necesidad de realinear después del merge.
+| Phase | Status | Spec |
+|-------|--------|------|
+| Phase 0 — Living Skeleton | Complete | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
+| Phase 1 — Context Store | Complete (v0.2.0+) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
+| Phase 2 — Cardinal v2 (Blackboard + MCP + Pool) | In progress (v0.2.5; `/router` + key create/USD + fusion ready) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
+| Phase 3+ — Graph + Automations | Future | — |
 
 ---
 
-## 👁️ Roles de Revisión
-
-Los agentes revisores son roles, no identidades fijas. Cualquier agente puede asumir
-un rol según el contexto. Los nombres específicos se asignan fuera del repo.
-
-| Rol | Disparador | Scope |
-|-----|-----------|-------|
-| **Standard Review** | Todo PR a `main` | Código, claridad, mantenibilidad, tests |
-| **Security Review** | Cambios en `auth/`, `keys/`, `ws/`, protocolo | Secrets, inyección, arquitectura de seguridad |
-| **Pentest** | One-shot, bajo demanda | Recon, vulnerabilidades, PoC |
-
-Templates de review: [`docs/agents/prompts/standard-review.md`](./docs/agents/prompts/standard-review.md)
-
----
-
-## 🧪 Test-Driven Development (TDD)
-
-### Ámbitos con TDD obligatorio (RED → GREEN → REFACTOR → COMMIT)
-
-| Ámbito | Qué cubre | Riesgo si falla |
-|--------|-----------|-----------------|
-| **Auth** | JWT sign/verify, expiración, login flow, cookie | Acceso no autorizado al sistema |
-| **Keys** | Generación, hashing SHA-256, validación, revocación | Suplantación de identidad de agentes |
-| **Protocolo WS** | Parseo de mensajes, state machine, ping/pong, timeout | Desconexiones silenciosas, estado corrupto |
-| **DB** | Migraciones, integridad de schema, queries críticas | Pérdida de datos, corrupción |
-| **Router** | Fallback chain, rate limiting, budget enforcement | Consumo descontrolado de APIs externas |
-
-### Flujo TDD por feature
-
-```
-1. RED     → bun test --watch              # escribí el test que FALLA
-2. GREEN   → implementación mínima         # corré el test → PASA
-3. REFACTOR → limpiá sin romper tests      # corré el test → sigue PASANDO
-4. COMMIT  → solo después de GREEN        # nunca committear tests rotos
-```
-
-### Ámbitos sin TDD obligatorio (test después, o solo typecheck)
-
-| Ámbito | Verificación |
-|--------|-------------|
-| Frontend components | `bun run build` (typecheck + Vite build) |
-| CSS / estilos | Revisión visual (manual) |
-| Docs, configs, deploy | Revisión humana |
-
----
-
-## 🐳 Containerización
-
-- **Dev local:** `compose.yaml` (`podman-compose`)
-- **Prod:** Podman Quadlet (archivos en `deploy/quadlet/`)
-- **Pod:** `cardinal` (Caddy + Nginx + Bun backend)
-- Imágenes: `localhost/cardinal-backend:latest`, `localhost/cardinal-frontend:latest`
-- Nunca exponer puertos sin Caddy delante
-
----
-
-## 🔒 Seguridad
-
-- **Auditar leaks antes de push:** keys, tokens, paths absolutos, emails
-- `.env` y secretos **nunca committeados** — usar `.env.example` como template
-- API keys de agentes: formato `sk-cardinal-*`, almacenadas como SHA-256 en DB
-- Nada expuesto sin auth layer
-
----
-
-## 📝 Documentación
-
-- **Cada feature, fix o patch debe tener un doc completo en el repo**
-- Ruta: `docs/features/<nombre>.md` dentro del repo
-- El doc debe incluir: **qué se hizo, por qué, decisiones tomadas, alternativas consideradas, y archivos creados/modificados**
-- La PR template es solo un resumen — **el detalle completo vive en el doc de la feature**
-- No hace falta documentar bumps de versión ni cambios triviales de una línea
-
-### Documentación para agentes (BMAD-lite)
-
-Los archivos en `docs/agents/` pueden usar delimitadores para lazy-loading:
-
-```markdown
-<!-- REGION: standard-review-checklist -->
-## Standard Review Checklist
-...
-<!-- ENDREGION: standard-review-checklist -->
-```
-
-Los agentes pueden cargar solo la región que necesitan sin leer el archivo entero.
-Esto aplica a: SOULs, prompts de review, checklists de seguridad.
-
----
-
-## 📁 Estructura del Repositorio
-
-```
-cardinal-system/
-├── .cursor/
-│   ├── agents/              subagentes Cursor (adapters)
-│   └── rules/
-├── packages/                  ← Bun workspaces (paquetes internos)
-│   ├── core/                  tipos compartidos, config, zod schemas
-│   ├── auth/                  JWT sign/verify, login, logout
-│   ├── keys/                  generación, hash, revocación
-│   ├── ws/                    protocolo, hub, mensajes
-│   ├── db/                    schema, migraciones, queries
-│   └── router/                model routing (Fase 2)
-├── backend/
-│   └── src/                   composición: server, api handlers, static serve
-├── frontend/
-│   └── src/                   React + Vite + Tailwind v4
-├── examples/
-│   └── ws-agent.ts            cliente WS de referencia (no SDK)
-├── deploy/
-│   ├── Containerfile
-│   ├── Caddyfile.example
-│   └── quadlet/
-├── docs/
-│   ├── features/              documentación de features completadas
-│   ├── agents/                SOULs, prompts, checklists de revisión
-│   │   ├── prompts/
-│   │   └── roles/           roles canónicos (agnósticos)
-│   ├── superpowers/
-│   │   ├── specs/             specs de diseño por fase
-│   │   └── plans/             planes de implementación
-│   └── references/            charlas, papers, arquitecturas externas
-├── skills/                    skills de Hermes para desarrollo del Cardinal
-├── AGENTS.md                  este archivo
-├── README.md
-└── package.json               workspaces + version source of truth
-```
-
-### Trackers
-
-- Skills planeadas y pendientes → [`docs/skills.md`](docs/skills.md)
-- Cronjobs planeados por fase → [`docs/cronjobs.md`](docs/cronjobs.md)
-
-### Skills activas
-
-- `cardinal-dev` — Workflow completo de desarrollo (branching, commits, PRs, versionado, TDD, revisión)
-- `cardinal-system` — Dev técnico (keys, WebSocket protocol, API, quirks, pipeline)
-
----
-
-*Reglas vivas. Si algo cambia, este archivo se actualiza.*
-
----
-
-## 🕸️ Swarm Workflow
-
-**Cursor es la superficie de desarrollo ahora.** Composer es el padre: implementa cambios de 1–2 archivos sin lógica crítica; delega el resto a subagentes en `.cursor/agents/`.
-
-- TDD obligatorio (auth, keys, ws, db, router), multi-archivo, review, docs de feature, verificación, u otro pane/kind → delegar.
-- Invocación: automática por `description`, o explícita (`/builder`, `/verifier`, “usá el subagente frontend”).
-- Tras un “listo”, siempre `verifier` con evidencia (`bun test` / `bun run build`).
-- Herdr (otra instancia de Cursor u otro kind) **solo** vía `herdr-dispatcher`, y solo si `HERDR_ENV=1`. Si no, in-session.
-- OpenCode CLI (`.opencode/`) sigue disponible (`/feature`, `/test`, `/review`); no es el camino diario.
-
-Flujo: tester RED → builder | ws-protocol | frontend GREEN → verifier → reviewer ∥ security-reviewer (si auth/keys/ws) → docs → el padre sugiere commit (no commitea salvo pedido).
-
-Workflow por feature:
-
-1. **Delegar** — 1–2 archivos sin lógica crítica in-session; el resto a subagentes
-2. **Verificar** — `verifier` con evidencia (`bun test` / `bun run build`); review si aplica
-3. **Documentar** — `docs/features/<fecha>-<nombre>.md` con qué, por qué, decisiones, alternativas, archivos
-4. **Commit + push** — conventional commit a `dev` incluyendo el doc; solo si el humano lo pide
-
-## 🤖 Agent Roles (Cursor)
-
-| Agente | Readonly | Rol |
-|--------|----------|-----|
-| `builder` | no | Implementa spec en `packages/` (salvo `ws/`) y `backend/` |
-| `ws-protocol` | no | Protocolo en `packages/ws/` |
-| `frontend` | no | `frontend/**`, types 1:1 con JSON, WS a `:8787` |
-| `tester` | no | TDD RED en `*.test.ts` |
-| `verifier` | sí | Corre tests/build; no cree claims; no parchea |
-| `reviewer` | sí | Calidad CRITICAL/HIGH/LOW |
-| `security-reviewer` | sí | Auth/keys/ws/leaks; findings confirmados |
-| `docs` | no | `docs/features/` tras verificar |
-| `herdr-dispatcher` | no | Split/start/prompt en Herdr; no implementa producto |
-
-Políticas canónicas: `docs/agents/roles/<rol>.md`. Adapters: `.cursor/agents/<rol>.md`. Built-ins de Cursor (`explore`, `bash`, `browser`) no se redefinen.
-
-## 📤 Delegation Rules
-
-- Padre Cursor: trabajo chico in-session; no es un orchestrator estricto.
-- Un subagente = una responsabilidad. `builder` no pisa `ws-protocol` ni `frontend`.
-- Backend+UI en paralelo (`builder`/`ws-protocol` + `frontend`). TDD nunca al revés (RED antes de GREEN).
-- El padre verifica resultados antes de marcar completo. `verifier` FAIL → re-delegar.
-- Commits: identidad del owner (`git config`); jamás nombre de agente. Solo si el humano lo pide.
-- Cardinal-producto no spawnea agentes en Herdr.
-
-## 🖥️ Cursor Section
-
-- Cursor lee `AGENTS.md` + `.cursor/rules/cardinal.mdc` + `.cursor/agents/`.
-- Composer orquesta e implementa lo chico. Especialistas y Herdr se delegan.
-- OpenCode CLI es swarm legado, no el camino diario.
-
-## ⚙️ OpenCode Config Reference
-
-- Config: `opencode.json` raíz (model default, default_agent, subagent_depth, permissions, MCPs)
-- Agentes: `.opencode/agents/<nombre>.md` (frontmatter + system prompt)
-- Comandos: `.opencode/commands/<nombre>.md`
-- Verificar el setup completo: `bash scripts/verify-dev-setup.sh` (agentes, rules, config)
-- El MCP de GitHub requiere `GITHUB_TOKEN` en el entorno: `set -x GITHUB_TOKEN (gh auth token)` (fish)
-- Extender: agente nuevo → archivo en `.opencode/agents/`; comando nuevo → `.opencode/commands/`; MCP nuevo → entrada en `opencode.json` → `mcp` + quitar su namespace del deny
-- Los MCPs globales (`ZerrantHive_*`, `pencil_*`) están deshabilitados en este proyecto
+*Live rules. If something changes, update `AGENTS/*.md`.*

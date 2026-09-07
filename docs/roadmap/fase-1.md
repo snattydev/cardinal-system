@@ -1,4 +1,4 @@
-# Fase 1 — Context Store 🏗️
+# Fase 1 — Context Store
 
 > Spec: [`../superpowers/specs/2026-07-23-cardinal-context-store-design.md`](../superpowers/specs/2026-07-23-cardinal-context-store-design.md)
 

@@ -1,17 +1,18 @@
 ---
 name: cardinal-pr
-description: Crear un Pull Request en Cardinal System — branch, bump version, commit, push, abrir PR, llenar template y asignar revisores.
+description: Create a Pull Request in Cardinal System — branch, version bump, commit, push, open PR, fill template, assign reviewers.
 category: development
 ---
 
-# Cardinal System — Crear un Pull Request
+# Cardinal System — Create a Pull Request
 
-## ⚠️ Regla fundamental
-El orquestador abre PRs, el humano mergea. Jamás auto-merge.
+## Fundamental rule
+
+The orchestrator opens PRs, the human merges them. Never auto-merge.
 
 ---
 
-## Flujo completo
+## Full flow
 
 ### 1. Branch
 
@@ -21,36 +22,39 @@ git pull origin dev
 git checkout -b <type>/<desc>
 ```
 
-Tipos: `feat/`, `fix/`, `chore/`, `docs/`
+Types: `feat/`, `fix/`, `chore/`, `docs/`.
 
-### 2. Cambios
+### 2. Changes
 
-- Delegar implementación a subagente one-shot
-- Verificar resultado: archivos, coherencia, leaks
-- Documentar en `docs/features/` (crear el .md)
+- Delegate implementation to a one-shot subagent.
+- Verify the result: files, coherence, leaks.
+- Document at `docs/features/` (create the `.md`).
 
 ### 3. Version bump
 
-**Solo si el PR es a `main`.** En PRs a `dev` no se toca la versión.
+**Only if the PR is to `main`.** For PRs to `dev`, do not touch the version.
 
 ```bash
-# Evaluar qué bump según lo acumulado:
-# PATCH: fixes, security, docs, chores  → 0.0.2 → 0.0.3
-# MINOR: nuevas features                 → 0.0.3 → 0.1.0
+# Evaluate which bump based on accumulated changes:
+# PATCH: fixes, security, docs, chores   → 0.0.2 → 0.0.3
+# MINOR: new features                    → 0.0.3 → 0.1.0
 # MAJOR: breaking changes                → 0.1.0 → 1.0.0
 
-# Editar package.json → "version": "X.Y.Z"
+# Edit package.json → "version": "X.Y.Z"
 ```
+
+Repo rule: the format is `MAJOR.FASE.PATCH`. FASE is bumped only in the PR `dev → main`; in `dev` only PATCH.
 
 ### 4. Commit
 
 ```
-<type>(<scope>): <breve en inglés>
+<type>(<scope>): <short in English>
 
-<Cuerpo en español: qué y por qué.>
+<Body in Spanish: what and why.>
 ```
 
-Ejemplo:
+Example:
+
 ```
 feat(ws): add agent heartbeat with ping/pong protocol
 
@@ -58,36 +62,36 @@ Health check sobre WebSocket con 30s de intervalo. 2 pings
 perdidos marcan al agente como offline en el dashboard.
 ```
 
-### 5. Push y PR
+### 5. Push and PR
 
 ```bash
 git push -u origin <branch>
-gh pr create --base dev --title "<título>" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+gh pr create --base dev --title "<title>" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
 ```
 
-- PR siempre a `dev`, NUNCA directo a `main`
-- El PR a `main` se hace solo cuando `dev` está estable (PR `dev → main`)
+- PR always to `dev`, **never** directly to `main`.
+- The PR to `main` happens only when `dev` is stable.
 
 ### 6. Template
 
-Llenar con `.github/PULL_REQUEST_TEMPLATE.md` — resumen ejecutivo, el detalle va en doc de vault.
+Fill it with `.github/PULL_REQUEST_TEMPLATE.md`. Executive summary — the detail goes in the feature doc.
 
-### 7. Revisores (solo PRs a `main`)
+### 7. Reviewers
 
-| PR a | Revisores |
-|------|-----------|
-| `dev` | Ninguno — merge directo |
-| `main` | Standard Reviewer (automático), Security Reviewer (bajo demanda) |
+| PR to | Reviewers |
+|-------|-----------|
+| `dev` | None — direct merge |
+| `main` | Standard Review (required), Security Review (if changes in `auth/`, `keys/`, `ws/`, protocol) |
 
 ---
 
-## Verificaciones pre-PR
+## Pre-PR verifications
 
-- [ ] Branch creada desde `dev` actualizado
-- [ ] Sin leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`
-- [ ] Versión bump si aplica
-- [ ] Commit message en formato conventional commits, cuerpo en español
-- [ ] PR template lleno
-- [ ] Doc en `docs/features/` creado
-- [ ] PR apunta a `dev` (no a `main`)
-- [ ] Skills sincronizadas: `bash skills/sync-skills.sh`
+- [ ] Branch created from updated `dev`.
+- [ ] No leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`.
+- [ ] Version bump if applicable (only PR to `main`).
+- [ ] Commit message in conventional commits format, body in Spanish.
+- [ ] PR template filled.
+- [ ] Doc at `docs/features/` created.
+- [ ] PR targets `dev` (not `main`).
+- [ ] Skills synced: `bash skills/sync-skills.sh`.
