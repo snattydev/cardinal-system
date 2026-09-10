@@ -9,6 +9,7 @@
     "build": "bun run --cwd frontend build",
     "start": "bun backend/src/index.ts",
     "test": "bun test --timeout 30000 packages/*/src backend/src scripts/*.test.ts",
+    "test:e2e": "bun run --cwd frontend playwright test",
     "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
     "keygen": "bun packages/keys/src/cli.ts",
     "cloud-agent": "bun scripts/cloud-agent.ts",

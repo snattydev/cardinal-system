@@ -154,20 +154,23 @@ with a JSON stdin/stdout contract and bounded scope**.
   supervision of Kirito, Lisbeth, and Agil from any browser.
 - Files: `frontend/src/components/CommandBar.tsx`, `frontend/src/pages/HerdrTerminal.tsx`.
 
-### N5 — SAO Design System
+### N5 — SAO Design System & Production Quadlet [done]
 
 - Design specification: `docs/superpowers/specs/2026-09-10-sao-design-system.md`.
-- Tokens:
-  - Obsidian Background: `#0A0B0E` (deep space obsidian)
-  - Graphite Panel: `#12151D` / `#181C26` with fine borders `rgba(255, 255, 255, 0.07)`
-  - Aincrad Orange: `#FF7A00` / `#FFA033` (primary actions, player cursor)
-  - Sinon Turquoise: `#00F0FF` / `#00C2CC` (telemetry, live data, success metrics)
-  - Underworld Purple: `#8A3FFC` / `#A56EFF` (identity, keys, encryption)
-  - Slash Red: `#FF2A4D` (error states, damage cutoffs, unauthorized denials)
-- Floating angular panels, clean typography (Geist/Inter + JetBrains Mono),
-  and optional audio effects (SAO menu pop, warning alert, link start).
-- Migration of `/keys`, `/router`, `/tasks` to new design system.
+- Tokens & primitives: Obsidian (`#0A0B0E`), Graphite (`#12151D`), Aincrad Orange (`#FF7A00`),
+  Sinon Turquoise (`#00F0FF`), Underworld Purple (`#8A3FFC`), Slash Red (`#FF2A4D`).
+- Primitives: `Card`, `Badge`, `Button`, `Input` in `frontend/src/components/ui/`.
+- Pages migrated: `Layout.tsx`, `Login.tsx`, `Tasks.tsx`, `Overview.tsx`, `AgentCard.tsx`.
+- Production deployment: Rootless Podman Quadlets running under systemd --user (`cardinal-pod`,
+  `cardinal-backend`, `cardinal-frontend`, `cardinal-caddy`) publishing port 8080.
 
+### N7 — Automated UI Testing via Cloud Cursor & Playwright
+
+- Framework: `@playwright/test` configured in `frontend/playwright.config.ts`.
+- E2E specs: `frontend/e2e/auth-and-dashboard.spec.ts` (Login, redirects, SAO elements).
+- Execution modes:
+  - Local: `bun run --cwd frontend playwright test` against `http://127.0.0.1:8080`.
+  - Cloud Cursor: Uses `@cursor/sdk` to dispatch cloud agents on feature branches for visual regression and PR generation once `CURSOR_API_KEY` is supplied in `.env`.
 ### N6 — In-App Notification Center
 
 - `notifications` table (id, target, type, payload, read, created_at).
