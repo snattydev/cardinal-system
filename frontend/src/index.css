@@ -18,17 +18,58 @@
 @import "tailwindcss";
 
 @theme {
-  --color-sao-bg: #08070c;
-  --color-sao-panel: #0a0e27;
-  --color-sao-accent: #00d4ff;
-  --color-sao-mint: #7ed3c1;
-  --color-sao-violet: #8b5cf6;
+  /* Core surfaces */
+  --color-sao-obsidian: #0A0B0E;
+  --color-sao-graphite: #12151D;
+  --color-sao-elevated: #181C26;
+
+  /* Functional accents */
+  --color-sao-aincrad: #FF7A00;
+  --color-sao-aincrad-glow: rgba(255, 122, 0, 0.15);
+  --color-sao-sinon: #00F0FF;
+  --color-sao-sinon-glow: rgba(0, 240, 255, 0.12);
+  --color-sao-underworld: #8A3FFC;
+  --color-sao-underworld-glow: rgba(138, 63, 252, 0.15);
+  --color-sao-slash-red: #FF2A4D;
+  --color-sao-slash-glow: rgba(255, 42, 77, 0.15);
+
+  /* High-contrast typography */
+  --color-sao-text: #EAECEF;
+  --color-sao-muted: #8C95A6;
+  --color-sao-dim: #535B6D;
+
+  /* Backward compatibility aliases */
+  --color-sao-bg: #0A0B0E;
+  --color-sao-panel: #12151D;
+  --color-sao-accent: #00F0FF;
+  --color-sao-mint: #00F0FF;
+  --color-sao-violet: #8A3FFC;
+
+  /* Typography */
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
 }
 
 body {
-  background-color: var(--color-sao-bg);
-  color: #e2e8f0;
+  background-color: var(--color-sao-obsidian);
+  color: var(--color-sao-text);
   font-family: var(--font-sans);
+  letter-spacing: -0.01em;
+}
+
+/* Floating angular panel utility */
+.sao-panel {
+  background-color: var(--color-sao-graphite);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+  border-radius: 2px;
+}
+
+.sao-panel-elevated {
+  background-color: var(--color-sao-elevated);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(12px);
+  border-radius: 2px;
 }
