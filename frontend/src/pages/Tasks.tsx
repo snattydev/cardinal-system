@@ -3,7 +3,7 @@ import { api, ApiError } from "../lib/api";
 import type { TaskPayload } from "../lib/types";
 import { connectRoster } from "../lib/ws";
 import { useAuth } from "../hooks/useAuth";
-
+import { Card, Badge, Button, Input } from "../components/ui";
 /** Raw shape from GET/POST/PUT `/api/tasks` (snake_case TaskRow). */
 interface TaskRowJson {
   id: string;
@@ -45,11 +45,11 @@ function fmtWhen(value: string | null): string {
   return value ?? "never";
 }
 
-function statusClass(status: TaskPayload["status"]): string {
-  if (status === "open") return "text-sao-accent";
-  if (status === "claimed") return "text-sao-violet";
-  if (status === "blocked") return "text-red-400";
-  return "text-slate-500";
+function TaskBadge({ status }: { status: TaskPayload["status"] }) {
+  if (status === "open") return <Badge variant="sinon" dot>open</Badge>;
+  if (status === "claimed") return <Badge variant="aincrad" dot>claimed</Badge>;
+  if (status === "blocked") return <Badge variant="slash" dot>blocked</Badge>;
+  return <Badge variant="neutral">done</Badge>;
 }
 
 export default function Tasks() {
@@ -143,47 +143,56 @@ export default function Tasks() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="font-mono text-lg tracking-widest text-sao-accent">TASKS</h1>
+      <div className="flex items-center justify-between border-b border-white/5 pb-4">
+        <div className="flex items-center gap-2 font-mono text-lg tracking-widest text-sao-text">
+          <span className="w-2 h-2 bg-sao-aincrad shadow-[0_0_8px_#FF7A00]"></span>
+          <span>TASKS</span>
+        </div>
         <button
           type="button"
           onClick={() => setShowHistory((v) => !v)}
-          aria-label="pasadas"
-          title="pasadas"
-          className={`rounded border p-1.5 text-slate-500 transition-colors hover:border-sao-accent/40 hover:text-sao-accent ${
-            showHistory ? "border-sao-accent/60 text-sao-accent" : "border-transparent"
+          aria-label="history"
+          title="Toggle completed history"
+          className={`rounded-[2px] border p-2 font-mono text-xs uppercase tracking-wider transition-all duration-150 ${
+            showHistory
+              ? "border-sao-aincrad/50 bg-sao-elevated text-sao-aincrad shadow-[0_0_12px_rgba(255,122,0,0.12)]"
+              : "border-white/10 text-sao-muted hover:border-white/20 hover:text-sao-text"
           }`}
         >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.25" />
-            <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" strokeWidth="1.25" />
-          </svg>
+          <span className="flex items-center gap-1.5">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="3" y="2" width="10" height="12" rx="1" stroke="currentColor" strokeWidth="1.25" />
+              <path d="M5.5 5.5h5M5.5 8h5M5.5 10.5h3" stroke="currentColor" strokeWidth="1.25" />
+            </svg>
+            Archive
+          </span>
         </button>
       </div>
 
       <form onSubmit={(e) => void onCreate(e)} className="flex flex-wrap gap-2">
-        <input
+        <Input
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          placeholder="goal"
-          className="min-w-48 flex-1 rounded border border-sao-accent/20 bg-sao-bg px-3 py-2 font-mono text-sm outline-none focus:border-sao-accent"
+          placeholder="Define new task goal..."
+          className="min-w-48 flex-1"
         />
-        <button
-          type="submit"
-          className="rounded border border-sao-accent bg-sao-accent/10 px-3 py-2 font-mono text-sm text-sao-accent transition-colors hover:bg-sao-accent/20"
-        >
-          crear
-        </button>
+        <Button type="submit" variant="primary">
+          Create Task
+        </Button>
       </form>
 
-      {error && <p className="font-mono text-sm text-red-400">{error}</p>}
+      {error && (
+        <div className="border border-sao-slash-red/40 bg-[rgba(255,42,77,0.08)] px-4 py-2 font-mono text-xs text-sao-slash-red">
+          {error}
+        </div>
+      )}
 
       {loadStatus === "ready" && live.length === 0 ? (
-        <p className="rounded-lg border border-sao-accent/20 bg-sao-panel/60 p-6 font-mono text-sm text-slate-500">
-          no open tasks — create one above
-        </p>
+        <Card className="p-8 text-center font-mono text-sm text-sao-dim border-dashed">
+          No active tasks — create one above.
+        </Card>
       ) : (
-        <div className="flex flex-col divide-y divide-sao-accent/10 rounded-lg border border-sao-accent/20 bg-sao-panel/60">
+        <div className="flex flex-col gap-2">
           {live.map((task) => (
             <TaskRow
               key={task.id}
@@ -199,21 +208,30 @@ export default function Tasks() {
       )}
 
       {showHistory && (
-        <section className="flex flex-col gap-2">
-          <h2 className="font-mono text-xs tracking-widest text-slate-500">PASADAS</h2>
+        <section className="mt-4 flex flex-col gap-3">
+          <h2 className="flex items-center gap-2 font-mono text-xs uppercase tracking-widest text-sao-muted">
+            <span className="w-1.5 h-1.5 bg-sao-dim inline-block"></span>
+            Completed Archive
+          </h2>
           {history.length === 0 ? (
-            <p className="font-mono text-sm text-slate-600">no completed tasks</p>
+            <Card className="p-6 text-center font-mono text-xs text-sao-dim">
+              No completed tasks recorded.
+            </Card>
           ) : (
-            <div className="flex flex-col divide-y divide-sao-accent/10 rounded-lg border border-sao-accent/20 bg-sao-panel/40">
+            <div className="flex flex-col gap-1.5">
               {history.map((task) => (
                 <div
                   key={task.id}
-                  className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 font-mono text-sm text-slate-500"
+                  className="sao-panel flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 font-mono text-xs text-sao-muted"
                 >
-                  <span className={statusClass(task.status)}>{task.status}</span>
-                  <span>{task.goal}</span>
-                  <span>{task.assignedTo ?? "unassigned"}</span>
-                  <span>done {fmtWhen(task.updatedAt)}</span>
+                  <div className="flex items-center gap-3">
+                    <TaskBadge status={task.status} />
+                    <span className="text-sao-text">{task.goal}</span>
+                  </div>
+                  <div className="flex items-center gap-4 text-[11px] text-sao-dim">
+                    <span>assigned: {task.assignedTo ?? "unassigned"}</span>
+                    <span>done {fmtWhen(task.updatedAt)}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -240,37 +258,47 @@ function TaskRow({
   onCancelComplete: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3 font-mono text-sm">
-      <span className={statusClass(task.status)}>{task.status}</span>
-      <span className="text-sao-accent">{task.goal}</span>
-      <span className="text-slate-400">{task.assignedTo ?? "unassigned"}</span>
-      <span className="text-slate-500">by {task.createdBy}</span>
-      <span className="text-slate-500">created {fmtWhen(task.createdAt)}</span>
-      <span className="ml-auto">
+    <Card
+      variant="interactive"
+      className="flex flex-wrap items-center justify-between gap-4 p-3.5"
+    >
+      <div className="flex flex-wrap items-center gap-3 font-mono text-xs">
+        <TaskBadge status={task.status} />
+        <span className="font-medium text-sao-text">{task.goal}</span>
+        <span className="text-sao-dim">|</span>
+        <span className="text-sao-muted">
+          {task.assignedTo ? `agent: ${task.assignedTo}` : "unassigned"}
+        </span>
+        <span className="text-sao-dim">by {task.createdBy}</span>
+        <span className="text-sao-dim">{fmtWhen(task.createdAt)}</span>
+      </div>
+
+      <div className="ml-auto flex items-center gap-2">
         {pendingId === task.id ? (
-          <span className="flex gap-2">
-            <button type="button" onClick={onConfirmComplete} className="text-red-400 hover:text-red-300">
-              sí
-            </button>
-            <button type="button" onClick={onCancelComplete} className="text-slate-500 hover:text-sao-accent">
-              no
-            </button>
-          </span>
+          <div className="flex items-center gap-2 font-mono text-xs">
+            <span className="text-sao-muted">Mark complete?</span>
+            <Button variant="danger" size="sm" onClick={onConfirmComplete}>
+              Confirm
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onCancelComplete}>
+              Cancel
+            </Button>
+          </div>
         ) : (
-          <span className="flex gap-3">
+          <div className="flex items-center gap-2">
             {task.status === "open" && (
-              <button type="button" onClick={onClaim} className="text-sao-violet hover:text-sao-accent">
-                claimar
-              </button>
+              <Button variant="secondary" size="sm" onClick={onClaim}>
+                Claim
+              </Button>
             )}
             {task.status !== "done" && (
-              <button type="button" onClick={onAskComplete} className="text-sao-violet hover:text-sao-accent">
-                completar
-              </button>
+              <Button variant="primary" size="sm" onClick={onAskComplete}>
+                Complete
+              </Button>
             )}
-          </span>
+          </div>
         )}
-      </span>
-    </div>
+      </div>
+    </Card>
   );
 }
