@@ -2,30 +2,32 @@
 
 > Complements the living spec `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`
 > and its backlog `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`.
-> Initial status: v0.2.5 (2026-09-03). Fase 2 advanced in `dev`. Router closed.
-> Re-scope 2026-09-07: now that the router is in place, one-shot container agents,
-> tasks v2 (assign triggers agent), chatbot, scoped memory, design system,
-> and notifications are enabled.
+> Status: v0.2.6 (2026-09-10). Fase 2 complete in `dev` (router, keys, blackboard, MCP hub).
+> Re-scoped 2026-09-10: Cardinal 24/7 server model, division of labor (lightweight
+> internal maintenance workers vs persistent Herdr agents), memory monolith (`/vaults`),
+> Cockpit Command (`Ctrl+K`) + Herdr Web TUI view (replacing bloated chat), and SAO Design System.
 
 ## Why a v3
 
-v2 closes the four pillars: identity, key pool/router, blackboard+mailbox,
-and MCP context hub. But the 2026-09-03 sprint (router) and the 2026-09-07
-discussion leave three explicit requests:
+v2 closes the foundational four pillars: identity, key pool/router, blackboard+mailbox,
+and MCP context hub. The 2026-09-10 architectural alignment refines the next phase:
 
-1. **Tasks without claim/complete.** The current model (`open | claimed | done |
-   blocked`) leaves agent triggering to the human. Request: on task creation,
-   a toggle triggers a one-shot agent that solves it. The human assigns; they do
-   not claim.
-2. **UI AI Chatbot.** Embedded Hermes (or similar) to converse and trigger actions
-   from the UI. Same agentic backend as tasks.
-3. **`/memory` with per-key/agent scopes.** Three levels: read, write-existing,
-   append-new. The current vault is reborn as a centralized module.
-
-Accompanying items: design system + critical screen redesign sprint (the current
-UI lacks conventions and polish), and an in-app notification center (task, agent,
-and memory events require a visible home).
-
+1. **Lightweight Internal Workers (N1):** Ephemeral Podman containers running a minimal
+   Bun + MCP runtime for system maintenance, memory hygiene, and background summarization.
+   Heavy coding and architecture remain sovereign to persistent Herdr agents (Kirito, Lisbeth, Agil)
+   or developer workstation CLIs.
+2. **Tasks v2 (N2):** Clean task lifecycle (`pending | running | done | failed`). Assign triggers
+   internal maintenance workers or routes to the blackboard for persistent agents.
+3. **Memory Monolith (`/vaults` - N3):** All system and personal knowledge unifies as Markdown (`.md`)
+   in `/vaults` on the 24/7 server. Structured categories (`personal/`, `cardinal-system/`, `projects/`,
+   `knowledge/`, `agents/`) protected by path-based ACL in `agent_keys.scopes` and automated backup jobs.
+4. **Cockpit Command & Herdr View (N4):** Replaces generic multi-turn chatbot with a rapid
+   SAO-style Command Bar (`Ctrl+K` for instant queries and actions) and an embedded Web TUI
+   viewer to monitor and command the persistent Herdr container.
+5. **SAO Design System (N5):** Complete visual cohesion across the dashboard with Obsidian/Graphite
+   surfaces, Aincrad Orange primary actions, Sinon Turquoise telemetry, Underworld Purple security badges,
+   Slash Red error cutoffs, floating angular panels, and an optional audio pack.
+6. **In-App Notification Center (N6):** Visible home for task completion, security alerts, and system health.
 ## Spawn Rule (v3 Update)
 
 Spec `2026-08-12-cardinal-v2-architecture.md` §3 stated in v2:
@@ -65,12 +67,12 @@ with a JSON stdin/stdout contract and bounded scope**.
 | 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | release | F2 | P1 | — | all |
 | 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | security/deploy | F2 | P0 | — | cloud blocker |
 | 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | feature | F2 | P1 | Yes | N1 |
-| **N1** | **Containerized agentic backend** (podman quadlet, base image, JSON stdin/stdout contract, lifecycle, TTL, cleanup) | infra | F2 | **P0** | Yes | router closed ([done]) |
-| **N2** | **Tasks v2: no claim/complete, assign triggers one-shot, auto-fire toggle** (clean migration: `pending | running | done | failed | cancelled`) | feature | F2 | **P1** | Yes | N1 |
-| **N3** | **`/memory` module with scoped permissions** (read / write-existing / append-new; per-key and per-agent; existing vault migrates as initial dataset) | feature | F3 | **P1** | Yes | N1 |
-| **N4** | **UI AI Chatbot** (embedded Hermes, WS, persisted conversations, triggers one-shots without auto-fire) | feature | F2 | **P2** | Yes | N1, N2, N5 |
-| **N5** | **Design system + critical screen redesign sprint** (palette, tokens, primitive components + migration of `/keys`, `/router`, `/tasks`, chat) | feature | F2 | **P2** | No | parallel to N4 |
-| **N6** | **In-app notification center** (persisted, snooze, linked to task/agent/memory events) | feature | F2 | **P2** | Yes | N2 |
+| **N1** | **Internal maintenance worker** (ephemeral Podman container, Bun + MCP runtime, JSON stdin/stdout contract, scoped keys, TTL cleanup) | infra | F2 | **P0** | Yes | router closed ([done]) |
+| **N2** | **Tasks v2: assignment triggers maintenance worker, auto-fire toggle** (clean migration: `pending | running | done | failed`) | feature | F2 | **P1** | Yes | N1 |
+| **N3** | **Memory Monolith (`/vaults`) & Path ACL** (`personal/`, `cardinal-system/`, `projects/`, `knowledge/`, `agents/`; path-level scopes in `agent_keys.scopes`; backup snapshot job) | feature | F3 | **P1** | Yes | N1 |
+| **N4** | **Cockpit Command & Herdr Web TUI** (SAO `Ctrl+K` quick query/RAG bar + embedded Web TUI view to server Herdr container) | feature | F2 | **P2** | Yes | N1, N5 |
+| **N5** | **SAO Design System** (Obsidian `#0A0B0E`, Graphite `#12151D`, Aincrad Orange `#FF7A00`, Sinon Turquoise `#00F0FF`, Underworld Purple `#8A3FFC`, Slash Red `#FF2A4D`, floating panels, audio pack) | feature | F2 | **P2** | No | parallel to N1 |
+| **N6** | **In-app notification center** (persisted, snooze, linked to task/agent/security events) | feature | F2 | **P2** | Yes | N2 |
 
 > Items marked with `[done]` belong to the v2 backlog and are already closed.
 > Items **N1–N6** are new. Items **5, 10, 11, 13** from v2 remain active;
@@ -78,147 +80,120 @@ with a JSON stdin/stdout contract and bounded scope**.
 
 ## Decisions
 
-- **N1 is the real blocker.** Without workers in containers, there is no honest
-  way to implement task assignment or the chatbot. It must be completed before any new feature.
-- **Tasks v2 (N2) is a clean cutover.** The `claim`/`complete` endpoints from the
-  current model will be removed when the new version lands. No deprecated coexistence.
-- **Auto-fire applies only to tasks.** Chat (N4) does NOT auto-trigger agents
-  upon detecting executable intent — the human must confirm.
-- **`/memory` is a rename of the vault + new module.** Three independent permission
-  levels: `read` (read entries), `write-existing` (edit existing entries),
-  `append-new` (create new entries without modifying old ones). Scopes per key
-  (`agent_keys.scopes`) and per agent (agent configuration).
-- **In-app notifications only.** Email, web push, and Telegram remain out of scope
-  for this sprint; they can be added as delivery channels to the same center later.
-- **Feature CLI:** N1, N2, N3 -> **cursor-agent** (under current rules).
-  N4, N5, N6 -> decided per sprint (N5 in particular can be handled directly: pure frontend, TDD does not apply).
-- **Target version:** v0.3.0 once N1+N2 land in `dev`. v0.3.x progressively integrates N3–N6.
-
+- **N1 is lightweight maintenance only (Division of Labor).** Workers in Cardinal
+  run minimal Bun + MCP loops. They do NOT compile or replace Herdr/OMP for heavy coding.
+  If a maintenance worker encounters a critical problem, it logs an escalation event.
+- **Tasks v2 (N2) is a clean cutover.** Remove `claim`/`complete` endpoints.
+  Tasks move to `pending | running | done | failed`.
+- **Memory is a single hierarchical `/vaults` tree.** No scattered stores.
+  Strict path-level authorization enforced on backend before filesystem access.
+  `personal/` is strictly denied to all agent keys.
+- **No bloated UI Chatbot.** Replaced by a fast `Ctrl+K` Spotlight command bar
+  and an embedded Web TUI for direct Herdr monitoring.
+- **In-app notifications only.** Keep core tight without external push dependencies.
+- **Feature development tools:** Core features (N1, N2, N3) use mandatory TDD.
+  Frontend and visual design (N4, N5) rely on visual verification and design tokens.
+- **Target version:** v0.3.0 once N1+N2+N3 land in `dev`.
 ## Item Details (Minimum Scope)
 
-### N1 — Containerized Agentic Backend
+### N1 — Internal Maintenance Worker
 
-- Base image `cardinal-worker:latest` (Bun runtime + Cardinal worker,
-  no external CLIs; no open network except what the orchestrator declares).
+- Base container image `cardinal-worker:latest` (minimal Bun runtime + `@cardinal/mcp` client,
+  no heavy dev tools; network bounded to Cardinal internal ports).
 - I/O contract: JSON via stdin/stdout.
-  - Input: `{ task_id, prompt, memory_scopes, allowed_models, timeout_s,
-    callback_url, secrets_ref }`.
-  - Output: `{ task_id, status, summary, artifact_ref, memory_writes,
-    notifications }`.
-- Lifecycle: the backend spawns a podman quadlet per invocation, awaits
-  output (or timeout), parses it, and runs `podman rm` on exit. Hard TTL
-  configurable per sprint (default 10 min).
-- Cleanup: `One-shot cleanup` cron (already exists in `docs/cronjobs.md` #13)
-  sweeps zombie containers; new cron `cardinal-worker image prune`
-  runs weekly (matching pattern in #14).
-- Security: container has NO direct DB access, NO real provider keys,
-  NO access to other tenants. Only what the orchestrator supplies via
-  stdin and secrets_ref (resolved by the backend prior to spawn).
-- TDD: JSON contract + output reducer + timeout handling. Podman integration
-  can use a test double (driver interface).
-- Estimated files: `packages/worker/` (new), `packages/core/` (extend with
-  `Worker*` types), `backend/src/orchestrator/` (new),
-  `infra/quadlets/cardinal-worker.*` (new).
+  - Input: `{ task_id, task_type: "maintenance" | "summary" | "hygiene", prompt, memory_scopes, timeout_s, callback_url }`.
+  - Output: `{ task_id, status: "success" | "failure", summary, memory_writes, escalation?: string }`.
+- Lifecycle: backend spawns worker container via Podman with dedicated ephemeral `sk-cardinal-*` key.
+  Awaits stdout or hard timeout (default 5 min), collects output, and runs `podman rm -f`.
+- Security: container has NO direct SQLite DB access, NO host root, NO provider keys.
+  Communicates solely via Cardinal Router and MCP using scoped ephemeral key.
+- TDD: JSON protocol + timeout handler + mock podman driver.
+- Estimated files: `packages/worker/` (new), `backend/src/orchestrator/` (new),
+  `infra/containers/cardinal-worker.Containerfile`.
 
-### N2 — Tasks v2 (Assign Triggers One-Shot)
+### N2 — Tasks v2 (Maintenance Trigger)
 
-- Schema migration: `tasks.status` moves from
-  `open | claimed | done | blocked` to `pending | running | done | failed
-  | cancelled`. Append SQL migration (no long table locks).
+- Schema migration: `tasks.status` moves to `pending | running | done | failed`.
 - Endpoints:
-  - `POST /api/tasks { title, prompt, auto_fire?: bool=true, ... }`
-    -> if `auto_fire=true` (default), creates task in `pending` and triggers
-    N1 with the prompt as input. Status transitions to `running`.
-  - `POST /api/tasks/:id/assign` -> explicit equivalent to auto-fire.
-  - `POST /api/tasks/:id/cancel` -> terminates container if `running`,
-    marks `cancelled`.
-  - `claim` and `complete` are removed. Old handlers and their tests are deleted.
-- UI `/tasks`: buttons become "Assign" and "Cancel" (no more "Claim" / "Complete").
-  "Auto-fire on create" toggle visible in creation form.
-- Notification: when a task transitions to `done` or `failed`, emits event for N6.
-- TDD: handlers + status reducer + N1 integration (mock driver).
-- Estimated files: `packages/db/src/schema.ts` (migration),
-  `packages/db/src/repos/tasks.ts`, `backend/src/api/tasks.ts`,
-  `backend/src/api/tasks.test.ts`, `frontend/src/pages/Tasks.tsx`.
+  - `POST /api/tasks { title, prompt, auto_fire?: bool=true, target?: "internal" | "board" }`
+    -> if `auto_fire=true` and `target="internal"`, triggers N1 worker immediately.
+  - `POST /api/tasks/:id/cancel` -> terminates container if running, marks `failed`.
+  - Deprecated `claim` and `complete` removed.
+- UI `/tasks`: "Auto-fire" toggle, status badges, cancel button.
+- TDD: task lifecycle reducer + N1 trigger integration.
 
-### N3 — `/memory` Module with Scoped Permissions
+### N3 — Memory Monolith (`/vaults`) & Path ACL
 
-- Existing vault moves to `packages/memory/` and is renamed `/memory`
-  in the dashboard.
-- Permission model (three independent levels):
-  - `read`: read entries.
-  - `write-existing`: edit existing entries (cannot create new ones).
-  - `append-new`: create new entries (cannot edit old ones).
-- Scope via `agent_keys.scopes`: add new types to scopes JSON:
-  `memory:read`, `memory:write-existing`, `memory:append-new`. Without
-  at least one of the three, the key cannot access the module.
-- Scope per agent: agent config file declares maximum permissions; N1
-  never passes the container more permissions than the agent holds.
-- ACL enforced on backend, not client. If MCP calls with service key `*`,
-  the backend filters identically (matching RAG fix in
-  `2026-09-06-task-identity-rag-vault-scope.md`).
-- TDD: repos + ACL + tests for "key without scope cannot read" /
-  "key with append-only cannot edit".
-- Estimated files: `packages/memory/` (new), migration of existing vault,
-  `backend/src/api/memory.ts`, extension of `packages/mcp/src/tools/`.
+- File tree living on 24/7 server host:
+  ```
+  /vaults/
+    ├── personal/         --> Strictly restricted (human only; denied to all agent keys)
+    ├── cardinal-system/  --> Specs, core rules, system directives
+    ├── projects/         --> Project documentation and architecture
+    ├── knowledge/        --> Frameworks, papers, technical guides
+    └── agents/           --> Agent scratchpads, decision logs, shared handoffs
+          ├── kirito/
+          ├── lisbeth/
+          └── shared/
+  ```
+- Authorization: Path-based scopes in `agent_keys.scopes`:
+  - `memory:read:<path-glob>`
+  - `memory:append:<path-glob>`
+  - `memory:write:<path-glob>`
+- Backend ACL middleware verifies paths strictly, preventing directory traversal (`..`)
+  and blocking any agent key from accessing `personal/*`.
+- Backup script: automated incremental snapshot job to secondary disk/backup location.
+- TDD: ACL path matcher + permission enforcement + traversal prevention.
 
-### N4 — UI AI Chatbot
+### N4 — Cockpit Command (`Ctrl+K`) & Herdr Web TUI
 
-- `/chat` page with bidirectional WS (same Hub as tasks).
-- Model: embedded Hermes as N1 worker (same agentic backend).
-- Conversations persisted in DB (`chat_threads` + `chat_messages` tables).
-- No auto-fire: chat suggests actions, human confirms with one click.
-- Confirmations trigger the same endpoints as `/tasks` and `/memory`.
-- TDD: WS handlers + reducer + persistence. LLM logic tested with fake model.
-- Estimated files: `backend/src/api/chat.ts`, `backend/src/ws/chat.ts`,
-  `frontend/src/pages/Chat.tsx`, `packages/db/src/schema.ts` (migration
-  for `chat_threads` and `chat_messages`).
+- **Cockpit Command Bar:** Floating modal triggered by `Ctrl+K`. Fast query to RAG,
+  system status check, or quick maintenance task trigger. No conversational thread bloat.
+- **Herdr Web TUI Viewer:** Embedded web terminal pane (via WebSocket PTY/ttyd)
+  connecting directly to the persistent Herdr container on the server, allowing live
+  supervision of Kirito, Lisbeth, and Agil from any browser.
+- Files: `frontend/src/components/CommandBar.tsx`, `frontend/src/pages/HerdrTerminal.tsx`.
 
-### N5 — Design System + Critical Screen Redesign
+### N5 — SAO Design System
 
-- Base design system: tokens (color, spacing, typography, radius, shadow),
-  primitive components (Button, Input, Card, Dialog, Toast, Tabs, Table, Badge),
-  iconography pattern.
-- Custom Cardinal palette (not default generic shadcn styling).
-- Redesign sprint: migrate `/keys`, `/router`, `/tasks`, `/chat` (when available),
-  `/memory` (when available) to the new design system.
-- No TDD (visual frontend — manual verification + screenshots).
-- Unspecified design choices: palette, typography, motion, icon set, layout grid.
-  Proposed in a brief spec (`docs/superpowers/specs/YYYY-MM-DD-cardinal-design-system.md`)
-  before implementation.
-- Estimated files: `frontend/src/design/` (new), migrations of existing pages.
+- Design specification: `docs/superpowers/specs/2026-09-10-sao-design-system.md`.
+- Tokens:
+  - Obsidian Background: `#0A0B0E` (deep space obsidian)
+  - Graphite Panel: `#12151D` / `#181C26` with fine borders `rgba(255, 255, 255, 0.07)`
+  - Aincrad Orange: `#FF7A00` / `#FFA033` (primary actions, player cursor)
+  - Sinon Turquoise: `#00F0FF` / `#00C2CC` (telemetry, live data, success metrics)
+  - Underworld Purple: `#8A3FFC` / `#A56EFF` (identity, keys, encryption)
+  - Slash Red: `#FF2A4D` (error states, damage cutoffs, unauthorized denials)
+- Floating angular panels, clean typography (Geist/Inter + JetBrains Mono),
+  and optional audio effects (SAO menu pop, warning alert, link start).
+- Migration of `/keys`, `/router`, `/tasks` to new design system.
 
 ### N6 — In-App Notification Center
 
-- `notifications` table (id, user_id/agent_id, type, payload, read, created_at).
-- Trigger events: task `done`/`failed`, container timeout, memory write denied
-  by ACL, chat reply received.
-- UI: header bell with badge; drawer with list; snooze per notification and per type.
-- Persistence: 30 days default; prune cron.
-- TDD: handlers + reducer + snooze logic.
-- Estimated files: `packages/db/src/schema.ts` (migration),
-  `backend/src/api/notifications.ts`, `frontend/src/components/Notifications.tsx`.
-
+- `notifications` table (id, target, type, payload, read, created_at).
+- Triggers: task completion/failure, worker timeout, ACL security denials.
+- UI: Top-bar bell badge, notification drawer, snooze options.
+- TDD: persistence + notification emitter.
 ## Proposed Execution Order
 
 ```
-P0: 5 (e2e zen) ─────────┐
-                         ├─ both block PR dev->main
-P0: 11 (password TTY) ───┘
-                           │
-P1: 10 (PR dev->main) ───── clean cutoff for Fase 2
-
-P0: N1 (agentic backend) ──────────┐
-                                   ├─ unblocks N2, N3
-P1: N2 (tasks v2) ───────┐         │
-                         ├─ in     │
-P1: N3 (/memory) ────────┴─ parallel
-                                   │
-P2: N5 (design system) ──┐         │
-                         ├─ feeds  ├─ enables decent visual N4
-P2: N4 (chatbot UI) ─────┘         │
-                                   │
-P2: N6 (notifications) ────────────┘ (depends on N2 for events)
+P0: 5 (seed router) ──────────┐
+                              ├─ all green in dev -> freeze Fase 2
+P0: 11 (password script) ─────┘
+                                │
+P1: 10 (PR dev->main) ────────── clean baseline v0.2.6
+                                │
+P0: N5 (SAO Design System) ─────┴─ frontend foundation
+                                │
+P0: N1 (maintenance worker) ────┬─ unblocks tasks v2
+                                │
+P1: N2 (tasks v2) ──────────────┼─ automated maintenance
+                                │
+P1: N3 (/vaults memory + ACL) ──┼─ secure context SSOT
+                                │
+P2: N4 (Ctrl+K + Herdr view) ───┼─ interactive cockpit
+                                │
+P2: N6 (notification center) ───┘─ feedback loop
 ```
 
 ## Next Step

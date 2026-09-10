@@ -1,23 +1,26 @@
 # Cardinal System — Roadmap
 
-> Updated: 2026-09-07. Single source of truth for priorities.
+> Updated: 2026-09-10. Single source of truth for priorities.
 
 ---
 
-## Now: Phase 2 — Cardinal v2 (closing — v0.2.5)
+## Now: Phase 2 — Cardinal v2 (closing — v0.2.6)
 
 Phase 1 (Context Store) complete in `dev` since v0.2.0. Phase 2 closing:
 blackboard + MCP hub + router/keys (`/router`, create keys, fusion) all
-green in `dev`. See [`roadmap/fase-2.md`](roadmap/fase-2.md). Sprint:
-[`sprints/2026-09-03-router-surface.md`](sprints/2026-09-03-router-surface.md).
-
-Next batch is v3 (post-router), unblocked now that the router closed:
-containerized agentic backend, tasks v2 (assignment triggers one-shot),
-scoped `/memory` module, chatbot, design system, notifications.
-Backlog: [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md).
+green in `dev` (461 tests pass). See [`roadmap/fase-2.md`](roadmap/fase-2.md).
 
 Pending stabilization: PR `dev → main` (item 10 of v2 backlog) before
 sprint N1.
+
+Next batch is v3 (post-router), unblocked once PR `dev -> main` lands:
+1. **N1:** Lightweight containerized maintenance worker (Bun + MCP, JSON I/O, scoped keys)
+2. **N2:** Tasks v2 (assignment triggers N1 worker, auto-fire toggle)
+3. **N3:** Memory monolith (`/vaults` Markdown tree with path-level ACL and backup job)
+4. **N4:** Cockpit Command (`Ctrl+K`) + Web TUI view to Herdr container (replacing heavy chatbot)
+5. **N5:** SAO Design System (Obsidian/Graphite, Aincrad Orange, Sinon Turquoise, Underworld Purple, Slash Red errors, floating panels, audio pack)
+6. **N6:** In-app notification center
+Backlog: [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md).
 
 ---
 
@@ -27,8 +30,8 @@ sprint N1.
 |-------|------|--------|---------|
 | 0 | Living Skeleton | Complete | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
 | 1 | Context Store | Complete (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
-| 2 | Cardinal v2 (Blackboard + MCP + Pool) | Closing (v0.2.5) | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
-| 2.5 | Cardinal v3 (Containerized workers + UI + Memory) | Planning | [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
+| 2 | Cardinal v2 (Blackboard + MCP + Pool) | Closing (v0.2.6) | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
+| 2.5 | Cardinal v3 (Maintenance workers + Vaults Memory + SAO Cockpit) | Planning | [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
 | 3 | Knowledge Graph | Future | — |
 | 4 | Automations | Future | — |
 
@@ -36,13 +39,14 @@ sprint N1.
 
 | Pillar | Done | Pending |
 |--------|------|---------|
-| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools, mailbox MCP | tasks v2 (assignment triggers, N2) |
-| 1 MCP hub | `packages/mcp` memory + board + mailbox, compose `:8789` | scoped `/memory` module (N3) |
-| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | spike-003 opencode-go (optional); e2e zen free (#5); UI mutate chains / show Fusion |
-| 5 Worker pool | — | N1: containerized agentic backend |
+| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools, mailbox MCP | tasks v2 (assignment triggers maintenance worker, N2) |
+| 1 MCP hub | `packages/mcp` memory + board + mailbox, compose `:8789` | `/vaults` scoped memory monolith (N3) |
+| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | UI mutate chains / show Fusion |
+| 5 Worker pool | — | N1: lightweight maintenance worker container |
 
-Thesis: orchestration is commodity; Cardinal is the brain (identity + context +
-blackboard); herdr/Hermes/CLIs are the hands.
+Thesis: Cardinal is the 24/7 SSOT brain (identity + memory vaults + blackboard + router).
+Heavy development belongs to persistent agents in Herdr (Kirito, Lisbeth, Agil) and workstation CLIs.
+Internal workers handle automated maintenance, summarization, and memory hygiene.
 
 ---
 

@@ -3,12 +3,15 @@
 
 Configures:
 - Providers:
-  1. opencode-zen (OpenCode free models via opencode-llm-proxy :4010)
-  2. mock-local (Local testing mock upstream :18999)
+  1. omp-gateway (OMP forward proxy for Cursor & Antigravity :4000)
+  2. opencode-zen (OpenCode free models via opencode-llm-proxy :4010)
+  3. mock-local (Local testing mock upstream :18999)
 - Routes:
-  1. fast -> [opencode-zen: opencode/deepseek-v4-flash-free, mock-local: test-model]
-  2. reasoning -> [opencode-zen: opencode/glm-4-flash-free, mock-local: test-model]
-
+  1. fast -> [omp-gateway: google-antigravity/gemini-3.8-flash, opencode-zen: opencode/deepseek-v4-flash-free, mock-local: test-model]
+  2. reasoning -> [omp-gateway: cursor/cursor-grok-4.6, opencode-zen: opencode/glm-4-flash-free, mock-local: test-model]
+  3. antigravity -> [omp-gateway: google-antigravity/gemini-3.8-flash]
+  4. grok -> [omp-gateway: cursor/cursor-grok-4.6]
+  5. composer -> [omp-gateway: cursor/composer-2.5]
 Usage:
   python3 scripts/seed-router.py [--db <path>] [--dry-run]
 """
@@ -29,6 +32,19 @@ DEFAULT_DB = Path(
 LOCAL_DB = REPO / "cardinal.db"
 
 PROVIDERS = [
+    {
+        "name": "omp-gateway",
+        "base_url": "http://host.containers.internal:4000/v1",
+        "wire_format": "openai",
+        "status": "active",
+        "cost_per_mtok": 0.0,
+        "models": [
+            "google-antigravity/gemini-3.8-flash",
+            "cursor/cursor-grok-4.6",
+            "cursor/composer-2.5",
+            "cursor/composer-2.5-fast",
+        ],
+    },
     {
         "name": "opencode-zen",
         "base_url": "http://host.containers.internal:4010/v1",
@@ -55,6 +71,7 @@ ROUTES = [
     {
         "alias": "fast",
         "fallback_chain": [
+            {"provider": "omp-gateway", "model": "google-antigravity/gemini-3.8-flash"},
             {"provider": "opencode-zen", "model": "opencode/deepseek-v4-flash-free"},
             {"provider": "mock-local", "model": "test-model"},
         ],
@@ -62,8 +79,27 @@ ROUTES = [
     {
         "alias": "reasoning",
         "fallback_chain": [
+            {"provider": "omp-gateway", "model": "cursor/cursor-grok-4.6"},
             {"provider": "opencode-zen", "model": "opencode/glm-4-flash-free"},
             {"provider": "mock-local", "model": "test-model"},
+        ],
+    },
+    {
+        "alias": "antigravity",
+        "fallback_chain": [
+            {"provider": "omp-gateway", "model": "google-antigravity/gemini-3.8-flash"},
+        ],
+    },
+    {
+        "alias": "grok",
+        "fallback_chain": [
+            {"provider": "omp-gateway", "model": "cursor/cursor-grok-4.6"},
+        ],
+    },
+    {
+        "alias": "composer",
+        "fallback_chain": [
+            {"provider": "omp-gateway", "model": "cursor/composer-2.5"},
         ],
     },
 ]

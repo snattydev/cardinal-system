@@ -88,7 +88,7 @@ services:
       PORT: 8789
       CARDINAL_BACKEND_URL: http://backend:8787
       CARDINAL_VAULTS_ROOT: /data/vaults
-      CARDINAL_VAULTS: "the portal,for-my-agents"
+      CARDINAL_VAULTS: "${CARDINAL_VAULTS:-personal,cardinal-system,projects,knowledge,agents}"
       CARDINAL_SERVICE_KEY: ${CARDINAL_SERVICE_KEY}
     depends_on:
       - backend
