@@ -42,11 +42,11 @@ podman build -t cardinal-frontend:latest -f deploy/Containerfile.frontend .
 # 2. Copy Quadlet files
 cp -r deploy/quadlet/* ~/.config/containers/systemd/
 
-# 3. Create env file
+# 3. Create config and env files
 mkdir -p ~/.config/cardinal
 cp deploy/env.example ~/.config/cardinal/env
+cp deploy/Caddyfile ~/.config/cardinal/Caddyfile
 # Edit ~/.config/cardinal/env — set ADMIN_PASSWORD_HASH and JWT_SECRET
-
 # 4. Reload systemd and start the pod
 systemctl --user daemon-reload
 systemctl --user start cardinal-pod.service
