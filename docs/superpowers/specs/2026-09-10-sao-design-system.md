@@ -106,3 +106,17 @@ The cockpit includes an optional audio feedback system with a persistent toggle 
 | Key Revoke / Delete | Slash Impact | Clean, sharp low-frequency transient cut. |
 
 Audio files are stored locally in `frontend/public/sounds/` as lightweight, highly compressed `.ogg`/`.mp3` files (< 15KB each) and preloaded on user interaction.
+
+---
+
+## 7. Future Visual Refinements (Post-v0.3.0)
+
+> Feedback note (2026-09-11): The current color palette feels slightly too generic. Needs deeper alignment with the source material.
+
+- **Direct Anime Palette Extraction**: Extract exact hex codes directly from SAO anime frames and game UI assets (Aincrad menu gradients, GGO sniper scopes, Underworld system crystals) rather than generic dark-mode tokens.
+- **Authentic Aesthetic Details**: Introduce non-generic SAO visual signatures:
+  - 45-degree chamfered panel cuts (angular clipped corners instead of standard `rounded-[2px]`).
+  - Subtle hexagonal HUD grid overlays.
+  - Authentic circular player action wheel / menu popups.
+  - Characteristic HP / system load gradient bars.
+  - SAO UI sound effects on menu interactions.

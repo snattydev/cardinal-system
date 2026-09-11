@@ -163,7 +163,7 @@ with a JSON stdin/stdout contract and bounded scope**.
 - Pages migrated: `Layout.tsx`, `Login.tsx`, `Tasks.tsx`, `Overview.tsx`, `AgentCard.tsx`.
 - Production deployment: Rootless Podman Quadlets running under systemd --user (`cardinal-pod`,
   `cardinal-backend`, `cardinal-frontend`, `cardinal-caddy`) publishing port 8080.
-
+- Future visual refinement (post-v0.3.0): extract palette directly from anime frames + authentic chamfered HUD elements (see spec §7).
 ### N7 — Automated UI Testing via Cloud Cursor & Playwright
 
 - Framework: `@playwright/test` configured in `frontend/playwright.config.ts`.
