@@ -9,7 +9,8 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: "list",
   use: {
-    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:8080",
+    // Local dev: Vite on :5173 (proxy → backend :8787). Production pod: Caddy on :8080.
+    baseURL: process.env.PLAYWRIGHT_BASE_URL || "http://127.0.0.1:5173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
   },
