@@ -64,6 +64,7 @@ If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged 
 - [ ] Version bump if applicable
 - [ ] Conventional commit, English body
 - [ ] PR title and description in English (`AGENTS/docs.md`)
+- [ ] Linked to GitHub Issue (`Closes #N`) with appropriate labels (`enhancement`, `bug`, etc.) per `AGENTS/issues.md`
 - [ ] PR template filled
 - [ ] `docs/features/` updated when required
 - [ ] PR targets `dev` (unless this is the release PR to `main`)

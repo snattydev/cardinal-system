@@ -13,6 +13,7 @@ This skill is an index. Do not restate repo rules here.
 | Rules index | `AGENTS.md` |
 | Language (English only) | `AGENTS/docs.md` |
 | Branching, PRs, TDD, versioning, security, docs, layout | `AGENTS/*.md` |
+| Issue tracking (GitHub & Blackboard) | `AGENTS/issues.md` |
 | Commit format | `cardinal-commit` (`skills/cardinal-commit.md`) |
 | Open a PR | `cardinal-pr` (`skills/cardinal-pr.md`) |
 | Runtime, API, quirks | `cardinal-system` (`skills/cardinal-system.md`) |

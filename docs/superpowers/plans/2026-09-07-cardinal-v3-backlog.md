@@ -2,7 +2,8 @@
 
 > Complements the living spec `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`
 > and its backlog `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`.
-> Status: v0.2.6 (2026-09-10). Fase 2 complete in `dev` (router, keys, blackboard, MCP hub).
+> Status: v0.2.6 (2026-09-14). Fase 2 complete in `dev`. SDLC: GitHub Issues
+> ([#28](https://github.com/snattydev/cardinal-system/issues/28)). Runtime: Blackboard.
 > Re-scoped 2026-09-10: Cardinal 24/7 server model, division of labor (lightweight
 > internal maintenance workers vs persistent Herdr agents), memory monolith (`/vaults`),
 > Cockpit Command (`Ctrl+K`) + Herdr Web TUI view (replacing bloated chat), and SAO Design System.
@@ -61,22 +62,26 @@ with a JSON stdin/stdout contract and bounded scope**.
 
 ## Backlog (New Order, 2026-09-07)
 
-| # | Item | Type | Fase | Priority | TDD | Depends on |
-|---|------|------|------|----------|-----|------------|
-| 5 | [done] Seed providers/routes (`scripts/seed-router.py`) | spike/e2e | F2 | P0 | — | 6, 7 (v2) |
-| 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | release | F2 | P1 | — | all |
-| 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | security/deploy | F2 | P0 | — | cloud blocker |
-| 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | feature | F2 | P1 | Yes | N1 |
-| **N1** | **Internal maintenance worker** (ephemeral Podman container, Bun + MCP runtime, JSON stdin/stdout contract, scoped keys, TTL cleanup) | infra | F2 | **P0** | Yes | router closed ([done]) |
-| **N2** | **Tasks v2: assignment triggers maintenance worker, auto-fire toggle** (clean migration: `pending | running | done | failed`) | feature | F2 | **P1** | Yes | N1 |
-| **N3** | **Memory Monolith (`/vaults`) & Path ACL** (`personal/`, `cardinal-system/`, `projects/`, `knowledge/`, `agents/`; path-level scopes in `agent_keys.scopes`; backup snapshot job) | feature | F3 | **P1** | Yes | N1 |
-| **N4** | **Cockpit Command & Herdr Web TUI** (SAO `Ctrl+K` quick query/RAG bar + embedded Web TUI view to server Herdr container) | feature | F2 | **P2** | Yes | N1, N5 |
-| **N5** | **SAO Design System** (Obsidian `#0A0B0E`, Graphite `#12151D`, Aincrad Orange `#FF7A00`, Sinon Turquoise `#00F0FF`, Underworld Purple `#8A3FFC`, Slash Red `#FF2A4D`, floating panels, audio pack) | feature | F2 | **P2** | No | parallel to N1 |
-| **N6** | **In-app notification center** (persisted, snooze, linked to task/agent/security events) | feature | F2 | **P2** | Yes | N2 |
+| # | Item | GitHub | Type | Fase | Priority | TDD | Depends on |
+|---|------|--------|------|------|----------|-----|------------|
+| 5 | [done] Seed providers/routes (`scripts/seed-router.py`) | — | spike/e2e | F2 | P0 | — | 6, 7 (v2) |
+| 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | [#16](https://github.com/snattydev/cardinal-system/issues/16) | release | F2 | P1 | — | all |
+| 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | — | security/deploy | F2 | P0 | — | cloud blocker |
+| 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | [#27](https://github.com/snattydev/cardinal-system/issues/27) | feature | F2 | P1 | Yes | N1 |
+| **N1** | **Internal maintenance worker** | [#20](https://github.com/snattydev/cardinal-system/issues/20) | infra | F2 | **P0** | Yes | router closed ([done]) |
+| **N2** | **Tasks v2: assignment triggers maintenance worker, auto-fire toggle** | [#21](https://github.com/snattydev/cardinal-system/issues/21) | feature | F2 | **P1** | Yes | N1 |
+| **N3** | **Memory Monolith (`/vaults`) & Path ACL** | [#22](https://github.com/snattydev/cardinal-system/issues/22) | feature | F3 | **P1** | Yes | N1 |
+| **N4** | **Cockpit Command & Herdr Web TUI** | [#23](https://github.com/snattydev/cardinal-system/issues/23) | feature | F2 | **P2** | Yes | N1, N5 |
+| **N5** | **SAO Design System** [done on `dev`] | [#17](https://github.com/snattydev/cardinal-system/issues/17) | feature | F2 | **P2** | No | parallel to N1 |
+| **N6** | **In-app notification center** | [#24](https://github.com/snattydev/cardinal-system/issues/24) | feature | F2 | **P2** | Yes | N2 |
+| **N7** | **Playwright E2E** (auth/tasks/overview landed; keys/router open) | [#18](https://github.com/snattydev/cardinal-system/issues/18) | test | F2 | **P2** | — | N5 |
+| **N8** | **QOL: `/keys` Hermes setup snippet** (refuse wrapper aliases as `model.default`) | [#25](https://github.com/snattydev/cardinal-system/issues/25) | frontend | F2 | **P2** | No | N9 |
+| **N9** | **Wrapper hops internal-only** | [#26](https://github.com/snattydev/cardinal-system/issues/26) | feature | F2 | **P1** | Yes | findings 2026-09-12 |
 
 > Items marked with `[done]` belong to the v2 backlog and are already closed.
-> Items **N1–N6** are new. Items **5, 10, 11, 13** from v2 remain active;
-> 13 changes form (bound to N1).
+> GitHub Issues are the SDLC board (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)).
+> Dual tracking: [`AGENTS/issues.md`](../../../AGENTS/issues.md).
+> N1 is implemented on `feature/#20-cardinal-worker` and is **out of** the v0.2.6 freeze.
 
 ## Decisions
 
@@ -201,10 +206,10 @@ P2: N6 (notification center) ───┘─ feedback loop
 
 ## Next Step
 
-1. Close **5** (e2e zen) and **11** (password TTY) — remaining v2 blockers.
-2. PR **10** `dev->main` with accumulated changes.
-3. Branch `feature/N1-cardinal-worker` with detailed spec for containerized agentic backend.
-4. After N1 passes green, the remainder can run in one- or two-item sprints following table order.
+1. Human review and merge of PR [#12](https://github.com/snattydev/cardinal-system/pull/12) (`Closes #16 #17 #19`).
+2. PR `feature/#20-cardinal-worker` → `dev` after the freeze (N1, issue [#20](https://github.com/snattydev/cardinal-system/issues/20)).
+3. Parallel: N9 wrapper enforcement ([#26](https://github.com/snattydev/cardinal-system/issues/26)).
+4. Then N2 / N3 / item 13 following table order.
 
 ## Lessons from v2 Backlog Applied to v3
 

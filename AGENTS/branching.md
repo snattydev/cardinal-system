@@ -14,6 +14,7 @@ docs/*     ──→ PR ──→ dev ──→ PR ──→ main
 ## Rules
 
 - Work is done in `feature/*`, `fix/*`, `chore/*`, or `docs/*` from `dev`.
+- Branch names should reference the corresponding GitHub Issue when applicable (e.g. `feature/#12-worker-pool` or `fix/#15-jwt-expiry`).
 - Each branch is opened as a PR to `dev`. No direct merges to `dev`.
 - The merge to `dev` is done by the same agent that implemented the feature, after green.
 - When `dev` is stable → a single PR from `dev` to `main` with review.

@@ -8,6 +8,7 @@ globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
 Canonical rules: `AGENTS.md` and `AGENTS/*.md`. Do not restate them here.
 
 - Work on `feature/*` | `fix/*` | `chore/*` | `docs/*` from `dev`. PR into `dev`; never commit directly to `dev` or `main`.
+- Issue tracking: Dual tracking model (`AGENTS/issues.md`). Integrated Blackboard for runtime agent coordination; GitHub Issues (`enhancement`, `bug`, etc.) mandatory for strict system development. Branches and PRs must reference issues (`Closes #N`).
 - Language: English only — docs, skills, comments, identifiers, commits, PRs, prompts. Policy: `AGENTS/docs.md`.
 - Commits: Conventional Commits, English subject and body, ≤72 char subject. Details: `skills/cardinal-commit.md`.
 - TDD required in auth, keys, ws, db, router.

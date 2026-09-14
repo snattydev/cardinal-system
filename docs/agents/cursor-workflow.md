@@ -28,11 +28,11 @@ tester (RED) -> builder | ws-protocol | frontend (GREEN)
 
 ### Per-feature workflow
 
+0. **Track** — ensure a GitHub Issue exists with proper labels (`enhancement`, `bug`, etc.) alongside the integrated Blackboard (`AGENTS/issues.md`).
 1. **Delegate** — 1–2 files without critical logic in-session; the rest to subagents.
 2. **Verify** — `verifier` with evidence (`bun test` / `bun run build`); review if applicable.
 3. **Document** — `docs/features/<date>-<name>.md` with what, why, decisions, alternatives, files.
-4. **Commit + push** — conventional commit to `dev` including the doc; only if the human asks.
-
+4. **Commit + push** — conventional commit to `dev` referencing `Closes #N` and including the doc; only if the human asks.
 ## Roles (summary)
 
 Canonical definitions at `docs/agents/roles/<role>.md`. Adapters at `.cursor/agents/<role>.md`.
