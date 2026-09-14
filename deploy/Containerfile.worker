@@ -1,0 +1,23 @@
+# Cardinal System — Maintenance Worker Container (N1)
+# Build: podman build -t cardinal-worker:latest -f deploy/Containerfile.worker .
+#
+# Lightweight Bun container executing isolated hygiene/summary/maintenance tasks.
+# Communicates exclusively via JSON stdin/stdout and Cardinal internal HTTP/MCP.
+# Runs non-root, no host mounts, no direct SQLite access.
+
+FROM docker.io/oven/bun:1-slim
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Monorepo workspaces manifest
+COPY package.json bun.lock ./
+COPY packages ./packages
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+
+RUN bun install --production --frozen-lockfile
+
+USER bun
+
+ENTRYPOINT ["bun", "packages/worker/src/main.ts"]
