@@ -376,15 +376,18 @@ export function consumeBudgetUsd(db: Database, keyHash: string, usd: number): bo
   const key = findActiveKeyByHash(db, keyHash);
   if (key === null) return false;
   if (key.budget_usd_limit === null) return true;
+  const used = Math.round(key.budget_usd_used * 1e6);
+  const increment = Math.round(usd * 1e6);
+  const limit = Math.round(key.budget_usd_limit * 1e6);
+  if (used + increment > limit) return false;
   const result = db
     .query(
       `UPDATE agent_keys
-       SET budget_usd_used = budget_usd_used + ?
+       SET budget_usd_used = ?
        WHERE key_hash = ? AND revoked_at IS NULL
-         AND budget_usd_limit IS NOT NULL
-         AND budget_usd_used + ? <= budget_usd_limit`,
+         AND budget_usd_limit IS NOT NULL`,
     )
-    .run(usd, keyHash, usd);
+    .run((used + increment) / 1e6, keyHash);
   return result.changes > 0;
 }
 
@@ -400,10 +403,12 @@ export function listKeys(db: Database): AgentKeyRow[] {
 
 export function listHumanKeys(db: Database, status: "active" | "revoked"): AgentKeyRow[] {
   const revokedClause = status === "active" ? "revoked_at IS NULL" : "revoked_at IS NOT NULL";
+  const expiryClause =
+    status === "active" ? " AND (expires_at IS NULL OR expires_at > datetime('now'))" : "";
   return db
     .query(
       `SELECT * FROM agent_keys
-       WHERE created_by = 'human' AND ${revokedClause}
+       WHERE created_by = 'human' AND ${revokedClause}${expiryClause}
        ORDER BY id DESC`,
     )
     .all() as AgentKeyRow[];
@@ -635,7 +640,7 @@ export function getSystemCounts(db: Database): SystemCounts {
     agentsTotal: count("SELECT COUNT(*) AS count FROM agents"),
     agentsOnline: count("SELECT COUNT(*) AS count FROM agents WHERE connected = 1"),
     keysActive: count(
-      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL AND created_by = 'human'",
+      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL AND created_by = 'human' AND (expires_at IS NULL OR expires_at > datetime('now'))",
     ),
     keysRevoked: count(
       "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL AND created_by = 'human'",

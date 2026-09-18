@@ -36,4 +36,4 @@ You document features and changes in Cardinal System.
 - The document must include: **what was done, why, decisions made, alternatives considered, and created/modified files**
 - Do not document version bumps or trivial one-line changes
 - Agent documentation (`docs/agents/`) may use BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`
-- Commit body in Spanish; first line in English (Conventional Commits)
+- Commit body in English; first line in English (Conventional Commits)

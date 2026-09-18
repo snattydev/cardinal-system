@@ -140,8 +140,13 @@ export default function Keys() {
     const tokens = parseOptionalNumber(budgetTokens);
     if (tokens !== undefined) body.budgetLimit = tokens;
 
-    if (expires.trim().length > 0) {
-      body.expiresAt = new Date(expires).toISOString();
+    const expiryRaw = expires.trim();
+    if (expiryRaw.length > 0) {
+      if (!Number.isFinite(Date.parse(expiryRaw))) {
+        setError("invalid expiry");
+        return;
+      }
+      body.expiresAt = new Date(expiryRaw).toISOString();
     }
 
     const usd = parseOptionalNumber(usdCap);

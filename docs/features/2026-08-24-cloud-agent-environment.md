@@ -62,8 +62,6 @@ without manual setup steps.
   `/api/agents` showing agent `connected: true`, and web dashboard (login + Agent Hub
   showing live WebSocket subagent online using host `127.0.0.1`).
 
-## Note (pre-existing bug, out of scope)
+## Note
 
-`bun run typecheck` fails with a pre-existing error in `backend/src/server.ts`:
-`maxPayloadLength` is passed as a top-level option to `Bun.serve()` but belongs to the
-`websocket:` handler. Application code was not touched as part of the environment setup.
+`bun run typecheck` passes. `maxPayloadLength` belongs on the websocket handler (fixed).

@@ -6,6 +6,7 @@ import {
   VaultError,
   type VaultFile,
 } from "./vaults";
+import rootPkg from "../../../package.json";
 
 export interface McpServerOptions extends ValidatorOptions {
   backendUrl: string;
@@ -398,7 +399,7 @@ export function createMcpServer(options: McpServerOptions) {
         return reply({
           protocolVersion: String(msg.params?.protocolVersion ?? "2024-11-05"),
           capabilities: { tools: {} },
-          serverInfo: { name: "cardinal-mcp", version: "0.1.0" },
+          serverInfo: { name: "cardinal-mcp", version: rootPkg.version },
         });
       case "ping":
         return reply({});

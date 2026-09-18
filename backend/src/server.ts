@@ -97,7 +97,7 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/auth/login" && method === "POST") return handleLogin(req, config);
-      if (pathname === "/api/auth/logout" && method === "POST") return handleLogout();
+      if (pathname === "/api/auth/logout" && method === "POST") return handleLogout(req);
       if (pathname === "/api/auth/me" && method === "GET") return handleMe(req, config);
 
       if (pathname === "/api/agents" && method === "GET") {
