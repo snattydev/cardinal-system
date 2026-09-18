@@ -6,7 +6,7 @@ readonly: true
 is_background: false
 ---
 
-Leé `docs/agents/roles/reviewer.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/reviewer.md` and follow it. If the read fails:
 
-- Read-only. Calidad, no security.
-- Output: CRITICAL / HIGH / LOW con `(none)` si vacío.
+- Read-only. Quality, not security.
+- Output: CRITICAL / HIGH / LOW with `(none)` if empty.

@@ -1,6 +1,7 @@
 import type { Database } from "bun:sqlite";
-import { consumeBudget, findActiveKeyByHash, logUsage } from "@cardinal/db";
+import { consumeBudget, consumeBudgetUsd, findActiveKeyByHash, logUsage } from "@cardinal/db";
 import { RouterError } from "./error";
+import { runFusion, shouldRunFusion } from "./fusion";
 import { resolveModelChain, type ResolvedHop } from "./resolve";
 import { callUpstream, type UpstreamBody, type UpstreamResult } from "./upstream";
 
@@ -99,11 +100,20 @@ function meterSuccess(
   hop: ResolvedHop,
   usage: { promptTokens: number; completionTokens: number; totalTokens: number },
 ): void {
+  const usdLimit = findActiveKeyByHash(db, keyHash)?.budget_usd_limit ?? null;
   const consumed = consumeBudget(db, keyHash, usage.totalTokens);
   if (!consumed) {
     db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ? AND revoked_at IS NULL", [
       keyHash,
     ]);
+  }
+  if (usdLimit !== null) {
+    const usdConsumed = consumeBudgetUsd(db, keyHash, (usage.totalTokens / 1e6) * hop.costPerMtok);
+    if (!usdConsumed) {
+      db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ? AND revoked_at IS NULL", [
+        keyHash,
+      ]);
+    }
   }
   logUsage(db, {
     agentName,
@@ -172,6 +182,13 @@ export async function routeCompletion(
   if (!keyAllowsModel(key.scopes, request.model)) throw new RouterError("scope_denied");
   if (key.budget_limit !== null && key.budget_used >= key.budget_limit) {
     throw new RouterError("budget_exceeded");
+  }
+  if (key.budget_usd_limit !== null && key.budget_usd_used >= key.budget_usd_limit) {
+    throw new RouterError("budget_exceeded");
+  }
+
+  if (shouldRunFusion(db, request.model)) {
+    return runFusion(db, key, keyHash, request, options);
   }
 
   const chain = await resolveModelChain(db, request.model);

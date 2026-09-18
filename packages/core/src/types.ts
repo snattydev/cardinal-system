@@ -45,6 +45,9 @@ export interface AgentKeyRow {
   scopes: string;
   budget_limit: number | null;
   budget_used: number;
+  expires_at: string | null;
+  budget_usd_limit: number | null;
+  budget_usd_used: number;
 }
 
 export type WireFormat = "openai" | "anthropic" | "gemini";
@@ -179,4 +182,14 @@ export interface TaskRow {
   artifact_ref: string | null;
   created_at: string;
   updated_at: string | null;
+}
+
+export interface MessageRow {
+  id: string;
+  from_agent: string;
+  to_agent: string;
+  type: string;
+  payload_ref: string | null;
+  read: number;
+  created_at: string;
 }

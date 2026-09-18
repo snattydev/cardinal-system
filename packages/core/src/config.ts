@@ -26,7 +26,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: Number(env.PORT ?? 8787),
     dbPath: env.DB_PATH ?? "./cardinal.db",
     adminUser: env.ADMIN_USER,
-    adminPasswordHash: env.ADMIN_PASSWORD_HASH,
+    adminPasswordHash: env.ADMIN_PASSWORD_HASH.replace(/\\(\$)/g, "$1").trim().replace(/^['"]|['"]$/g, ""),
     jwtSecret: env.JWT_SECRET,
     poolSecret: env.POOL_SECRET,
     staticDir: env.STATIC_DIR ?? "frontend/dist",

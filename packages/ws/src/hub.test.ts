@@ -3,7 +3,7 @@ import type { Database } from "bun:sqlite";
 import type { ServerWebSocket } from "bun";
 import { createDb, createAgentKey, createTask, getAgent, listEvents, registerAgent } from "@cardinal/db";
 import { hashKey } from "@cardinal/keys";
-import { Hub, taskToPayload } from "./hub";
+import { Hub, messageToPayload, taskToPayload } from "./hub";
 import type { ConnData } from "./hub";
 
 const TEST_KEY = "sk-cardinal-" + "ab".repeat(32);
@@ -258,5 +258,110 @@ describe("task broadcast", () => {
     const { db, hub } = makeHub();
     const row = createTask(db, { goal: "x", createdBy: "system" });
     expect(() => hub.broadcastTask(row)).not.toThrow();
+  });
+});
+
+function insertMessage(
+  db: Database,
+  row: {
+    id: string;
+    from_agent: string;
+    to_agent: string;
+    type: string;
+    payload_ref?: string | null;
+    read?: number;
+  },
+) {
+  db.run("INSERT INTO messages (id, from_agent, to_agent, type, payload_ref, read) VALUES (?, ?, ?, ?, ?, ?)", [
+    row.id,
+    row.from_agent,
+    row.to_agent,
+    row.type,
+    row.payload_ref ?? null,
+    row.read ?? 0,
+  ]);
+  return db.query("SELECT * FROM messages WHERE id = ?").get(row.id) as {
+    id: string;
+    from_agent: string;
+    to_agent: string;
+    type: string;
+    payload_ref: string | null;
+    read: number;
+    created_at: string;
+  };
+}
+
+describe("message broadcast", () => {
+  test("messageToPayload mapea snake_case → camelCase", () => {
+    const { db } = makeHub();
+    const unread = insertMessage(db, {
+      id: "msg-unread",
+      from_agent: "shinon",
+      to_agent: "kirito",
+      type: "handoff",
+    });
+    expect(messageToPayload(unread)).toMatchObject({
+      id: unread.id,
+      fromAgent: "shinon",
+      toAgent: "kirito",
+      type: "handoff",
+      payloadRef: null,
+      read: false,
+      createdAt: unread.created_at,
+    });
+
+    const read = insertMessage(db, {
+      id: "msg-read",
+      from_agent: "asuna",
+      to_agent: "kirito",
+      type: "ping",
+      payload_ref: "notes/result.md",
+      read: 1,
+    });
+    expect(messageToPayload(read)).toMatchObject({
+      id: read.id,
+      fromAgent: "asuna",
+      toAgent: "kirito",
+      type: "ping",
+      payloadRef: "notes/result.md",
+      read: true,
+      createdAt: read.created_at,
+    });
+  });
+
+  test("broadcastMessage emite message_update a dashboards suscritos", () => {
+    const { db, hub } = makeHub();
+    const dash = mockWs({ dashboardAuthed: true });
+    hub.websocket.message(dash.ws, JSON.stringify({ type: "subscribe" }));
+    const row = insertMessage(db, {
+      id: "msg-broadcast",
+      from_agent: "shinon",
+      to_agent: "kirito",
+      type: "handoff",
+    });
+
+    hub.broadcastMessage(row);
+
+    const msg = dash.sent[dash.sent.length - 1] as { type: string; message: Record<string, unknown> };
+    expect(msg.type).toBe("message_update");
+    expect(msg.message).toMatchObject({
+      id: row.id,
+      fromAgent: "shinon",
+      toAgent: "kirito",
+      type: "handoff",
+      payloadRef: null,
+      read: false,
+    });
+  });
+
+  test("broadcastMessage sin dashboards no lanza", () => {
+    const { db, hub } = makeHub();
+    const row = insertMessage(db, {
+      id: "msg-nodash",
+      from_agent: "shinon",
+      to_agent: "kirito",
+      type: "ping",
+    });
+    expect(() => hub.broadcastMessage(row)).not.toThrow();
   });
 });

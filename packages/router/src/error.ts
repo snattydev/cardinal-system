@@ -3,7 +3,10 @@ export type RouterErrorCode =
   | "unauthorized"
   | "scope_denied"
   | "budget_exceeded"
-  | "all_providers_failed";
+  | "all_providers_failed"
+  | "fusion_not_configured"
+  | "fusion_streaming_unsupported"
+  | "fusion_strategy_unsupported";
 
 export class RouterError extends Error {
   readonly code: string;

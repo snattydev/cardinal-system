@@ -408,6 +408,24 @@ describe("handlePutMemory", () => {
     db.close();
   });
 
+  test("content no string → 400 y no borra el mirror", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola mundo" });
+    const req = new Request("http://localhost/api/memories/hermes/memory", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ content: 123 }),
+    });
+    const res = await handlePutMemory(db, "hermes", "memory", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_content" });
+    const stored = handleGetMemory(db, "hermes", "memory");
+    const body = (await stored.json()) as { memory: { content: string | null } };
+    expect(body.memory.content).toBe("hola mundo");
+    db.close();
+  });
+
   test("body no JSON → 400 {error: 'bad_request'}", async () => {
     const db = createDb(":memory:");
     upsertProfile(db, "hermes", {});
@@ -586,6 +604,100 @@ describe("handleRagSearch", () => {
     expect(typeof body.detail).toBe("string");
     db.close();
   });
+
+  const twoVaultHits = [
+    { file_path: "/data/vaults/the portal/index.md", content: "portal", heading: "", rrf_score: 0.9 },
+    { file_path: "/data/vaults/for-my-agents/tasks.md", content: "agents", heading: "", rrf_score: 0.8 },
+  ];
+
+  test("vaultScopes vault:the portal filtra y descarta for-my-agents", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+    db.close();
+  });
+
+  test("vaultScopes * no filtra", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["*"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("sin vaultScopes no filtra (dashboard)", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("vaultScopes sin vault: ni * → results vacíos", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["fast"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: unknown[] };
+    expect(body.results).toEqual([]);
+    db.close();
+  });
+
+  test("filtra también respuestas cacheadas", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const first = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    const firstBody = (await first.json()) as { results: Array<{ path: string }>; cached: boolean };
+    expect(firstBody.cached).toBe(false);
+    expect(firstBody.results).toHaveLength(2);
+
+    const second = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    const secondBody = (await second.json()) as { results: Array<{ path: string }>; cached: boolean };
+    expect(secondBody.cached).toBe(true);
+    expect(secondBody.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+    expect(calls).toHaveLength(1);
+    db.close();
+  });
 });
 
 describe("handleGetConfig", () => {
@@ -688,6 +800,24 @@ describe("handlePutConfig", () => {
       version: 2,
     });
     expect(body.config.updated_at).not.toBeNull();
+    db.close();
+  });
+
+  test("config_yaml no string → 400 y no borra el template", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertConfigTemplate(db, "hermes", { config_yaml: "model:\n  default: gpt-4o\n" });
+    const req = new Request("http://localhost/api/config/hermes", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ config_yaml: { model: "gpt-4o" } }),
+    });
+    const res = await handlePutConfig(db, "hermes", req);
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_config_yaml" });
+    const stored = handleGetConfig(db, "hermes");
+    const body = (await stored.json()) as { config: { config_yaml: string | null } };
+    expect(body.config.config_yaml).toBe("model:\n  default: gpt-4o\n");
     db.close();
   });
 });

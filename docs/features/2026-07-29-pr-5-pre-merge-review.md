@@ -1,101 +1,101 @@
-# Revisión Pre-Merge — PR #5: Pre-Fase 1: Bun Workspaces + Docs Restructure (v0.1.1)
+# Pre-Merge Review — PR #5: Pre-Fase 1: Bun Workspaces + Docs Restructure (v0.1.1)
 
-## Contexto
+## Context
 
 - **PR:** [#5](https://github.com/snattydev/cardinal-system/pull/5)
-- **Origen → destino:** `dev` → `main`
-- **Estado del PR:** Abierto, a la espera de revisión.
-- **Objetivo de la revisión:** Verificar que el código acumulado en `dev` cumpla el checklist de pre-merge y sea estable antes de integrar a `main`.
+- **Source -> target:** `dev` -> `main`
+- **PR Status:** Open, awaiting review.
+- **Review Objective:** Verify that cumulative code on `dev` satisfies the pre-merge checklist and is stable before integrating into `main`.
 
-## Qué se revisó
+## What was reviewed
 
-Se analizó el diff completo entre `main` (626d5fd) y `dev` (18b1a7b) con enfoque en:
+Analyzed the complete diff between `main` (626d5fd) and `dev` (18b1a7b) focusing on:
 
-1. Alineación con `docs/roadmap.md`, `docs/stack.md` y `AGENTS.md`.
-2. Calidad de código y separación de responsabilidades.
-3. Seguridad de `auth/`, `keys/` y `ws/`.
-4. Tests: `bun test` y `bun run build`.
-5. Producción: `Containerfile`, `Containerfile.frontend` y `compose.yaml`.
+1. Alignment with `docs/roadmap.md`, `docs/stack.md`, and `AGENTS.md`.
+2. Code quality and separation of concerns.
+3. Security of `auth/`, `keys/`, and `ws/`.
+4. Tests: `bun test` and `bun run build`.
+5. Production: `Containerfile`, `Containerfile.frontend`, and `compose.yaml`.
 6. Typecheck: `bun run typecheck`.
 
-## Hallazgos
+## Findings
 
-### 🔴 Críticos (bloquean merge)
+### [critical] Critical (block merge)
 
-1. **Tests fallan por versiones hardcodeadas**
-   - Archivos: `backend/src/server.test.ts:75`, `backend/src/api/api.test.ts:14`
-   - `package.json` raíz está en `0.1.1`, pero los tests esperan `0.1.0`.
-   - Impacto: `bun test` del pre-merge checklist falla.
+1. **Tests fail due to hardcoded versions**
+   - Files: `backend/src/server.test.ts:75`, `backend/src/api/api.test.ts:14`
+   - Root `package.json` is at `0.1.1`, but tests expect `0.1.0`.
+   - Impact: `bun test` in pre-merge checklist fails.
 
-2. **Backend `Containerfile` no soporta workspaces**
-   - Archivo: `deploy/Containerfile:16-23`
-   - Solo copia `package.json` raíz y `backend/package.json`, sin `packages/` ni `bun.lock` raíz.
-   - Impacto: `bun install` falla con `Workspace dependency "@cardinal/auth" not found`. Imposible deployar backend.
+2. **Backend `Containerfile` does not support workspaces**
+   - File: `deploy/Containerfile:16-23`
+   - Only copies root `package.json` and `backend/package.json`, without `packages/` or root `bun.lock`.
+   - Impact: `bun install` fails with `Workspace dependency "@cardinal/auth" not found`. Backend cannot be deployed.
 
-3. **Frontend `Containerfile` no soporta workspaces**
-   - Archivo: `deploy/Containerfile.frontend:11-16`
-   - Copia `package.json` raíz con workspaces junto a `frontend/package.json`, lo que rompe la resolución de `vite`.
-   - Impacto: `bun run build` falla con `vite: command not found`. Imposible deployar frontend.
+3. **Frontend `Containerfile` does not support workspaces**
+   - File: `deploy/Containerfile.frontend:11-16`
+   - Copies root `package.json` with workspaces alongside `frontend/package.json`, breaking `vite` resolution.
+   - Impact: `bun run build` fails with `vite: command not found`. Frontend cannot be deployed.
 
-4. **`compose.yaml` no monta `packages/`**
-   - Archivo: `compose.yaml:22-28`
-   - Falta montar el directorio `packages/` en el servicio backend.
-   - Impacto: `podman-compose up` falla en clone limpio.
+4. **`compose.yaml` does not mount `packages/`**
+   - File: `compose.yaml:22-28`
+   - Missing mount for `packages/` directory into backend service.
+   - Impact: `podman-compose up` fails in clean clone.
 
-### 🟡 Importantes (deberían corregirse antes de merge)
+### [warning] Important (should be fixed before merge)
 
-5. **`bun run typecheck` falla**
-   - Archivo: `backend/tsconfig.json:23-29`
-   - Usa `references` a proyectos que no tienen `"composite": true` y tienen `"noEmit": true`.
-   - Impacto: El checklist de pre-merge requiere build limpia; typecheck roto es un riesgo de regresión.
+5. **`bun run typecheck` fails**
+   - File: `backend/tsconfig.json:23-29`
+   - Uses `references` to projects without `"composite": true` and with `"noEmit": true`.
+   - Impact: Pre-merge checklist requires clean build; broken typecheck is a regression risk.
 
-6. **`useSystem` tiene fuga de `setInterval` global**
-   - Archivo: `frontend/src/lib/system.ts:22-40`
-   - Estado y timer a nivel de módulo; nunca se limpia el intervalo.
-   - Impacto: Memory leak y patrón anti-React. Afectará al dashboard a medida que crezca.
+6. **`useSystem` has global `setInterval` leak**
+   - File: `frontend/src/lib/system.ts:22-40`
+   - Module-level state and timer; interval is never cleared.
+   - Impact: Memory leak and anti-React pattern. Affects dashboard as it grows.
 
-7. **`/api/system` expone `db_path`**
-   - Archivos: `backend/src/api/system.ts:16`, `frontend/src/pages/Settings.tsx:14`
-   - Devuelve la ruta absoluta del archivo SQLite.
-   - Impacto: Violación explícita de `docs/security.md` y `AGENTS.md` sobre no filtrar paths.
+7. **`/api/system` exposes `db_path`**
+   - Files: `backend/src/api/system.ts:16`, `frontend/src/pages/Settings.tsx:14`
+   - Returns absolute path of SQLite file.
+   - Impact: Explicit violation of `docs/security.md` and `AGENTS.md` regarding path leaking.
 
-8. **Protección contra path traversal en `static.ts` es frágil**
-   - Archivo: `backend/src/static.ts:6-9`
-   - Depende de regex sobre path normalizado en lugar de verificar que el target resuelto esté dentro de `staticDir`.
-   - Impacto: Riesgo de seguridad en serving estático.
+8. **Path traversal protection in `static.ts` is fragile**
+   - File: `backend/src/static.ts:6-9`
+   - Relies on regex on normalized path instead of verifying that resolved target is inside `staticDir`.
+   - Impact: Security risk in static serving.
 
-9. **`handleSystem` usa SQL crudo con casts inseguros**
-   - Archivo: `backend/src/api/system.ts:10-11`
-   - `db.query(sql).get() as { count: number }` es un cast ciego y duplica lógica que debería vivir en `@cardinal/db`.
-   - Impacto: Cambios de schema rompen silenciosamente los counts.
+9. **`handleSystem` uses raw SQL with unsafe casts**
+   - File: `backend/src/api/system.ts:10-11`
+   - `db.query(sql).get() as { count: number }` is a blind cast duplicating logic that belongs in `@cardinal/db`.
+   - Impact: Schema changes silently break counts.
 
-10. **Mock de versión en frontend desactualizado**
-    - Archivo: `frontend/src/lib/system.ts:12`
-    - `MOCK_INFO.version` es `"0.0.1"`, inconsistente con el resto de la app.
-    - Impacto: Inconsistencia menor pero sintomática de mocks sin mantener.
+10. **Outdated version mock in frontend**
+    - File: `frontend/src/lib/system.ts:12`
+    - `MOCK_INFO.version` is `"0.0.1"`, inconsistent with the rest of the application.
+    - Impact: Minor inconsistency, but symptomatic of unmaintained mocks.
 
-### 🟢 Menores
+### [minor] Minor
 
-11. `useAuth.tsx` tiene ramas de error redundantes.
-12. Cookie de sesión carece de flag `Secure` para producción HTTPS.
-13. No hay rate limiting en login (ya trackeado para Fase 2).
-14. Migraciones no tienen `down` (aceptable para Fase 0/1, documentar).
+11. `useAuth.tsx` has redundant error branches.
+12. Session cookie lacks `Secure` flag for production HTTPS.
+13. No rate limiting on login (already tracked for Fase 2).
+14. Migrations have no `down` (acceptable for Fase 0/1, document).
 
-## Recomendaciones de proceso
+## Process Recommendations
 
-- Agregar un script de CI/check que ejecute `bun test`, `bun run build`, `bun run typecheck` y smoke de builds de contenedores dentro de la imagen de Bun.
-- No hardcodear versiones en tests: assert contra `package.json` o verificar solo forma.
-- Los contenedores deben copiar el workspace completo (root `package.json`, `bun.lock`, `packages/`, app objetivo) e instalar desde `/app`.
-- Refactorizar `useSystem` para eliminar estado global a nivel de módulo antes de que más componentes lo consuman.
-- Eliminar `db_path` de `/api/system` para alinearse con las reglas de leak-audit del proyecto.
+- Add a CI/check script executing `bun test`, `bun run build`, `bun run typecheck`, and container build smoke checks inside the Bun image.
+- Do not hardcode versions in tests: assert against `package.json` or verify shape only.
+- Containers must copy the entire workspace (root `package.json`, `bun.lock`, `packages/`, target app) and install from `/app`.
+- Refactor `useSystem` to eliminate module-level global state before more components consume it.
+- Remove `db_path` from `/api/system` to align with the project's leak-audit rules.
 
-## Veredicto
+## Verdict
 
-**REQUEST CHANGES** — No está listo para merge.
+**REQUEST CHANGES** — Not ready for merge.
 
-El refactor a workspaces es sólido y la cobertura de tests es buena, pero hay cuatro bloqueos críticos (tests rotos, dos Containerfiles rotos, compose.yaml roto) y varios problemas importantes de seguridad/TypeScript/React que deben corregirse antes de integrar a `main`.
+The workspace refactor is solid and test coverage is good, but there are four critical blockers (broken tests, two broken Containerfiles, broken compose.yaml) and several important security/TypeScript/React issues that must be addressed before integrating into `main`.
 
-## Archivos referenciados
+## Referenced Files
 
 - `backend/src/server.test.ts`
 - `backend/src/api/api.test.ts`
@@ -116,4 +116,4 @@ El refactor a workspaces es sólido y la cobertura de tests es buena, pero hay c
 
 ---
 
-*Revisión generada el 2026-07-29.*
+*Review generated on 2026-07-29.*

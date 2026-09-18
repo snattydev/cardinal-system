@@ -4,8 +4,12 @@ import {
   addProviderModel,
   addSkillToProfile,
   consumeBudget,
+  consumeBudgetUsd,
   createAgentKey,
   findActiveKeyByHash,
+  getKeyById,
+  listHumanKeys,
+  revokeKeyById,
   getAgent,
   getConfigTemplate,
   getMemoryMirror,
@@ -56,7 +60,7 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 16 tables and sets user_version to 12", () => {
+  test("migrate creates the 17 tables and sets user_version to 14", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
@@ -64,6 +68,7 @@ describe("migrations", () => {
       "agents",
       "config_templates",
       "memory_mirror",
+      "messages",
       "model_routes",
       "profile_skills",
       "profiles",
@@ -77,7 +82,7 @@ describe("migrations", () => {
       "usage_log",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
+    expect(row.user_version).toBe(14);
     db.close();
   });
 
@@ -86,8 +91,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
-    expect(tableNames(db)).toHaveLength(16);
+    expect(row.user_version).toBe(14);
+    expect(tableNames(db)).toHaveLength(17);
     db.close();
   });
 
@@ -97,7 +102,7 @@ describe("migrations", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("device_info");
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(12);
+    expect(row.user_version).toBe(14);
     db.close();
   });
 
@@ -137,6 +142,42 @@ describe("migrations", () => {
     db.close();
   });
 
+  test("migration 14 adds expires_at / budget_usd_limit / budget_usd_used to agent_keys", () => {
+    const db = createDb(":memory:");
+    const cols = db.query("PRAGMA table_info(agent_keys)").all() as Array<{
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+    }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toContain("expires_at");
+    expect(names).toContain("budget_usd_limit");
+    expect(names).toContain("budget_usd_used");
+
+    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
+    expect(byName.expires_at.type).toBe("TEXT");
+    expect(byName.expires_at.notnull).toBe(0);
+    expect(byName.budget_usd_limit.type).toBe("REAL");
+    expect(byName.budget_usd_limit.notnull).toBe(0);
+    expect(byName.budget_usd_used.type).toBe("REAL");
+    expect(byName.budget_usd_used.notnull).toBe(1);
+    expect(byName.budget_usd_used.dflt_value).toBe("0");
+
+    db.query("INSERT INTO agents (name) VALUES (?)").run("shinon");
+    db.query("INSERT INTO agent_keys (key_hash, agent_name) VALUES (?, ?)").run("hash-m14", "shinon");
+    const row = db.query("SELECT expires_at, budget_usd_limit, budget_usd_used FROM agent_keys WHERE key_hash = ?").get(
+      "hash-m14",
+    ) as { expires_at: string | null; budget_usd_limit: number | null; budget_usd_used: number };
+    expect(row.expires_at).toBeNull();
+    expect(row.budget_usd_limit).toBeNull();
+    expect(row.budget_usd_used).toBe(0);
+
+    const version = db.query("PRAGMA user_version").get() as { user_version: number };
+    expect(version.user_version).toBe(14);
+    db.close();
+  });
+
   test("migration 11 creates usage_log with token columns and created_at default", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toContain("usage_log");
@@ -166,6 +207,72 @@ describe("migrations", () => {
     expect(row.total_tokens).toBe(0);
     expect(typeof row.created_at).toBe("string");
     expect(row.created_at).not.toBe("");
+
+    db.close();
+  });
+
+  test("migration 12 creates the messages table with columns, DEFAULT read=0 and created_at", () => {
+    const db = createDb(":memory:");
+    expect(tableNames(db)).toContain("messages");
+
+    const cols = db.query("PRAGMA table_info(messages)").all() as Array<{
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+      pk: number;
+    }>;
+    const names = cols.map((c) => c.name);
+    expect(names).toEqual([
+      "id",
+      "from_agent",
+      "to_agent",
+      "type",
+      "payload_ref",
+      "read",
+      "created_at",
+    ]);
+
+    const byName = Object.fromEntries(cols.map((c) => [c.name, c]));
+    expect(byName.id.pk).toBe(1);
+    expect(byName.from_agent.notnull).toBe(1);
+    expect(byName.to_agent.notnull).toBe(1);
+    expect(byName.type.notnull).toBe(1);
+    expect(byName.payload_ref.notnull).toBe(0);
+    expect(byName.read.notnull).toBe(1);
+    expect(byName.read.dflt_value).toBe("0");
+    expect(byName.created_at.notnull).toBe(1);
+    expect(typeof byName.created_at.dflt_value).toBe("string");
+    expect(byName.created_at.dflt_value).toContain("datetime");
+
+    db.query("INSERT INTO messages (id, from_agent, to_agent, type) VALUES (?, ?, ?, ?)").run(
+      "m1",
+      "shinon",
+      "kirito",
+      "handoff",
+    );
+    const row = db.query("SELECT * FROM messages WHERE id = ?").get("m1") as Record<string, unknown>;
+    expect(row.read).toBe(0);
+    expect(row.payload_ref).toBeNull();
+    expect(typeof row.created_at).toBe("string");
+    expect(row.created_at).not.toBe("");
+
+    db.query("INSERT INTO messages (id, from_agent, to_agent, type) VALUES (?, ?, ?, ?)").run(
+      "m-ghost",
+      "ghost-from",
+      "ghost-to",
+      "custom-type",
+    );
+
+    expect(() =>
+      db.query("INSERT INTO messages (id, to_agent, type) VALUES (?, ?, ?)").run("m2", "kirito", "handoff"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO messages (id, from_agent, type) VALUES (?, ?, ?)").run("m3", "shinon", "handoff"),
+    ).toThrow();
+    expect(() =>
+      db.query("INSERT INTO messages (id, from_agent, to_agent) VALUES (?, ?, ?)").run("m4", "shinon", "kirito"),
+    ).toThrow();
 
     db.close();
   });
@@ -861,6 +968,132 @@ describe("keys repo", () => {
     expect(def!.budget_used).toBe(0);
     db.close();
   });
+
+  test("createAgentKey persists expires_at, budget_usd_limit, and budget_usd_used default 0", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, {
+      keyHash: "hash-usd",
+      agentName: "shinon",
+      expiresAt: "2099-01-01T00:00:00Z",
+      budgetUsdLimit: 12.5,
+    });
+    const row = db
+      .query("SELECT expires_at, budget_usd_limit, budget_usd_used FROM agent_keys WHERE key_hash = ?")
+      .get("hash-usd") as {
+      expires_at: string | null;
+      budget_usd_limit: number | null;
+      budget_usd_used: number;
+    };
+    expect(row.expires_at).toBe("2099-01-01T00:00:00Z");
+    expect(row.budget_usd_limit).toBe(12.5);
+    expect(row.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("createAgentKey without expiresAt/budgetUsdLimit defaults those columns to null and used to 0", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-no-usd", agentName: "shinon" });
+    const row = db
+      .query("SELECT expires_at, budget_usd_limit, budget_usd_used FROM agent_keys WHERE key_hash = ?")
+      .get("hash-no-usd") as {
+      expires_at: string | null;
+      budget_usd_limit: number | null;
+      budget_usd_used: number;
+    };
+    expect(row.expires_at).toBeNull();
+    expect(row.budget_usd_limit).toBeNull();
+    expect(row.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("findActiveKeyByHash treats null expires_at as active", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-no-exp", agentName: "shinon" });
+    expect(findActiveKeyByHash(db, "hash-no-exp")).not.toBeNull();
+    db.close();
+  });
+
+  test("findActiveKeyByHash treats future expires_at as active", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-future", agentName: "shinon", expiresAt: "2099-01-01T00:00:00Z" });
+    expect(findActiveKeyByHash(db, "hash-future")).not.toBeNull();
+    db.close();
+  });
+
+  test("findActiveKeyByHash returns null for expired keys", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-past", agentName: "shinon", expiresAt: "1999-01-01T00:00:00Z" });
+    expect(findActiveKeyByHash(db, "hash-past")).toBeNull();
+    db.close();
+  });
+
+  test("listHumanKeys returns only human keys, newest id first, filtered by status", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    registerAgent(db, "kirito", "agent");
+    createAgentKey(db, { keyHash: "h-old", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-new", agentName: "kirito" });
+    createAgentKey(db, { keyHash: "sys", agentName: "shinon", createdBy: "system" });
+    const older = findActiveKeyByHash(db, "h-old")!;
+    revokeKeyById(db, older.id);
+
+    const active = listHumanKeys(db, "active");
+    expect(active.map((k) => k.key_hash)).toEqual(["h-new"]);
+    expect(active.every((k) => k.created_by === "human")).toBe(true);
+
+    const revoked = listHumanKeys(db, "revoked");
+    expect(revoked.map((k) => k.key_hash)).toEqual(["h-old"]);
+    expect(revoked[0]!.revoked_at).not.toBeNull();
+
+    expect(listKeys(db)).toHaveLength(3);
+    db.close();
+  });
+
+  test("listHumanKeys active excludes unrevoked expired keys", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-expired", agentName: "shinon", expiresAt: "1999-01-01T00:00:00Z" });
+
+    expect(listHumanKeys(db, "active").map((k) => k.key_hash)).toEqual(["h-live"]);
+    expect(listHumanKeys(db, "revoked").map((k) => k.key_hash)).toEqual([]);
+    db.close();
+  });
+
+  test("getKeyById returns the row or null", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-1", agentName: "shinon" });
+    const id = findActiveKeyByHash(db, "h-1")!.id;
+    expect(getKeyById(db, id)?.key_hash).toBe("h-1");
+    expect(getKeyById(db, 99999)).toBeNull();
+    db.close();
+  });
+
+  test("revokeKeyById revokes one row and leaves sibling keys of the same agent active", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "keep", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "drop", agentName: "shinon" });
+    const dropId = findActiveKeyByHash(db, "drop")!.id;
+    const keepId = findActiveKeyByHash(db, "keep")!.id;
+
+    const revoked = revokeKeyById(db, dropId);
+    expect(revoked).not.toBeNull();
+    expect(revoked!.id).toBe(dropId);
+    expect(revoked!.revoked_at).not.toBeNull();
+    expect(findActiveKeyByHash(db, "drop")).toBeNull();
+    expect(findActiveKeyByHash(db, "keep")!.id).toBe(keepId);
+
+    expect(revokeKeyById(db, dropId)).toBeNull();
+    expect(revokeKeyById(db, 99999)).toBeNull();
+    db.close();
+  });
 });
 
 describe("providers repo", () => {
@@ -1003,6 +1236,73 @@ describe("consumeBudget", () => {
   });
 });
 
+describe("consumeBudgetUsd", () => {
+  test("key with budget_usd_limit consumes until limit then returns false", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-budget", agentName: "shinon", budgetUsdLimit: 10 });
+    expect(consumeBudgetUsd(db, "hash-usd-budget", 6)).toBe(true);
+    expect(consumeBudgetUsd(db, "hash-usd-budget", 4)).toBe(true);
+    expect(consumeBudgetUsd(db, "hash-usd-budget", 0.01)).toBe(false);
+    const row = db.query("SELECT budget_usd_used FROM agent_keys WHERE key_hash = ?").get("hash-usd-budget") as {
+      budget_usd_used: number;
+    };
+    expect(row.budget_usd_used).toBe(10);
+    db.close();
+  });
+
+  test("key without budget_usd_limit returns true without incrementing budget_usd_used", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-nolimit", agentName: "shinon" });
+    expect(consumeBudgetUsd(db, "hash-usd-nolimit", 99.99)).toBe(true);
+    const row = db.query("SELECT budget_usd_used FROM agent_keys WHERE key_hash = ?").get("hash-usd-nolimit") as {
+      budget_usd_used: number;
+    };
+    expect(row.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("consumeBudgetUsd on revoked key returns false", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-revoked", agentName: "shinon", budgetUsdLimit: 10 });
+    revokeKeysForAgent(db, "shinon");
+    expect(consumeBudgetUsd(db, "hash-usd-revoked", 1)).toBe(false);
+    db.close();
+  });
+
+  test("consumeBudgetUsd on unknown key returns false", () => {
+    const db = createDb(":memory:");
+    expect(consumeBudgetUsd(db, "ghost-hash", 1)).toBe(false);
+    db.close();
+  });
+
+  test("usd=0 with limit set returns true and used does not change", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-zero", agentName: "shinon", budgetUsdLimit: 10 });
+    expect(consumeBudgetUsd(db, "hash-usd-zero", 0)).toBe(true);
+    const row = db.query("SELECT budget_usd_used FROM agent_keys WHERE key_hash = ?").get("hash-usd-zero") as {
+      budget_usd_used: number;
+    };
+    expect(row.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("consumeBudgetUsd accepts increment equal to limit when compared as micro-USD", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-micro", agentName: "shinon", budgetUsdLimit: 0.03 });
+    expect(consumeBudgetUsd(db, "hash-usd-micro", (30 / 1e6) * 1000)).toBe(true);
+    const row = db.query("SELECT budget_usd_used FROM agent_keys WHERE key_hash = ?").get("hash-usd-micro") as {
+      budget_usd_used: number;
+    };
+    expect(row.budget_usd_used).toBeCloseTo(0.03);
+    db.close();
+  });
+});
+
 describe("usage_log repo", () => {
   test("logUsage inserts a row and listUsage returns newest first", () => {
     const db = createDb(":memory:");
@@ -1073,6 +1373,40 @@ describe("getSystemCounts", () => {
       agentsOnline: 1,
       keysActive: 1,
       keysRevoked: 1,
+    });
+    db.close();
+  });
+
+  test("keysActive and keysRevoked count only created_by=human", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "human-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "human-dead", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "sys-live", agentName: "shinon", createdBy: "system" });
+    createAgentKey(db, { keyHash: "sys-dead", agentName: "shinon", createdBy: "system" });
+    revokeKeyById(db, findActiveKeyByHash(db, "human-dead")!.id);
+    revokeKeyById(db, findActiveKeyByHash(db, "sys-dead")!.id);
+
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 1,
+      agentsOnline: 0,
+      keysActive: 1,
+      keysRevoked: 1,
+    });
+    db.close();
+  });
+
+  test("keysActive does not count unrevoked expired human keys", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-expired", agentName: "shinon", expiresAt: "1999-01-01T00:00:00Z" });
+
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 1,
+      agentsOnline: 0,
+      keysActive: 1,
+      keysRevoked: 0,
     });
     db.close();
   });

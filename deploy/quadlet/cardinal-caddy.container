@@ -7,8 +7,7 @@ After=network-online.target
 Image=docker.io/library/caddy:alpine
 Pod=cardinal.pod
 # Mount the Caddyfile into the container
-Volume=%h/Data/Projects/agents/cardinal-system/deploy/Caddyfile:/etc/caddy/Caddyfile:ro,Z
-
+Volume=%h/.config/cardinal/Caddyfile:/etc/caddy/Caddyfile:ro,Z
 [Service]
 Restart=always
 MemoryMax=64M

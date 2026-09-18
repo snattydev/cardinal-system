@@ -1,61 +1,61 @@
-# Blackboard Tasks — tabla + CRUD (2026-08-12)
+# Blackboard Tasks — Table + CRUD (2026-08-12)
 
-Primer feature del pilar "Blackboard" de Cardinal v2.
+First feature of Cardinal v2's "Blackboard" pillar.
 
-## Qué se hizo
+## What was done
 
-Tabla `tasks` + repos + handlers + rutas JWT para coordinación cross-provider
-entre agentes. Modelo tipo Linear/equipo: tasks con status, assignee, árbol
-padre/hijo, summary acotado y artifact_ref (puntero al resultado, nunca la prosa
-completa).
+`tasks` table + repos + handlers + JWT routes for cross-provider coordination
+between agents. Linear/team-style model: tasks with status, assignee, parent/child
+tree, bounded summary, and artifact_ref (pointer to the result, never the full
+prose).
 
-## Por qué
+## Why
 
-Validado en spike 001 (`spikes/001-blackboard-no-inflacion/`): dos agentes de
-proveedores distintos (Hermes + opencode vía herdr) coordinaron un objetivo en
-común por un board estructurado sin inflar contexto ni tocar memoria. La regla de
-oro es "pull + refs": el estado vive en filas de DB, los agentes consultan lo que
-necesitan y cruzan pointers, no transcripts.
+Validated in spike 001 (`spikes/001-blackboard-no-inflacion/`): two agents from
+different providers (Hermes + opencode via herdr) coordinated towards a common
+goal through a structured board without inflating context or touching memory.
+The golden rule is "pull + refs": state lives in DB rows, agents query what they
+need and exchange pointers, not transcripts.
 
-## Decisiones
+## Decisions
 
-- `tasks` como tabla nueva (migration append, no toca las existentes).
+- `tasks` as a new table (append migration, does not touch existing ones).
 - id = `crypto.randomUUID()`.
 - status CHECK: `open | claimed | done | blocked`.
-- `claim` solo desde `open` → 409 `{error: "not_open"}` si no. Evita doble claim
-  (lección de dedup de Nogal Hive).
-- `complete` sin restricción de status previo; body vacío = `{summary: null,
-  artifact_ref: null}` (un agente puede completar sin resumen).
-- `created_by` default `"system"` (keys dinámicas / one-shot), overridable.
-- Rutas `/api/tasks/:id/claim` y `/api/tasks/:id/complete` matcheadas ANTES del
-  genérico `/api/tasks/:id` para no comerse el sufijo.
+- `claim` only from `open` -> 409 `{error: "not_open"}` otherwise. Prevents double
+  claims (deduplication lesson from Nogal Hive).
+- `complete` without previous status restriction; empty body = `{summary: null,
+  artifact_ref: null}` (an agent can complete without a summary).
+- `created_by` defaults to `"system"` (dynamic / one-shot keys), overridable.
+- Routes `/api/tasks/:id/claim` and `/api/tasks/:id/complete` matched BEFORE the
+  generic `/api/tasks/:id` to avoid consuming the suffix.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- **Endpoint único `/api/tasks/:id` con PATCH** (estado en body): descartado,
-  acciones explícitas (`claim`/`complete`) son más claras y menos ambiguas.
-- **Cola de mensajes (mailbox) en el mismo feature**: pospuesto. El board es el
-  primitivo de coordinación; el mailbox directo (agent_send/inbox) es otro feature
-  cuando haga falta handoff directo.
+- **Single endpoint `/api/tasks/:id` with PATCH** (state in body): discarded,
+  explicit actions (`claim`/`complete`) are clearer and less ambiguous.
+- **Message queue (mailbox) in the same feature**: postponed. The board is the
+  coordination primitive; direct mailbox (agent_send/inbox) is a separate feature
+  when direct handoffs are required.
 
-## Archivos
+## Files
 
-- Creados: `backend/src/api/tasks.ts`, `backend/src/api/tasks.test.ts`
-- Modificados: `backend/src/server.ts`, `packages/core/src/types.ts`,
+- Created: `backend/src/api/tasks.ts`, `backend/src/api/tasks.test.ts`
+- Modified: `backend/src/server.ts`, `packages/core/src/types.ts`,
   `packages/core/src/index.ts`, `packages/db/src/schema.ts`,
   `packages/db/src/repos.ts`, `packages/db/src/index.ts`, `packages/db/src/db.test.ts`
 
-## Verificación
+## Verification
 
-- `podman exec cardinal-backend sh -c 'cd /app && bun test'` → 213 pass / 0 fail
-  (suite completa, no solo los nuevos tests).
-- Implementado por cursor-agent vía herdr; verificado por el orquestador en 3
-  capas (tests, diff, revisión de código).
-- Desvíos del brief (justificados): re-export en `db/index.ts`, update del count
-  de tablas (11→12) en `db.test.ts`.
+- `podman exec cardinal-backend sh -c 'cd /app && bun test'` -> 213 pass / 0 fail
+  (full suite, not just new tests).
+- Implemented by cursor-agent via herdr; verified by orchestrator across 3 layers
+  (tests, diff, code review).
+- Deviations from brief (justified): re-export in `db/index.ts`, updated table
+  count (11->12) in `db.test.ts`.
 
-## Pendiente (fuera de este feature)
+## Pending (out of scope for this feature)
 
-- Exponer tasks como MCP tools (spike-002).
-- Mailbox (`messages`) para handoff directo.
-- WS broadcast de cambios en el board a dashboards suscritos.
+- Expose tasks as MCP tools (spike-002).
+- Mailbox (`messages`) for direct handoff.
+- WS broadcast of board changes to subscribed dashboards.

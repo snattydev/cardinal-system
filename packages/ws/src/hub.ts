@@ -11,7 +11,7 @@ import {
   updateAgentStatus,
   upsertAgentOnConnect,
 } from "@cardinal/db";
-import type { AgentKind, AgentRow, TaskRow } from "@cardinal/core";
+import type { AgentKind, AgentRow, TaskRow, MessageRow } from "@cardinal/core";
 import { parseClientMessage, resolveKind } from "@cardinal/core";
 import { hashKey, isKeyFormat } from "@cardinal/keys";
 
@@ -66,6 +66,28 @@ export function taskToPayload(row: TaskRow): TaskPayload {
     artifactRef: row.artifact_ref,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+export interface MessagePayload {
+  id: string;
+  fromAgent: string;
+  toAgent: string;
+  type: string;
+  payloadRef: string | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export function messageToPayload(row: MessageRow): MessagePayload {
+  return {
+    id: row.id,
+    fromAgent: row.from_agent,
+    toAgent: row.to_agent,
+    type: row.type,
+    payloadRef: row.payload_ref,
+    read: row.read === 1,
+    createdAt: row.created_at,
   };
 }
 
@@ -245,6 +267,11 @@ export class Hub {
 
   broadcastTask(task: TaskRow): void {
     const payload = JSON.stringify({ type: "task_update", task: taskToPayload(task) });
+    for (const dash of this.dashboards) dash.send(payload);
+  }
+
+  broadcastMessage(message: MessageRow): void {
+    const payload = JSON.stringify({ type: "message_update", message: messageToPayload(message) });
     for (const dash of this.dashboards) dash.send(payload);
   }
 

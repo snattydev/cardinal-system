@@ -28,7 +28,7 @@ between them.
 
 ## Prerequisites
 
-- Podman ≥ 4.6 (rootless)
+- Podman >= 4.6 (rootless)
 - systemd --user enabled
 - `~/.config/containers/systemd/` directory exists
 
@@ -42,11 +42,11 @@ podman build -t cardinal-frontend:latest -f deploy/Containerfile.frontend .
 # 2. Copy Quadlet files
 cp -r deploy/quadlet/* ~/.config/containers/systemd/
 
-# 3. Create env file
+# 3. Create config and env files
 mkdir -p ~/.config/cardinal
 cp deploy/env.example ~/.config/cardinal/env
+cp deploy/Caddyfile ~/.config/cardinal/Caddyfile
 # Edit ~/.config/cardinal/env — set ADMIN_PASSWORD_HASH and JWT_SECRET
-
 # 4. Reload systemd and start the pod
 systemctl --user daemon-reload
 systemctl --user start cardinal-pod.service
@@ -73,7 +73,7 @@ curl http://localhost:8080/api/health
 
 | File | Purpose |
 |------|---------|
-| `cardinal.pod` | Pod definition, publishes port 8080→80 |
+| `cardinal.pod` | Pod definition, publishes port 8080->80 |
 | `cardinal-backend.container` | Bun backend, AutoUpdate=registry, 256M/50% CPU |
 | `cardinal-frontend.container` | nginx SPA server, 128M/25% CPU |
 | `cardinal-caddy.container` | Caddy reverse proxy, 64M/25% CPU |

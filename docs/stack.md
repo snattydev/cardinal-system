@@ -1,64 +1,64 @@
-# Cardinal System — Stack Técnico
+# Cardinal System — Technical Stack
 
-> Qué usamos y por qué. Para agentes que necesitan entender las decisiones técnicas.
+> What we use and why. For agents that need to understand the technical decisions.
 
 ---
 
-## Lenguajes y Runtime
+## Languages and runtime
 
-| Capa | Tecnología | Versión | Por qué |
-|------|-----------|---------|---------|
-| Backend | TypeScript + Bun | latest | `Bun.serve`, `bun:sqlite`, tipado sin build |
-| Frontend | React + TypeScript + Vite | latest | HMR rápido, estado complejo |
-| CLI tools | Bun scripts | — | keygen, migraciones, seeders |
+| Layer | Technology | Version | Why |
+|-------|-----------|---------|-----|
+| Backend | TypeScript + Bun | latest | `Bun.serve`, `bun:sqlite`, typed without build |
+| Frontend | React + TypeScript + Vite | latest | Fast HMR, complex state |
+| CLI tools | Bun scripts | — | keygen, migrations, seeders |
 
-## Base de datos
+## Database
 
-| Motor | Librería | Archivo |
-|-------|----------|---------|
-| SQLite | `bun:sqlite` (nativo) | `/data/cardinal.db` |
+| Engine | Library | File |
+|--------|---------|------|
+| SQLite | `bun:sqlite` (native) | `/data/cardinal.db` |
 
-**Migraciones:** `PRAGMA user_version` + archivos SQL secuenciales en `packages/db/migrations/`.
+**Migrations:** `PRAGMA user_version` + sequential SQL files in `packages/db/migrations/`.
 
-## Comunicación
+## Communication
 
-| Canal | Tecnología | Detalle |
-|-------|-----------|---------|
-| REST API | `Bun.serve` | Endpoints bajo `/api/` |
-| WebSocket | `Bun.serve` nativo | Un solo endpoint `/ws`, doble auth (cookie + key) |
-| Auth humana | JWT (HS256, `jose`) | Cookie `httpOnly`, `SameSite=Strict`, 12h expiry |
-| Auth agentes | API key `sk-cardinal-*` | SHA-256 en DB, identidad = key |
+| Channel | Technology | Detail |
+|---------|-----------|--------|
+| REST API | `Bun.serve` | Endpoints under `/api/` |
+| WebSocket | `Bun.serve` native | Single `/ws` endpoint, dual auth (cookie + key) |
+| Human auth | JWT (HS256, `jose`) | `httpOnly` cookie, `SameSite=Strict`, 12h expiry |
+| Agent auth | API key `sk-cardinal-*` | SHA-256 in DB, identity = key |
 
-## Estilos
+## Styles
 
-| Capa | Tecnología |
-|------|-----------|
+| Layer | Technology |
+|-------|-----------|
 | CSS | Tailwind CSS v4 |
-| Fuentes | Inter + JetBrains Mono (woff2 self-hosted en `frontend/public/fonts/`) |
-| Tema | SAO dark: `#08070c` bg, `#00d4ff` accent, `#8b5cf6` secondary |
+| Fonts | Inter + JetBrains Mono (woff2 self-hosted in `frontend/public/fonts/`) |
+| Theme | SAO dark: `#08070c` bg, `#00d4ff` accent, `#8b5cf6` secondary |
 
-## Contenedores
+## Containers
 
-| Entorno | Herramienta | Config |
-|---------|-------------|--------|
-| Dev local | Podman + `compose.yaml` | `cardinal-backend` (:8787) + `cardinal-frontend` (:5173) |
+| Environment | Tool | Config |
+|-------------|------|--------|
+| Local dev | Podman + `compose.yaml` | `cardinal-backend` (:8787) + `cardinal-frontend` (:5173) |
 | Prod | Podman Quadlet + Caddy | Reverse proxy, auto-SSL |
 
 ## Monorepo
 
-| Herramienta | Uso |
-|-------------|-----|
+| Tool | Use |
+|------|-----|
 | Bun workspaces | `packages/*`, `backend`, `frontend` |
-| `package.json` raíz | version source of truth (`MAJOR.FASE.PATCH`) |
+| Root `package.json` | version source of truth (`MAJOR.FASE.PATCH`) |
 
 ## Testing
 
-| Tipo | Herramienta | Cuándo |
-|------|-------------|--------|
-| Unit + Integración | `bun test` | Obligatorio para core (auth, keys, ws, db, router) |
+| Type | Tool | When |
+|------|------|------|
+| Unit + integration | `bun test` | Required for core (auth, keys, ws, db, router) |
 | Typecheck | `tsc --noEmit` | Frontend |
 | Build | `bun run build` (Vite) | Frontend |
 
 ---
 
-*Actualizado: 2026-07-28. Si cambia el stack, este archivo se actualiza.*
+*Updated: 2026-07-28. If the stack changes, this file is updated.*

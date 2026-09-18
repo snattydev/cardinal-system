@@ -1,29 +1,29 @@
 # Cursor subagents (2026-08-20)
 
-## Qué se hizo
+## What was done
 
-Nueve subagentes de Cursor (`.cursor/agents/`) y roles canónicos agnósticos en `docs/agents/roles/`. Composer pasa a ser la superficie de desarrollo: delega por tamaño, verifica con `verifier`, y usa `herdr-dispatcher` para otras instancias/kinds si hay Herdr.
+Nine Cursor subagents (`.cursor/agents/`) and agnostic canonical roles in `docs/agents/roles/`. Composer becomes the development surface: delegates by size, verifies with `verifier`, and uses `herdr-dispatcher` for other instances/kinds when Herdr is available.
 
-## Por qué
+## Why
 
-El swarm de OpenCode existía, pero el desarrollo diario del repo es Cursor. Hacía falta delegar desde adentro sin duplicar identidades (SOULs) ni hacer que Cardinal spawnee agentes.
+The OpenCode swarm existed, but day-to-day repo development happens in Cursor. In-IDE delegation was needed without duplicating identities (SOULs) or making Cardinal spawn agents.
 
-## Decisiones
+## Decisions
 
-- Híbrido: roles de proceso + especialistas (`ws-protocol`, `frontend`) + `verifier` + `herdr-dispatcher`.
-- Capas: role doc agnóstico + adapter Cursor corto. `description` en inglés; cuerpos en español.
-- `readonly` en reviewer / security-reviewer / verifier. `is_background: false` en todos.
-- OpenCode no se expande; los 5 agentes existentes apuntan al role doc. Reviewer de OpenCode sigue cubriendo security porque ese runtime no tiene `security-reviewer`.
-- SOULs y prompts one-shot de PR no se tocaron.
+- Hybrid: process roles + specialists (`ws-protocol`, `frontend`) + `verifier` + `herdr-dispatcher`.
+- Layers: agnostic role doc + concise Cursor adapter. `description` in English; bodies in Spanish.
+- `readonly` in reviewer / security-reviewer / verifier. `is_background: false` across all.
+- OpenCode not expanded; the 5 existing agents point to the role doc. OpenCode reviewer continues covering security because that runtime lacks `security-reviewer`.
+- SOULs and PR one-shot prompts were not touched.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- Solo roles de proceso (espejo OpenCode): insuficiente para ws/frontend/Herdr/verifier.
-- Especialistas por cada package: demasiado ruido para el Task tool.
-- Wrappers flacos (solo “leé el doc”): frágil en contexto vacío.
-- Padre orchestrator estricto: peor para diffs de 1–2 archivos.
+- Process roles only (OpenCode mirror): insufficient for ws/frontend/Herdr/verifier.
+- Specialists for every package: too much noise for the Task tool.
+- Thin wrappers (only "read the doc"): fragile in empty contexts.
+- Strict orchestrator parent: worse for 1-2 file diffs.
 
-## Archivos creados/modificados
+## Created/modified files
 
-- Creados: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), `docs/superpowers/plans/2026-08-20-cursor-subagents.md`, este doc
-- Modificados: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (punteros), `scripts/verify-dev-setup.sh`, `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md` (status/footer)
+- Created: `docs/agents/roles/*.md` (9), `.cursor/agents/*.md` (9), `docs/superpowers/plans/2026-08-20-cursor-subagents.md`, this doc
+- Modified: `AGENTS.md`, `.cursor/rules/cardinal.mdc`, `.opencode/agents/*.md` (pointers), `scripts/verify-dev-setup.sh`, `docs/superpowers/specs/2026-08-20-cursor-subagents-design.md` (status/footer)

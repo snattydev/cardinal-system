@@ -17,6 +17,7 @@ export async function handleCreateTask(
   db: Database,
   req: Request,
   onChange?: (task: TaskRow) => void,
+  createdByOverride?: string,
 ): Promise<Response> {
   let body: unknown;
   try {
@@ -30,7 +31,12 @@ export async function handleCreateTask(
     return json({ error: "missing_goal" }, 400);
   }
 
-  const createdBy = typeof raw.created_by === "string" ? raw.created_by : "system";
+  const createdBy =
+    typeof createdByOverride === "string" && createdByOverride.length > 0
+      ? createdByOverride
+      : typeof raw.created_by === "string"
+        ? raw.created_by
+        : "system";
   const parentId = typeof raw.parent_id === "string" ? raw.parent_id : null;
   if (parentId !== null && getTask(db, parentId) === null) {
     return json({ error: "parent_not_found" }, 400);
@@ -51,6 +57,7 @@ export async function handleClaimTask(
   id: string,
   req: Request,
   onChange?: (task: TaskRow) => void,
+  byOverride?: string,
 ): Promise<Response> {
   let body: unknown;
   try {
@@ -60,11 +67,16 @@ export async function handleClaimTask(
   }
 
   const raw = (body ?? {}) as Record<string, unknown>;
-  if (typeof raw.by !== "string" || raw.by.trim().length === 0) {
+  let by: string;
+  if (typeof byOverride === "string" && byOverride.length > 0) {
+    by = byOverride;
+  } else if (typeof raw.by !== "string" || raw.by.trim().length === 0) {
     return json({ error: "bad_request" }, 400);
+  } else {
+    by = raw.by;
   }
 
-  const task = claimTask(db, id, raw.by);
+  const task = claimTask(db, id, by);
   if (!task) {
     return getTask(db, id) === null
       ? json({ error: "not_found" }, 404)
@@ -79,6 +91,7 @@ export async function handleCompleteTask(
   id: string,
   req: Request,
   onChange?: (task: TaskRow) => void,
+  actorAgent?: string,
 ): Promise<Response> {
   let summary: string | null = null;
   let artifactRef: string | null = null;
@@ -92,6 +105,14 @@ export async function handleCompleteTask(
     }
   } catch {
     return json({ error: "bad_request" }, 400);
+  }
+
+  if (actorAgent !== undefined) {
+    const existing = getTask(db, id);
+    if (!existing) return json({ error: "not_found" }, 404);
+    if (existing.assigned_to !== actorAgent) {
+      return json({ error: "forbidden" }, 403);
+    }
   }
 
   const task = completeTask(db, id, { summary, artifactRef });

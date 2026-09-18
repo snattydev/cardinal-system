@@ -1,107 +1,84 @@
-# Cardinal System — Modelo de Seguridad
+# Cardinal System — Security Model
 
-> Reglas de seguridad que todo agente debe conocer antes de tocar código.
-
----
-
-## Principios
-
-- **Nada expuesto sin auth.** Todo endpoint bajo `/api/` requiere JWT o API key.
-- **Keys son identidad.** `sk-cardinal-*` = el agente. En DB solo hash SHA-256.
-- **Human-in-the-loop.** El humano cierra cada loop (merge, confirmación, gates).
-- **Efímero por default.** Estado en git/DB, nunca en el proceso.
-- **Fail-closed.** Si algo falla, denegar. Nunca permitir por defecto.
+> Security rules every agent must know before touching code.
 
 ---
 
-## Autenticación
+## Principles
 
-| Actor | Método | Storage | Lifetime |
+- **Nothing exposed without auth.** Every endpoint under `/api/` requires JWT or API key.
+- **Keys are identity.** `sk-cardinal-*` = the agent. Only SHA-256 hash in DB.
+- **Human-in-the-loop.** The human closes every loop (merge, confirmation, gates).
+- **Ephemeral by default.** State in git/DB, never in the process.
+- **Fail-closed.** If something fails, deny. Never allow by default.
+
+## Authentication
+
+| Actor | Method | Storage | Lifetime |
 |-------|--------|---------|----------|
-| Humano (dashboard) | JWT (HS256) via `POST /api/auth/login` | Cookie `httpOnly`, `SameSite=Strict` | 12h |
-| Agente (WS) | API key `sk-cardinal-*` en mensaje `hello` | DB: `key_hash` (SHA-256) | Revocable |
-| Agente (REST) | API key `sk-cardinal-*` via `Authorization: Bearer` | Igual que WS | Revocable |
-| Subagente (localhost) | API key `created_by=system`, auto-revocable | DB: `key_hash` | Efímera |
+| Human (dashboard) | JWT (HS256) via `POST /api/auth/login` | `httpOnly` cookie, `SameSite=Strict` | 12h |
+| Agent (WS) | API key `sk-cardinal-*` in `hello` message | DB: `key_hash` (SHA-256) | Revocable |
+| Agent (REST) | API key `sk-cardinal-*` via `Authorization: ***` | Same as WS | Revocable |
+| Subagent (localhost) | API key `created_by=system`, auto-revocable | DB: `key_hash` | Ephemeral |
 
----
+## API keys
 
-## API Keys
+- **Format:** `sk-cardinal-<64 chars hex>` (77 chars total)
+- **Generation:** `crypto.getRandomValues(new Uint8Array(32))` → hex
+- **Hash:** SHA-256 (only the hash is persisted in DB)
+- **Revocation:** `revoked_at` timestamp. Revoked keys reject with 4401.
+- **Human keys (`created_by='human'`):** Never touched automatically. Only explicit human action.
+- **System keys (`created_by='system'`):** Created and revoked automatically for one-shot agents.
 
-- **Formato:** `sk-cardinal-<64 chars hex>` (77 chars total)
-- **Generación:** `crypto.getRandomValues(new Uint8Array(32))` → hex
-- **Hash:** SHA-256 (solo el hash se persiste en DB)
-- **Revocación:** `revoked_at` timestamp. Keys revocadas rechazan con 4401.
-- **Keys humanas (`created_by='human'`):** Jamás se tocan automáticamente. Solo acción explícita del humano.
-- **Keys del sistema (`created_by='system'`):** Se crean y revocan automáticamente para one-shot agents.
+## Permissions
 
----
-
-## Permisos
-
-| Nivel | Scope |
+| Level | Scope |
 |-------|-------|
-| Admin (humano) | Todo: dashboard, keygen, config |
-| Agent key | Conexión WS + consultas RAG + uso del router |
-| Subagent key | Solo ejecución de una tarea (efímera, scoped) |
+| Admin (human) | Everything: dashboard, keygen, config. RAG unfiltered. Tasks/mailbox with body identity. |
+| Agent key | WS connection + router usage. RAG filtered by key JSON scopes (`*` or `vault:<name>`). On `/api/tasks` and `/api/messages` the key **is** identity (`agent_name`). |
+| Subagent key | Single task execution only (ephemeral, scoped) |
 
-El sistema de scopes fino (lectura/escritura por servicio) se implementa en Fase 2.
+Vault scopes in `POST /api/rag/search` are enforced server-side for agent keys. Finer scopes (read/write per service, e.g. `board`) are still pending.
 
----
+## Sensitive data
 
-## Datos sensibles
+| What | Where it does NOT go | Where it DOES go |
+|------|----------------------|------------------|
+| `.env` (JWT_SECRET, credentials) | Git, logs, diffs | Server only |
+| Admin password in plaintext | Agent chat, logs, git, tickets | Local human TTY only (stdin, no echo) |
+| API keys in plaintext | Git, logs, DB | Printed only ONCE when created |
+| Tokens, secrets, absolute paths | Commits, PR descriptions | — |
+| `.env.example` | — | Template without real values |
 
-| Qué | Dónde NO va | Dónde SÍ va |
-|-----|-------------|-------------|
-| `.env` (JWT_SECRET, credenciales) | ❌ Git, logs, diffs | Solo en el server |
-| Password admin en texto plano | ❌ Chat de agentes, logs, git, tickets | Solo TTY local del humano (stdin, sin echo) |
-| API keys en texto plano | ❌ Git, logs, DB | Solo se imprimen UNA vez al crearlas |
-| Tokens, secrets, paths absolutos | ❌ Commits, PR descriptions | — |
-| `.env.example` | — | ✅ Template sin valores reales |
+## Admin password bootstrap (required pre-cloud)
 
----
+Decision 2026-08-20: in **local dev/testing** any password works (even one generated in an agent session). That **is not** the production flow.
 
-## Bootstrap de password admin (imprescindible pre-nube)
+Before the first cloud deploy — even if the only user is the owner — the creation or rotation of `ADMIN_PASSWORD_HASH` **cannot go through the model**. The plaintext password enters the agent context, ends up in transcripts, and can leak. A single user does not override the requirement.
 
-Decisión 2026-08-20 (Santi): en **dev/testing local** cualquier password sirve
-(incluso una generada en sesión de agente). Eso **no** es el flujo de producción.
+**Canonical flow (`scripts/bootstrap-admin-password.sh` or `bun run bootstrap:password`):**
 
-Antes del primer deploy a la nube — aunque el único usuario sea el owner —
-el alta o rotación de `ADMIN_PASSWORD_HASH` **no puede pasar por el modelo**.
-La password en claro entra al contexto del agente, queda en transcripts y se
-puede filtrar. Un usuario no invalida el requisito.
+1. Interactive script in human TTY (`read -s`): prompts for password silently, never echoed or logged.
+2. Hashes with `Bun.password.hash` (Argon2id) on that same machine via stdin pipe (never in CLI args).
+3. Writes **only the hash** to `.env` or `~/.config/cardinal/env` (`--cloud`).
+4. The agent can verify that the bootstrap ran (exit 0). Never sees or generates the plaintext.
 
-**Flujo requerido (aún no implementado — blocker de deploy cloud):**
+Implemented in `scripts/bootstrap-admin-password.sh` (item 11 of the v2 backlog plan).
+## Pre-push audit
 
-1. Script interactivo en TTY del humano (`read -s` / equivalente): pide la
-   password, no la imprime, no la loguea.
-2. Hashea con `Bun.password.hash` **en esa misma máquina**.
-3. Escribe **solo el hash** a `~/.config/cardinal/env` o a un Podman secret.
-4. El agente puede saber que el bootstrap corrió (ok/fail). Nunca ve ni genera
-   el plaintext. Tampoco lo pide "pasámela por el chat".
+Before every push to `dev`:
 
-Hasta que ese script exista, el cloud deploy no se considera listo. Detalle de
-seguimiento: item 11 del
-[`plan de backlog v2`](superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
+- [ ] `grep -r "sk-cardinal-" --include="*.ts" --include="*.json"` → zero results
+- [ ] `grep -r "JWT_SECRET" --include="*.ts"` → only `process.env.JWT_SECRET`
+- [ ] No absolute home paths in code
+- [ ] No emails or tokens in comments or strings
 
----
-
-## Auditoría pre-push
-
-Antes de cada push a `dev`:
-
-- [ ] `grep -r "sk-cardinal-" --include="*.ts" --include="*.json"` → cero resultados
-- [ ] `grep -r "JWT_SECRET" --include="*.ts"` → solo `process.env.JWT_SECRET`
-- [ ] No hay paths absolutos (`/home/snatty/`) en código
-- [ ] No hay emails ni tokens en comentarios o strings
-
----
-
-## WS Security
+## WS security
 
 - **Close codes:** 4401 (auth failed), 4400 (invalid message)
-- **Timeout:** 2 pings perdidos (60s) → desconexión
-- **Rate limit:** No implementado en F0. Pendiente F2.
+- **Timeout:** 2 lost pings (60s) → disconnect
+- **Rate limit:** Not implemented in F0. Pending F2.
 
 ---
 
-*Actualizado: 2026-08-20.*
+*Updated: 2026-09-06.*

@@ -1,128 +1,128 @@
 # OpenCode Multi-Agent QOL — Design
 
-> Setup de agentes, comandos y MCPs de OpenCode para dev onboarding en Cardinal System.
-> Cursor (Grok 4.5) como orquestador visual; OpenCode CLI para implementación con subagentes.
+> OpenCode agent, command, and MCP setup for developer onboarding in Cardinal System.
+> Cursor (Grok 4.5) as visual orchestrator; OpenCode CLI for implementation with subagents.
 
 ---
 
-## Arquitectura de uso
+## Usage Architecture
 
 ```
 Cursor + Grok 4.5              OpenCode CLI
-(orquestador visual)           (implementación)
+(visual orchestrator)          (implementation)
         │                            │
-        ├── Planning, review         ├── builder (implementa)
-        ├── Refactors grandes        ├── tester (TDD)
+        ├── Planning, review         ├── builder (implements)
+        ├── Large refactors          ├── tester (TDD)
         │                            ├── reviewer (code review)
-        │                            └── docs (documentación)
+        │                            └── docs (documentation)
         │                            │
         └──────── AGENTS.md ─────────┘
               .cursor/rules/cardinal.mdc
 ```
 
-El dev elige según la tarea:
-- **Cursor**: planning de features complejas, code review visual, refactors multi-archivo
-- **OpenCode**: implementación concreta con `/feature`, TDD con `/test`, review rápido con `/review`
+The developer chooses based on the task:
+- **Cursor**: planning complex features, visual code review, multi-file refactors
+- **OpenCode**: concrete implementation with `/feature`, TDD with `/test`, quick review with `/review`
 
-Ambos comparten reglas via `AGENTS.md` y `.cursor/rules/`.
+Both share rules via `AGENTS.md` and `.cursor/rules/`.
 
 ---
 
-## Archivos creados
+## Files Created
 
 ```
 cardinal-system/
-├── .opencode/                       # NUEVO
+├── .opencode/                       # NEW
 │   ├── agents/
 │   │   ├── orchestrator.md          # Primary agent: deepseek-v4-pro
-│   │   ├── builder.md               # Subagent: implementación
+│   │   ├── builder.md               # Subagent: implementation
 │   │   ├── tester.md                # Subagent: TDD
 │   │   ├── reviewer.md              # Subagent: code review read-only
-│   │   └── docs.md                  # Subagent: documentación
+│   │   └── docs.md                  # Subagent: documentation
 │   └── commands/
-│       ├── feature.md               # /feature workflow completo
+│       ├── feature.md               # /feature complete workflow
 │       ├── review.md                # /review code review
 │       ├── test.md                  # /test TDD workflow
 │       └── deploy.md                # /deploy build + verify
 ├── .cursor/
 │   └── rules/
-│       └── cardinal.mdc             # NUEVO — Cursor rules para Grok 4.5
+│       └── cardinal.mdc             # NEW — Cursor rules for Grok 4.5
 ```
 
-## Archivos modificados
+## Files Modified
 
-- `opencode.json` — expandido con model, default_agent, MCPs, permissions, instructions
-- `AGENTS.md` — secciones nuevas: Swarm Workflow, Agent Roles, Delegation Rules, Cursor Section, OpenCode Config Reference
+- `opencode.json` — expanded with model, default_agent, MCPs, permissions, instructions
+- `AGENTS.md` — new sections: Swarm Workflow, Agent Roles, Delegation Rules, Cursor Section, OpenCode Config Reference
 
 ---
 
-## Agentes OpenCode
+## OpenCode Agents
 
 ### `orchestrator` (primary, `deepseek-v4-pro`)
 
-Coordina subagentes. No escribe código — delega implementación a builder, tests a tester.
-Usa skills de superpowers (`dispatching-parallel-agents`, `subagent-driven-development`, etc.).
+Coordinates subagents. Does not write code — delegates implementation to builder, tests to tester.
+Uses superpowers skills (`dispatching-parallel-agents`, `subagent-driven-development`, etc.).
 
-**Permisos:** read-only en código, bash acotado (solo comandos seguros), `permission.task` permite invocar a builder, tester, reviewer, docs.
+**Permissions:** read-only on code, scoped bash (safe commands only), `permission.task` allows invoking builder, tester, reviewer, docs.
 
-### `builder` (subagent, hereda modelo del primario)
+### `builder` (subagent, inherits primary model)
 
-Implementa features siguiendo specs del orchestrator. Stack: TypeScript + Bun, WebSocket nativo, SQLite.
-No agrega funcionalidad extra, solo lo spec. Containerizado — no instala dependencias nativas.
+Implements features following specs from the orchestrator. Stack: TypeScript + Bun, native WebSocket, SQLite.
+Does not add extra functionality, only what is specified. Containerized — does not install native dependencies.
 
-**Permisos:** edit en `packages/**`, `backend/**`, `frontend/**`, `tests/**`.
+**Permissions:** edit on `packages/**`, `backend/**`, `frontend/**`, `tests/**`.
 
-### `tester` (subagent, hereda modelo del primario)
+### `tester` (subagent, inherits primary model)
 
-TDD estricto: RED → GREEN → REFACTOR. Escribe tests primero.
-Cobertura de ramas críticas (auth, keys, ws, db, router).
+Strict TDD: RED → GREEN → REFACTOR. Writes tests first.
+Covers critical branches (auth, keys, ws, db, router).
 
-**Permisos:** edit en `**/*.test.ts`, bash para `bun test`.
+**Permissions:** edit on `**/*.test.ts`, bash for `bun test`.
 
-### `reviewer` (subagent, hereda modelo del primario)
+### `reviewer` (subagent, inherits primary model)
 
-Read-only code review. Enfocado en seguridad, rendimiento, estilo, edge cases.
-Output estructurado: CRITICAL / HIGH / LOW.
+Read-only code review. Focused on security, performance, style, edge cases.
+Structured output: CRITICAL / HIGH / LOW.
 
-**Permisos:** read-only, sin edit ni bash destructivo.
+**Permissions:** read-only, no edit or destructive bash.
 
-### `docs` (subagent, hereda modelo del primario)
+### `docs` (subagent, inherits primary model)
 
-Documentación técnica en `docs/features/`. Sigue convenciones del repo: qué, por qué, decisiones, alternativas, archivos.
+Technical documentation in `docs/features/`. Follows repo conventions: what, why, decisions, alternatives, files.
 
-**Permisos:** edit en `docs/**`, `README.md`.
+**Permissions:** edit on `docs/**`, `README.md`.
 
 ---
 
-## Comandos custom
+## Custom Commands
 
-### `/feature "descripción"`
+### `/feature "description"`
 
-Workflow completo: orchestrator descompone → @tester (RED) → @builder (GREEN + REFACTOR) → verify → @reviewer → @docs → sugiere commit.
+Complete workflow: orchestrator decomposes → @tester (RED) → @builder (GREEN + REFACTOR) → verify → @reviewer → @docs → suggests commit.
 
 ### `/review`
 
-@reviewer analiza diff contra `dev`. Reporta bugs, security, style, suggestions.
+@reviewer analyzes diff against `dev`. Reports bugs, security, style, suggestions.
 
 ### `/test [path]`
 
-@tester escribe test para el módulo, corre (debe fallar), sugiere @builder para implementar.
+@tester writes test for the module, runs it (must fail), suggests @builder for implementation.
 
 ### `/deploy`
 
-Build con Bun → tests → build container con Podman → verifica healthcheck.
+Build with Bun → tests → build container with Podman → verify healthcheck.
 
 ---
 
-## MCP servers
+## MCP Servers
 
-Solo el GitHub MCP se configura explícitamente. La regla `"mcp__*": "deny"` en permisos bloquea cualquier MCP externo que venga de config global o remota. Agregar un MCP nuevo es una entrada en `opencode.json` → `mcp` + quitar su namespace del deny.
+Only the GitHub MCP is configured explicitly. The `"mcp__*": "deny"` rule in permissions blocks any external MCP from global or remote config. Adding a new MCP is an entry in `opencode.json` → `mcp` plus removing its namespace from the deny list.
 
-MCPs postergados: SQLite (redundante, los agentes usan `bun:sqlite`), Cardinal API (overkill, backend es `bun run` local), Podman (bash directo es suficiente).
+Deferred MCPs: SQLite (redundant, agents use `bun:sqlite`), Cardinal API (overkill, backend is local `bun run`), Podman (direct bash is sufficient).
 
 ---
 
-## `opencode.json` (reemplaza el actual)
+## `opencode.json` (replaces the current one)
 
 ```jsonc
 {
@@ -155,36 +155,36 @@ MCPs postergados: SQLite (redundante, los agentes usan `bun:sqlite`), Cardinal A
 
 ---
 
-## AGENTS.md — adiciones
+## AGENTS.md — Additions
 
-Secciones nuevas al final del archivo (sin modificar lo existente):
+New sections appended to the file (without modifying existing content):
 
-1. **Swarm Workflow** — cuándo usar `/feature` vs directo. Features de 1-2 archivos → directo; features con dependencias → `/feature`.
-2. **Agent Roles Table** — referencia rápida de los 5 agentes.
-3. **Delegation Rules** — qué delega el orchestrator. El orchestrator no escribe código, solo coordina, verifica y commitea.
-4. **Cursor Section** — Grok 4.5 en Composer como orquestador visual, cuándo usar cada herramienta.
-5. **OpenCode Config Reference** — paths y cómo extender.
+1. **Swarm Workflow** — when to use `/feature` vs direct. 1–2 file features → direct; features with dependencies → `/feature`.
+2. **Agent Roles Table** — quick reference for the 5 agents.
+3. **Delegation Rules** — what the orchestrator delegates. The orchestrator does not write code; it only coordinates, verifies, and commits.
+4. **Cursor Section** — Grok 4.5 in Composer as visual orchestrator; when to use each tool.
+5. **OpenCode Config Reference** — paths and how to extend.
 
 ---
 
 ## `.cursor/rules/cardinal.mdc`
 
-Archivo de reglas para Cursor con frontmatter de glob patterns. Grok 4.5 en Composer lo carga como contexto. Contiene stack, convenciones, y guía de cuándo usar Cursor vs OpenCode.
+Rules file for Cursor with glob pattern frontmatter. Grok 4.5 in Composer loads it as context. Contains stack, conventions, and guidance on when to use Cursor vs OpenCode.
 
 ---
 
-## Extensibilidad
+## Extensibility
 
-- **Agente nuevo:** crear `.opencode/agents/<nombre>.md` con frontmatter + system prompt
-- **Comando nuevo:** crear `.opencode/commands/<nombre>.md`
-- **MCP nuevo:** agregar entrada en `opencode.json` → `mcp`, quitar su namespace del deny de permisos
-- **Cursor rule nueva:** crear `.cursor/rules/<nombre>.mdc`
+- **New agent:** create `.opencode/agents/<name>.md` with frontmatter + system prompt
+- **New command:** create `.opencode/commands/<name>.md`
+- **New MCP:** add entry in `opencode.json` → `mcp`, remove its namespace from the permissions deny list
+- **New Cursor rule:** create `.cursor/rules/<name>.mdc`
 
 ---
 
-## Referencias
+## References
 
 - [OpenCode Agents Docs](https://opencode.ai/docs/agents/)
 - [OpenCode Config Docs](https://opencode.ai/docs/config/)
 - [OpenCode MCP Servers Docs](https://opencode.ai/docs/mcp-servers/)
-- [`docs/guides/opencode-orchestration-plan.md`](../guides/opencode-orchestration-plan.md) — plan original que inspiró este diseño
+- [`docs/guides/opencode-orchestration-plan.md`](../guides/opencode-orchestration-plan.md) — original plan that inspired this design

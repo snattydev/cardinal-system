@@ -1,17 +1,16 @@
 ---
 name: cardinal-pr
-description: Crear un Pull Request en Cardinal System — branch, bump version, commit, push, abrir PR, llenar template y asignar revisores.
+description: Create a Pull Request in Cardinal System — branch, version bump, commit, push, template, reviewers.
 category: development
 ---
 
-# Cardinal System — Crear un Pull Request
+# Cardinal System — Create a Pull Request
 
-## ⚠️ Regla fundamental
-El orquestador abre PRs, el humano mergea. Jamás auto-merge.
+The orchestrator opens PRs. The human merges `dev → main`. Never auto-merge.
 
----
+Policy (checklist, merge strategy, reviewers): `AGENTS/prs.md`. This skill is the command sequence.
 
-## Flujo completo
+## Flow
 
 ### 1. Branch
 
@@ -21,73 +20,52 @@ git pull origin dev
 git checkout -b <type>/<desc>
 ```
 
-Tipos: `feat/`, `fix/`, `chore/`, `docs/`
+Types: `feat/`, `fix/`, `chore/`, `docs/`.
 
-### 2. Cambios
+### 2. Changes
 
-- Delegar implementación a subagente one-shot
-- Verificar resultado: archivos, coherencia, leaks
-- Documentar en `docs/features/` (crear el .md)
+- Implement (or delegate), then verify files, coherence, leaks.
+- Document at `docs/features/<date>-<name>.md` when the change is significant.
 
 ### 3. Version bump
 
-**Solo si el PR es a `main`.** En PRs a `dev` no se toca la versión.
+Format is `MAJOR.FASE.PATCH` (`package.json`). See `AGENTS/versioning.md`.
 
-```bash
-# Evaluar qué bump según lo acumulado:
-# PATCH: fixes, security, docs, chores  → 0.0.2 → 0.0.3
-# MINOR: nuevas features                 → 0.0.3 → 0.1.0
-# MAJOR: breaking changes                → 0.1.0 → 1.0.0
-
-# Editar package.json → "version": "X.Y.Z"
-```
+- PR to `dev`: PATCH only, and only if the change warrants it. Do not bump FASE.
+- PR `dev → main`: bump FASE if the previous phase closed; otherwise leave FASE unchanged.
 
 ### 4. Commit
 
-```
-<type>(<scope>): <breve en inglés>
+Use `cardinal-commit`. English subject and body.
 
-<Cuerpo en español: qué y por qué.>
-```
-
-Ejemplo:
-```
-feat(ws): add agent heartbeat with ping/pong protocol
-
-Health check sobre WebSocket con 30s de intervalo. 2 pings
-perdidos marcan al agente como offline en el dashboard.
-```
-
-### 5. Push y PR
+### 5. Push and PR
 
 ```bash
 git push -u origin <branch>
-gh pr create --base dev --title "<título>" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
+gh pr create --base dev --title "<title>" --body "$(cat .github/PULL_REQUEST_TEMPLATE.md)"
 ```
 
-- PR siempre a `dev`, NUNCA directo a `main`
-- El PR a `main` se hace solo cuando `dev` está estable (PR `dev → main`)
+- Feature work always targets `dev`, never `main`.
+- `dev → main` only when `dev` is stable. If a `dev → main` PR already exists, edit that PR instead of opening a second one.
 
-### 6. Template
+If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged PRs and get approval before pushing everything.
 
-Llenar con `.github/PULL_REQUEST_TEMPLATE.md` — resumen ejecutivo, el detalle va en doc de vault.
+### 6. Reviewers
 
-### 7. Revisores (solo PRs a `main`)
+| PR to | Reviewers |
+|-------|-----------|
+| `dev` | None — implementing agent merges after green |
+| `main` | Standard Review (required), Security Review (if `auth/`, `keys/`, `ws/`, protocol) |
 
-| PR a | Revisores |
-|------|-----------|
-| `dev` | Ninguno — merge directo |
-| `main` | Standard Reviewer (automático), Security Reviewer (bajo demanda) |
+## Pre-PR checks
 
----
-
-## Verificaciones pre-PR
-
-- [ ] Branch creada desde `dev` actualizado
-- [ ] Sin leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`
-- [ ] Versión bump si aplica
-- [ ] Commit message en formato conventional commits, cuerpo en español
-- [ ] PR template lleno
-- [ ] Doc en `docs/features/` creado
-- [ ] PR apunta a `dev` (no a `main`)
-- [ ] Skills sincronizadas: `bash skills/sync-skills.sh`
+- [ ] Branch created from updated `dev`
+- [ ] No leaks: `git diff dev..HEAD | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`
+- [ ] Version bump if applicable
+- [ ] Conventional commit, English body
+- [ ] PR title and description in English (`AGENTS/docs.md`)
+- [ ] Linked to GitHub Issue (`Closes #N`) with appropriate labels (`enhancement`, `bug`, etc.) per `AGENTS/issues.md`
+- [ ] PR template filled
+- [ ] `docs/features/` updated when required
+- [ ] PR targets `dev` (unless this is the release PR to `main`)
+- [ ] Skills synced if `skills/*.md` changed: `bash skills/sync-skills.sh`

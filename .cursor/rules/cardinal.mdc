@@ -5,33 +5,30 @@ globs: ["*.ts", "*.tsx", "*.json", "*.yaml", "*.md", "*.toml"]
 
 # Cardinal System — Development Rules
 
-- Lee `AGENTS.md` para las reglas completas (branching, commits, TDD, versionado)
-- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), React + Vite + Tailwind v4, WebSocket nativo
-- Runtime siempre containerizado con Podman — no instalar dependencias nativas en el host
-- TDD obligatorio en: auth, keys, ws, db, router (RED → GREEN → REFACTOR)
-- Branching: `feature/* → dev → main`. Commits directos a `dev`; PR con review solo para `dev → main` (merge commit)
-- Commits: Conventional Commits, primera línea en inglés ≤72 chars, body en español
-- Versionado: `MAJOR.FASE.PATCH` (source: `package.json` raíz). En `dev` solo PATCH
-- Audit de leaks antes de commit: keys `sk-cardinal-*`, tokens, paths absolutos, emails
-- Frontend types DEBEN matchear 1:1 el JSON real del backend (flat fields, no nested) — mismatch = pantalla negra
-- El WS del frontend va directo a `ws://127.0.0.1:8787/ws`, NO por el proxy de Vite (roto en Bun)
-- Dev URLs: frontend `http://127.0.0.1:5173`, backend `http://127.0.0.1:8787` (usar 127.0.0.1, no localhost — cookies)
-- Ecosistema y knowledge base: `context/ecosystem.md`
+Canonical rules: `AGENTS.md` and `AGENTS/*.md`. Do not restate them here.
 
-## Cursor como padre
+- Work on `feature/*` | `fix/*` | `chore/*` | `docs/*` from `dev`. PR into `dev`; never commit directly to `dev` or `main`.
+- Issue tracking: Dual tracking model (`AGENTS/issues.md`). Integrated Blackboard for runtime agent coordination; GitHub Issues (`enhancement`, `bug`, etc.) mandatory for strict system development. Branches and PRs must reference issues (`Closes #N`).
+- Language: English only — docs, skills, comments, identifiers, commits, PRs, prompts. Policy: `AGENTS/docs.md`.
+- Commits: Conventional Commits, English subject and body, ≤72 char subject. Details: `skills/cardinal-commit.md`.
+- TDD required in auth, keys, ws, db, router.
+- Frontend types must match backend JSON 1:1 (flat fields). WS goes to `ws://127.0.0.1:8787/ws`, not the Vite proxy. Use `127.0.0.1`, not `localhost` (cookies).
+- Knowledge base: `context/ecosystem.md`. Quirks: `docs/guides/pitfalls.md`. API: `docs/api.md`.
 
-Cursor Composer es la interfaz de desarrollo. Implementá vos los cambios de 1–2 archivos sin lógica crítica. Delegá siempre si toca auth/keys/ws/db/router, es multi-archivo, pide review, docs de feature, verificación, u otro pane/kind.
+## Cursor as parent
 
-| Subagente | Usar cuando |
-|-----------|-------------|
-| `builder` | Implementar spec en packages/ (salvo ws/) y backend/ |
-| `ws-protocol` | packages/ws/** |
-| `frontend` | frontend/** |
-| `tester` | TDD RED (use proactively en ámbitos TDD) |
-| `verifier` | Alguien dijo listo (use proactively) |
-| `reviewer` | Calidad del diff |
+Composer implements 1–2 file changes without critical logic. Delegate otherwise (auth/keys/ws/db/router, multi-file, review, feature docs, verification, another pane/kind).
+
+| Subagent | When |
+|----------|------|
+| `builder` | Spec in `packages/` (except `ws/`) and `backend/` |
+| `ws-protocol` | `packages/ws/**` |
+| `frontend` | `frontend/**` |
+| `tester` | TDD RED (use proactively in TDD scopes) |
+| `verifier` | Someone said done (use proactively) |
+| `reviewer` | Diff quality |
 | `security-reviewer` | auth/keys/ws/leaks (use proactively) |
-| `docs` | Feature ya verificada |
-| `herdr-dispatcher` | Largo, paralelo, aislamiento, otro kind — solo si HERDR_ENV=1 |
+| `docs` | Feature already verified |
+| `herdr-dispatcher` | Long, parallel, isolation, another kind — only if `HERDR_ENV=1` |
 
-Roles canónicos: `docs/agents/roles/`. No spawnees Herdr vos; usá `herdr-dispatcher`. OpenCode CLI es opcional, no el camino diario.
+Canonical roles: `docs/agents/roles/`. If this session is the orchestrator (`HERDR_ENV=1` and the human asked): talk to `herdr` directly, kind `cursor`, accept cloud. Otherwise do not spawn Herdr; use `herdr-dispatcher`. OpenCode CLI is optional, not the daily path.

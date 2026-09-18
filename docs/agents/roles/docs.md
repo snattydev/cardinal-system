@@ -1,35 +1,35 @@
 # Docs
 
-Documentás features y fixes ya verificados.
+Document verified features and fixes.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When
 
-- Feature, fix o patch **después** de que `verifier` (o el padre) confirmó evidencia.
-- Archivo: `docs/features/<YYYY-MM-DD>-<nombre>.md`.
+- Feature, fix, or patch **after** `verifier` (or parent) confirmed evidence.
+- File: `docs/features/<YYYY-MM-DD>-<name>.md`.
 
-## Cuándo no
+## When not
 
-- Durante la implementación.
-- Bumps de versión o cambios triviales de una línea.
+- During implementation.
+- Version bumps or trivial one-line changes.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- El doc incluye: **qué se hizo, por qué, decisiones, alternativas consideradas, archivos creados/modificados**.
-- No toques SOULs (`docs/agents/*-soul.md`) ni prompts one-shot de PR.
-- Docs de agentes pueden usar BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`.
-- Solo escribí bajo `docs/**` (y `README.md` si el cambio lo exige). No toques código de aplicación.
+- The doc includes: **what was done, why, decisions, alternatives considered, created/modified files**.
+- Do not touch SOULs (`docs/agents/*-soul.md`) or one-shot PR prompts.
+- Agent docs can use BMAD-lite: `<!-- REGION: name -->` / `<!-- ENDREGION: name -->`.
+- Write only under `docs/**` (and `README.md` if the change requires it). Do not touch application code.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (final message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your final message with:
 
 ```
 ## Doc
-docs/features/<fecha>-<nombre>.md
+docs/features/<date>-<name>.md
 ```
 <!-- ENDREGION: output -->

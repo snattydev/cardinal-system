@@ -1,72 +1,72 @@
 # Fix: PR #5 pre-merge review findings (v0.1.1)
 
-## Contexto
+## Context
 
-Revisión pre-merge del PR [#5](https://github.com/snattydev/cardinal-system/pull/5) (`dev` → `main`) bloqueó el merge por 4 críticos y 6 importantes. Detalle de la revisión: [`2026-07-29-pr-5-pre-merge-review.md`](./2026-07-29-pr-5-pre-merge-review.md).
+Pre-merge review of PR [#5](https://github.com/snattydev/cardinal-system/pull/5) (`dev` -> `main`) blocked the merge due to 4 critical and 6 important findings. Review details: [`2026-07-29-pr-5-pre-merge-review.md`](./2026-07-29-pr-5-pre-merge-review.md).
 
-## Qué se hizo
+## What was done
 
-### Críticos
+### Critical
 
-1. **Tests de versión** — dejan de hardcodear `0.1.0`; assert contra `package.json` raíz.
-2. **`deploy/Containerfile`** — copia workspace completo (`package.json`, `bun.lock`, `packages/`, manifests de backend/frontend) e instala desde `/app`.
-3. **`deploy/Containerfile.frontend`** — mismo patrón de install monorepo; build con `bun run --cwd frontend build`.
-4. **`compose.yaml`** — monta `packages/`, `bun.lock` y `frontend/package.json`; `bun install` corre desde la raíz del workspace.
+1. **Version tests** — stopped hardcoding `0.1.0`; assert against root `package.json`.
+2. **`deploy/Containerfile`** — copies full workspace (`package.json`, `bun.lock`, `packages/`, backend/frontend manifests) and installs from `/app`.
+3. **`deploy/Containerfile.frontend`** — same monorepo install pattern; builds with `bun run --cwd frontend build`.
+4. **`compose.yaml`** — mounts `packages/`, `bun.lock`, and `frontend/package.json`; `bun install` runs from workspace root.
 
-### Importantes
+### Important
 
-5. **Typecheck** — se eliminaron `references` de `backend/tsconfig.json` (incompatibles con `noEmit` / sin `composite`). Los `paths` ya resuelven los packages.
-6. **`useSystem`** — estado y `setInterval` viven en el efecto del hook, con cleanup al unmount.
-7. **`db_path`** — removido de `/api/system`, `SystemInfo` y Settings (leak-audit).
-8. **`serveStatic`** — verifica que el path resuelto quede dentro de `staticDir` con `resolve()`.
-9. **Counts de sistema** — `getSystemCounts()` en `@cardinal/db` + tests.
-10. **Mock version** — `MOCK_INFO.version` → `0.1.1`.
+5. **Typecheck** — removed `references` from `backend/tsconfig.json` (incompatible with `noEmit` / without `composite`). `paths` already resolve packages.
+6. **`useSystem`** — state and `setInterval` live in hook effect, with cleanup on unmount.
+7. **`db_path`** — removed from `/api/system`, `SystemInfo`, and Settings (leak-audit).
+8. **`serveStatic`** — verifies resolved path stays within `staticDir` using `resolve()`.
+9. **System counts** — `getSystemCounts()` in `@cardinal/db` + tests.
+10. **Mock version** — `MOCK_INFO.version` -> `0.1.1`.
 
 ### Extra
 
-- Scripts root `build` / `dev:frontend`: `bun run --cwd frontend …` (la forma `bun --cwd … run` no ejecuta el script).
+- Root scripts `build` / `dev:frontend`: `bun run --cwd frontend ...` (the `bun --cwd ... run` form does not execute the script).
 
-## Por qué
+## Why
 
-Sin estos cambios el checklist de pre-merge falla (`bun test`, imágenes Podman, compose en clone limpio) y hay leaks / deuda de seguridad en serving estático y API de sistema.
+Without these changes, the pre-merge checklist fails (`bun test`, Podman images, compose in a clean clone) and security leaks / technical debt remain in static serving and the system API.
 
-## Decisiones
+## Decisions
 
-- Contenedores instalan desde la raíz del monorepo (no desde `backend/` o `frontend/` aislados).
-- Frontend no depende de `@cardinal/*`, pero su `package.json` debe existir para que Bun resuelva workspaces.
-- No se habilitó `composite` en packages: con Bun + `noEmit` alcanza con `paths`.
-- Path traversal fuera de `staticDir` cae al SPA fallback (`index.html`), nunca sirve archivos externos.
+- Containers install from monorepo root (not from isolated `backend/` or `frontend/`).
+- Frontend does not depend on `@cardinal/*`, but its `package.json` must exist for Bun to resolve workspaces.
+- Did not enable `composite` in packages: with Bun + `noEmit`, `paths` is sufficient.
+- Path traversal outside `staticDir` falls back to the SPA fallback (`index.html`), never serving external files.
 
-## Alternativas consideradas
+## Alternatives Considered
 
-- Stub vacío de `packages/` en compose → rechazado; hace falta el source real.
-- `composite: true` + emit en todos los packages → más complejo, poco valor con Bun.
-- 403 en path traversal → se mantiene SPA fallback (compatible con tests existentes y seguro).
+- Empty stub of `packages/` in compose -> rejected; real source is required.
+- `composite: true` + emit across all packages -> more complex, little value with Bun.
+- 403 on path traversal -> maintained SPA fallback (compatible with existing tests and secure).
 
-## Verificación
+## Verification
 
-- `bun test` → **85/85** pass
-- `bun run typecheck` → OK
-- `bun run build` → OK
-- `podman build -f deploy/Containerfile` → OK
-- `podman build -f deploy/Containerfile.frontend` → OK
+- `bun test` -> **85/85** pass
+- `bun run typecheck` -> OK
+- `bun run build` -> OK
+- `podman build -f deploy/Containerfile` -> OK
+- `podman build -f deploy/Containerfile.frontend` -> OK
 
-## Archivos
+## Files
 
-| Archivo | Cambio |
-|---------|--------|
-| `backend/src/server.test.ts` | version desde rootPkg |
-| `backend/src/api/api.test.ts` | sin assert hardcodeado |
-| `backend/src/api/system.ts` | sin `db_path`; usa `getSystemCounts` |
-| `backend/src/static.ts` | path containment con `resolve` |
-| `backend/tsconfig.json` | sin `references` |
-| `compose.yaml` | mounts workspace |
-| `deploy/Containerfile` | install monorepo |
-| `deploy/Containerfile.frontend` | install monorepo |
-| `frontend/src/lib/system.ts` | sin leak de interval |
-| `frontend/src/lib/types.ts` | sin `db_path` |
-| `frontend/src/pages/Settings.tsx` | sin row `db_path` |
-| `package.json` | scripts `--cwd` correctos |
+| File | Change |
+|------|--------|
+| `backend/src/server.test.ts` | version from rootPkg |
+| `backend/src/api/api.test.ts` | without hardcoded assert |
+| `backend/src/api/system.ts` | without `db_path`; uses `getSystemCounts` |
+| `backend/src/static.ts` | path containment with `resolve` |
+| `backend/tsconfig.json` | without `references` |
+| `compose.yaml` | workspace mounts |
+| `deploy/Containerfile` | monorepo install |
+| `deploy/Containerfile.frontend` | monorepo install |
+| `frontend/src/lib/system.ts` | no interval leak |
+| `frontend/src/lib/types.ts` | without `db_path` |
+| `frontend/src/pages/Settings.tsx` | without `db_path` row |
+| `package.json` | correct `--cwd` scripts |
 | `packages/db/src/repos.ts` | `getSystemCounts` |
 | `packages/db/src/index.ts` | export |
-| `packages/db/src/db.test.ts` | tests de counts |
+| `packages/db/src/db.test.ts` | counts tests |

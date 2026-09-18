@@ -1,36 +1,39 @@
-## 📋 Resumen
+## Summary
 
-<!-- Qué hace y por qué. Una o dos frases. -->
+<!-- What and why, in English. One or two sentences. -->
 
+## Issue
 
+Closes #
 
-## 🔍 Cambios
+## Changes
 
-<!-- Archivos modificados y qué cambió. -->
+<!-- Files touched and what changed. -->
 
 - 
 - 
 
-## ⚠️ Breaking
+## Breaking
 
-<!-- ¿Algo se rompe? Si no, "Ninguno". -->
+<!-- Anything that breaks? If not, "None". -->
 
 
 
-## 🧪 Cómo probar
+## How to test
 
 1. 
 2. 
 
-## 🗂️ Documentación
+## Documentation
 
-<!-- Link al doc completo en docs/features/. Acá va TODO el detalle. -->
+<!-- Link to the full feature doc in docs/features/. Detail lives there. -->
 
 - 
 
-## ✅ Checklist
+## Checklist
 
-- [ ] Versión bump en `package.json` (solo si es PR a `main`)
-- [ ] Documentado en `docs/features/` (completo: qué, por qué, decisiones, archivos)
-- [ ] Sin leaks (keys, tokens, paths, emails)
-- [ ] Probado localmente
+- [ ] Linked to GitHub Issue (`Closes #N`) with appropriate labels (`enhancement`, `bug`, etc.)
+- [ ] Version bump in `package.json` (only for PRs to `main`)
+- [ ] Documented in `docs/features/` when the change is significant
+- [ ] No leaks (keys, tokens, paths, emails)
+- [ ] Tested locally

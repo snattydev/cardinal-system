@@ -6,8 +6,10 @@ import { api } from "../lib/api";
 export default function Layout() {
   const { logout } = useAuth();
   const [version, setVersion] = useState<string>("");
-  const [agentsOpen, setAgentsOpen] = useState(false);
   const location = useLocation();
+  const [routerOpen, setRouterOpen] = useState(
+    () => location.pathname.startsWith("/router") || location.pathname.startsWith("/keys"),
+  );
 
   useEffect(() => {
     api<{ version: string }>("/api/health")
@@ -15,50 +17,59 @@ export default function Layout() {
       .catch(() => setVersion(""));
   }, []);
 
-  const isAgentsActive =
-    location.pathname.startsWith("/agents") || location.pathname.startsWith("/keys");
+  const isRouterActive =
+    location.pathname.startsWith("/router") || location.pathname.startsWith("/keys");
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
-    `block rounded border px-3 py-2 font-mono text-sm transition-colors ${
+    `block rounded-[2px] border px-3 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150 ${
       isActive
-        ? "border-sao-accent/60 bg-sao-panel text-sao-accent"
-        : "border-transparent text-slate-400 hover:text-sao-accent hover:border-sao-accent/30"
+        ? "border-sao-aincrad/50 bg-sao-elevated text-sao-aincrad shadow-[0_0_15px_rgba(255,122,0,0.12)] font-semibold"
+        : "border-transparent text-sao-muted hover:text-sao-text hover:bg-white/5"
+    }`;
+
+  const sectionClass = (active: boolean) =>
+    `flex w-full items-center gap-2 rounded-[2px] border px-3 py-2 font-mono text-xs uppercase tracking-wider transition-all duration-150 ${
+      active
+        ? "border-sao-aincrad/50 bg-sao-elevated text-sao-aincrad shadow-[0_0_15px_rgba(255,122,0,0.12)] font-semibold"
+        : "border-transparent text-sao-muted hover:text-sao-text hover:bg-white/5"
     }`;
 
   return (
-    <div className="flex h-screen">
-      <aside className="flex w-56 flex-col border-r border-sao-accent/20 bg-sao-panel/40">
-        <div className="px-4 py-5 font-mono text-lg tracking-widest text-sao-accent">
-          CARDINAL
+    <div className="flex h-screen bg-sao-obsidian text-sao-text">
+      <aside className="flex w-60 flex-col border-r border-white/5 bg-sao-graphite">
+        <div className="px-4 py-5 flex items-center gap-2 font-mono text-sm tracking-widest text-sao-text uppercase border-b border-white/5">
+          <span className="w-2 h-2 bg-sao-aincrad shadow-[0_0_8px_#FF7A00]"></span>
+          CARDINAL <span className="text-[10px] text-sao-muted font-normal">SYSTEM</span>
         </div>
-
         <nav className="flex flex-col gap-1 px-3">
           <NavLink to="/" end className={linkClass}>
             Overview
           </NavLink>
 
-          {/* Agents dropdown */}
+          <NavLink to="/agents" className={linkClass}>
+            Agents
+          </NavLink>
+
+          <NavLink to="/tasks" className={linkClass}>
+            Tasks
+          </NavLink>
+
           <div className="flex flex-col">
             <button
-              onClick={() => setAgentsOpen((v) => !v)}
-              className={`flex w-full items-center gap-2 rounded border px-3 py-2 font-mono text-sm transition-colors ${
-                isAgentsActive
-                  ? "border-sao-accent/60 bg-sao-panel text-sao-accent"
-                  : "border-transparent text-slate-400 hover:text-sao-accent hover:border-sao-accent/30"
-              }`}
+              onClick={() => setRouterOpen((v) => !v)}
+              className={sectionClass(isRouterActive)}
             >
-              <span className="w-3 text-xs">{agentsOpen ? "▾" : "▸"}</span>
-              Agents
+              <span className="w-3 text-xs">{routerOpen ? "▾" : "▸"}</span>
+              Router
             </button>
-            {agentsOpen && (
-              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-sao-accent/20 pl-3">
-                <NavLink to="/agents" end className={linkClass}>
-                  Hub
+            {routerOpen && (
+              <div className="ml-4 mt-1 flex flex-col gap-1 border-l border-white/10 pl-3">
+                <NavLink to="/router" end className={linkClass}>
+                  Catalog
                 </NavLink>
-                <span className="flex items-center justify-between rounded border border-transparent px-3 py-2 font-mono text-sm text-slate-600 select-none">
+                <NavLink to="/keys" className={linkClass}>
                   Keys
-                  <span className="text-xs text-slate-600">Fase 2</span>
-                </span>
+                </NavLink>
               </div>
             )}
           </div>
@@ -71,11 +82,14 @@ export default function Layout() {
         <div className="mt-auto flex flex-col gap-3 px-3 pb-4">
           <button
             onClick={() => void logout()}
-            className="rounded border border-sao-violet/40 px-3 py-2 font-mono text-sm text-sao-violet transition-colors hover:bg-sao-violet/10"
+            className="rounded-[2px] border border-sao-underworld/40 px-3 py-1.5 font-mono text-xs uppercase tracking-wider text-sao-underworld transition-colors hover:bg-sao-underworld/10"
           >
-            logout
+            Logout
           </button>
-          <div className="px-1 font-mono text-xs text-slate-500">v{version}</div>
+          <div className="flex items-center justify-between px-1 font-mono text-[11px] text-sao-muted">
+            <span>SYS STATUS</span>
+            <span className="text-sao-sinon">v{version || "0.2.6"}</span>
+          </div>
         </div>
       </aside>
 

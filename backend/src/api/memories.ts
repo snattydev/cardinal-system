@@ -44,7 +44,10 @@ export async function handlePutMemory(
   }
 
   if (raw.content !== undefined) {
-    fields.content = typeof raw.content === "string" ? raw.content : null;
+    if (typeof raw.content !== "string") {
+      return json({ error: "invalid_content" }, 400);
+    }
+    fields.content = raw.content;
   }
 
   upsertMemoryMirror(db, profileName, target, fields);

@@ -1,90 +1,90 @@
-# Cardinal System — Fase 2: Pipeline de Agentes One-Shot
+# Cardinal System — FASE 2: One-Shot Agent Pipeline
 
-> **Diseño completo del pipeline: creación, ejecución y destrucción de agentes one-shot**
-> Fecha: 2026-07-23 · Estado: diseño aprobado para implementación
-> Basado en el flujo definido por Santiago: Shinon → subagente coding → PR → one-shot review → @mention para análisis pesado
+> **Complete pipeline design: creation, execution, and destruction of one-shot agents**
+> Date: 2026-07-23 · Status: design approved for implementation
+> Based on the flow defined by the owner: Shinon → coding subagent → PR → one-shot review → @mention for heavy analysis
 
 ---
 
-## 1. Visión General
+## 1. Overview
 
-El pipeline de **agentes one-shot** convierte al Cardinal de un sistema pasivo (Fase 0: solo recibe conexiones y sirve estado) a un **orquestador activo**: el Cardinal crea, ejecuta y destruye agentes con modelos específicos para tareas acotadas, **sin estado persistente entre invocaciones**.
+The **one-shot agent** pipeline transforms Cardinal from a passive system (FASE 0: only receives connections and serves state) to an **active orchestrator**: Cardinal creates, executes, and destroys agents with specific models for bounded tasks, **with no persistent state between invocations**.
 
-### Flujo deseado (de arriba a abajo)
+### Desired flow (top to bottom)
 
 ```
-Santi → "hacé esta feature"
+Owner → "implement this feature"
   └─ Shinon (deepseek-v4-flash, default profile)
-       └─ Subagente local de coding (deepseek-v4-flash)
-            ├─ Implementa la feature
+       └─ Local coding subagent (deepseek-v4-flash)
+            ├─ Implements the feature
             ├─ git commit + push → GitHub PR
-            └─ Notifica a Cardinal: "PR #N listo para review"
+            └─ Notifies Cardinal: "PR #N ready for review"
 
 Cardinal System
-  ├─ Crea one-shot agent de CODE REVIEW
-  │    ├─ Modelo: kimi-k2.6 (mid-tier) o deepseek-v4-pro
-  │    ├─ Contexto: diff del PR + description
-  │    ├─ max_turns = 1 → EXACTAMENTE 1 review (NO loop)
-  │    └─ Salida: review posteado como comentario en el PR
+  ├─ Creates one-shot CODE REVIEW agent
+  │    ├─ Model: kimi-k2.6 (mid-tier) or deepseek-v4-pro
+  │    ├─ Context: PR diff + description
+  │    ├─ max_turns = 1 → EXACTLY 1 review (NO loop)
+  │    └─ Output: review posted as comment on the PR
   │
-  ├─ Destruye el one-shot agent
-  └─ Registra resultado en DB
+  ├─ Destroys the one-shot agent
+  └─ Records result in DB
 
-Santi lee el PR + el review
-  └─ Si necesita más poder:
-       └─ @menciona un agente en GitHub (ej: @cardinal-deep-review)
-            └─ Cardinal detecta @mention via webhook
-                 ├─ Crea one-shot agent con modelo premium (qwen3.7-max)
-                 ├─ Pasa el PR completo como contexto
+Owner reads the PR + the review
+  └─ If more power is needed:
+       └─ @mentions an agent on GitHub (e.g.: @cardinal-deep-review)
+            └─ Cardinal detects @mention via webhook
+                 ├─ Creates one-shot agent with premium model (qwen3.7-max)
+                 ├─ Passes the full PR as context
                  ├─ max_turns = 1
-                 └─ Resultado: comentario en el PR o en dashboard
+                 └─ Result: comment on the PR or on dashboard
 ```
 
 ---
 
-## 2. Endpoints y Capacidades Nuevas del Cardinal
+## 2. New Cardinal Endpoints and Capabilities
 
-### 2.1 Endpoint LLM Router — `/v1/chat/completions`
+### 2.1 LLM Router Endpoint — `/v1/chat/completions`
 
-**Propósito:** Reemplazar a FreeLLMAPI como router de modelos central. Los agentes one-shot y los agentes SAO existentes pueden consumir LLM directamente del Cardinal.
+**Purpose:** Replace FreeLLMAPI as the central model router. One-shot agents and existing SAO agents can consume LLM directly from Cardinal.
 
-| Método | Path | Auth | Descripción |
+| Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/v1/chat/completions` | API key `sk-cardinal-*` | Proxy/compat OpenAI, model routing según tarea |
+| `POST` | `/v1/chat/completions` | API key `sk-cardinal-*` | OpenAI-compatible proxy/compat, model routing by task |
 
-**Modelo de datos nuevo — tabla `model_routes`:**
+**New data model — table `model_routes`:**
 
 ```sql
 CREATE TABLE model_routes (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   task_type     TEXT NOT NULL UNIQUE,      -- 'coding', 'review', 'deep_analysis', 'light'
-  primary_model TEXT NOT NULL,             -- ej: deepseek-v4-flash
-  fallback1     TEXT,                      -- ej: gpt-oss-120b
-  fallback2     TEXT,                      -- ej: kimi-k2.6
+  primary_model TEXT NOT NULL,             -- e.g.: deepseek-v4-flash
+  fallback1     TEXT,                      -- e.g.: gpt-oss-120b
+  fallback2     TEXT,                      -- e.g.: kimi-k2.6
   max_tokens    INTEGER DEFAULT 4096,
   temperature   REAL DEFAULT 0.7,
   created_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-**Lógica de routing:**
+**Routing logic:**
 
 ```
 POST /v1/chat/completions
   body: { model, messages, max_tokens?, temperature?, task_type? }
 
-  1. Si task_type está presente → lookup model_routes[task_type] → primary → fallback
-  2. Si model está presente → usarlo directamente (override)
-  3. El router intenta FreeLLMAPI primero, luego OpenCode Zen como fallback
-  4. Response: OpenAI-compatible streaming o no-streaming
+  1. If task_type is present → lookup model_routes[task_type] → primary → fallback
+  2. If model is present → use directly (override)
+  3. Router tries FreeLLMAPI first, then OpenCode Zen as fallback
+  4. Response: OpenAI-compatible streaming or non-streaming
 ```
 
-**Implementación como proxy:**
+**Implementation as proxy:**
 
 ```typescript
 // backend/src/router/index.ts
-// NO hace llamadas LLM directas — delega a FreeLLMAPI u OpenCode Zen
-// Solo maneja routing + fallback + rate limiting
+// NO direct LLM calls — delegates to FreeLLMAPI or OpenCode Zen
+// Only handles routing + fallback + rate limiting
 
 export async function handleChatCompletions(req: Request, db: Database): Promise<Response> {
   const body = await req.json();
@@ -100,12 +100,12 @@ export async function handleChatCompletions(req: Request, db: Database): Promise
 
 ### 2.2 Orchestration Endpoint — `POST /api/one-shot`
 
-**Propósito:** Spawnear un agente one-shot con parámetros específicos y obtener su resultado.
+**Purpose:** Spawn a one-shot agent with specific parameters and get its result.
 
-| Método | Path | Auth | Descripción |
+| Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/one-shot` | API key `sk-cardinal-*` o JWT humano | Crear y ejecutar un agente one-shot |
-| `GET` | `/api/one-shot/:id` | API key o JWT | Obtener resultado de un one-shot |
+| `POST` | `/api/one-shot` | API key `sk-cardinal-*` or human JWT | Create and execute a one-shot agent |
+| `GET` | `/api/one-shot/:id` | API key or JWT | Get the result of a one-shot |
 
 **Request body `POST /api/one-shot`:**
 
@@ -143,34 +143,34 @@ export async function handleChatCompletions(req: Request, db: Database): Promise
 
 ### 2.3 Webhook Endpoint — `POST /api/webhooks/github`
 
-**Propósito:** Recibir eventos de GitHub (PR opened, PR commented, @mention).
+**Purpose:** Receive GitHub events (PR opened, PR commented, @mention).
 
-| Método | Path | Auth | Descripción |
+| Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/webhooks/github` | Secret compartido | Eventos de GitHub |
+| `POST` | `/api/webhooks/github` | Shared secret | GitHub events |
 
 ---
 
-## 3. Ciclo de Vida de un Agente One-Shot
+## 3. One-Shot Agent Lifecycle
 
-El modelo de datos central para uno-shot agents:
+The central data model for one-shot agents:
 
 ```sql
 CREATE TABLE one_shot_agents (
-  id              TEXT PRIMARY KEY,            -- ej: os_a1b2c3d4 (prefijo 'os_')
-  name            TEXT NOT NULL,               -- nombre descriptivo: "review-pr-42"
+  id              TEXT PRIMARY KEY,            -- e.g.: os_a1b2c3d4 (prefix 'os_')
+  name            TEXT NOT NULL,               -- descriptive name: "review-pr-42"
   task_type       TEXT NOT NULL,               -- 'coding', 'review', 'deep_analysis'
-  model           TEXT NOT NULL,               -- modelo asignado
+  model           TEXT NOT NULL,               -- assigned model
   status          TEXT NOT NULL DEFAULT 'created',
                   -- 'created' → 'spawning' → 'running' → 'completed' | 'failed' | 'timed_out'
-  context         TEXT NOT NULL,               -- JSON: prompt, PR diff, instrucciones
-  result          TEXT,                        -- JSON: review output, análisis
-  key_hash        TEXT,                        -- hash de la key dinámica (sk-cardinal-os_*)
-  key_revoked_at  TEXT,                        -- cuándo se revocó la key
-  podman_id       TEXT,                        -- container ID si usó Podman
-  pid             INTEGER,                     -- process ID si usó terminal
-  ttl_seconds     INTEGER NOT NULL DEFAULT 300,-- tiempo de vida máximo
-  expires_at      TEXT NOT NULL,               -- ttl_seconds desde created_at
+  context         TEXT NOT NULL,               -- JSON: prompt, PR diff, instructions
+  result          TEXT,                        -- JSON: review output, analysis
+  key_hash        TEXT,                        -- hash of the dynamic key (sk-cardinal-os_*)
+  key_revoked_at  TEXT,                        -- when the key was revoked
+  podman_id       TEXT,                        -- container ID if Podman was used
+  pid             INTEGER,                     -- process ID if terminal was used
+  ttl_seconds     INTEGER NOT NULL DEFAULT 300,-- maximum lifetime
+  expires_at      TEXT NOT NULL,               -- ttl_seconds from created_at
   max_turns       INTEGER NOT NULL DEFAULT 1,  -- anti-loop: default 1
   output_channel  TEXT,                        -- 'github_comment', 'dashboard', 'webhook'
   created_by      TEXT NOT NULL,               -- 'shinon', 'system', 'github_webhook'
@@ -179,142 +179,141 @@ CREATE TABLE one_shot_agents (
 );
 ```
 
-### Fases del ciclo de vida
+### Lifecycle Phases
 
 ```
-FASE 1: CREACIÓN
-  Cardinal recibe POST /api/one-shot o detecta trigger
-  ├─ Valida parámetros (modelo existe, task_type válido)
-  ├─ Genera ID único (os_$random)
-  ├─ Genera key dinámica: sk-cardinal-os_$id (created_by='system')
-  ├─ Guarda row en one_shot_agents (status='created')
-  └─ Responde con ID + key
+PHASE 1: CREATION
+  Cardinal receives POST /api/one-shot or detects a trigger
+  ├─ Validates parameters (model exists, task_type valid)
+  ├─ Generates unique ID (os_$random)
+  ├─ Generates dynamic key: sk-cardinal-os_$id (created_by='system')
+  ├─ Saves row in one_shot_agents (status='created')
+  └─ Responds with ID + key
 
-FASE 2: SPAWNING (2 estrategias, ver §5)
-  ├─ Opción A (ligero): `hermes chat -q "prompt..."` vía terminal
-  │   └─ Proceso efímero con timeout = ttl_seconds
-  ├─ Opción B (pesado): `podman run --rm` container
-  │   └─ Podman exec con resource limits + mount temporario
-  ├─ Actualiza status → 'spawning'
-  └─ Inicia watchdog timer (ttl_seconds)
+PHASE 2: SPAWNING (2 strategies, see §5)
+  ├─ Option A (light): `hermes chat -q "prompt..."` via terminal
+  │   └─ Ephemeral process with timeout = ttl_seconds
+  ├─ Option B (heavy): `podman run --rm` container
+  │   └─ Podman exec with resource limits + temporary mount
+  ├─ Updates status → 'spawning'
+  └─ Starts watchdog timer (ttl_seconds)
 
-FASE 3: EJECUCIÓN
-  ├─ El agente recibe contexto + key dinámica
-  ├─ El agente puede llamar Cardinal /v1/chat/completions si necesita LLM
-  ├─ max_turns impide loops
-  └─ Watchdog: si expires_at se alcanza → kill + status='timed_out'
+PHASE 3: EXECUTION
+  ├─ Agent receives context + dynamic key
+  ├─ Agent can call Cardinal /v1/chat/completions if LLM is needed
+  ├─ max_turns prevents loops
+  └─ Watchdog: if expires_at is reached → kill + status='timed_out'
 
-FASE 4: RESULTADO
-  ├─ Agente completa su tarea
-  ├─ Postea output según output_channel
+PHASE 4: RESULT
+  ├─ Agent completes its task
+  ├─ Posts output according to output_channel
   │   ├─ github_comment → GitHub API: POST /repos/:owner/:repo/issues/:n/comments
-  │   ├─ dashboard → queda disponible en GET /api/one-shot/:id
-  │   └─ webhook → POST a URL configurada
-  ├─ Guarda result en one_shot_agents
-  ├─ Revoca la key dinámica (key_revoked_at)
+  │   ├─ dashboard → available at GET /api/one-shot/:id
+  │   └─ webhook → POST to configured URL
+  ├─ Saves result in one_shot_agents
+  ├─ Revokes the dynamic key (key_revoked_at)
   └─ Status → 'completed'
 
-FASE 5: CLEANUP
-  ├─ Si usó Podman: podman rm (ya --rm, pero forzar si no)
-  ├─ Revoca key (DISTINTO de revocar keys humanas — las system keys se auto-revocan)
-  ├─ Si expiró sin completar: status='timed_out'
-  └─ GC periódico: borra rows viejas + old > 7d
+PHASE 5: CLEANUP
+  ├─ If Podman was used: podman rm (already --rm, but force if not)
+  ├─ Revoke key (DIFFERENT from revoking human keys — system keys self-revoke)
+  ├─ If expired without completing: status='timed_out'
+  └─ Periodic GC: deletes old rows > 7d
 ```
 
 ### Anti-loop: `max_turns = 1`
 
-**La regla FUNDAMENTAL** (exigida por el usuario):
+**The FUNDAMENTAL rule** (required by the owner):
 
-> El one-shot review agent hace **EXACTAMENTE 1 review** y entrega resultado. No hay loop infinito.
+> The one-shot review agent performs **EXACTLY 1 review** and delivers the result. No infinite loop.
 
-Implementación:
+Implementation:
 - `one_shot_agents.max_turns` default = 1
-- En la ejecución del agente, el prompt incluye "You have exactly ONE pass to analyze this. Do your complete analysis now. No follow-ups, no iterations."
-- Si se usa `hermes chat -q`, el flag `--max-turns 1` (o equivalente según el tool de agente)
-- Si se usa un subagente Hermes, `delegate_task` con limitación de iteraciones
-- El watchdog timer garantiza que incluso si el agente intenta loopear, el timeout lo mata
+- In the agent execution, the prompt includes "You have exactly ONE pass to analyze this. Do your complete analysis now. No follow-ups, no iterations."
+- If `hermes chat -q` is used, the `--max-turns 1` flag (or equivalent per agent tool)
+- If a Hermes subagent is used, `delegate_task` with iteration limits
+- The watchdog timer guarantees that even if the agent tries to loop, the timeout kills it
 
 ---
 
-## 4. Integración con GitHub PRs
+## 4. GitHub PR Integration
 
 ### 4.1 Auto-Review Post-PR
 
-**Trigger:** Shinon (o subagente de coding) crea un PR en GitHub.
+**Trigger:** Shinon (or coding subagent) creates a PR on GitHub.
 
-**Flujo:**
+**Flow:**
 
 ```
-1. Coding subagent completa feature, hace git push, crea PR:
+1. Coding subagent completes feature, does git push, creates PR:
    gh pr create --title "feat: JWT refresh rotation" --body "..."
 
-2. PR creado → subagente notifica a Cardinal:
+2. PR created → subagent notifies Cardinal:
    POST /api/one-shot {
      name: "review-pr-42",
      task_type: "review",
      model: "kimi-k2.6",
      context: {
        pr_url: "https://github.com/owner/repo/pull/42",
-       pr_diff: "<obtener diff via gh pr diff 42 o API GitHub>",
+       pr_diff: "<get diff via gh pr diff 42 or GitHub API>",
        pr_description: "Adds JWT refresh token rotation"
      },
      max_turns: 1,
      output_channel: "github_comment"
    }
 
-3. Cardinal spawns one-shot review agent (ver §5)
+3. Cardinal spawns one-shot review agent (see §5)
 
-4. Review agent recibe el diff + descripción, analiza, produce review
+4. Review agent receives the diff + description, analyzes, produces review
 
-5. Review agent postea resultado como comentario en el PR:
+5. Review agent posts result as a comment on the PR:
    gh pr review 42 --comment --body "## Code Review\n\n### Critical\n...\n### Warnings\n..." 
 
-6. Cardinal registra resultado, revoca key, cleanup
+6. Cardinal records result, revokes key, cleanup
 ```
 
-### 4.2 @Mention en GitHub — Deep Analysis
+### 4.2 @Mention on GitHub — Deep Analysis
 
-**Trigger:** Alguien @menciona un agente conocido en un comentario de GitHub.
+**Trigger:** Someone @mentions a known agent in a GitHub comment.
 
-**Formato de @mention:**
-
-```
-@cardinal-review        → modelo mid-tier (kimi-k2.6)
-@cardinal-deep          → modelo premium (qwen3.7-max)
-@cardinal-coding        → coding ligero (deepseek-v4-flash)
-```
-
-**Flujo:**
+**@mention format:**
 
 ```
-1. GitHub envía webhook a Cardinal:
+@cardinal-review        → mid-tier model (kimi-k2.6)
+@cardinal-deep          → premium model (qwen3.7-max)
+@cardinal-coding        → light coding (deepseek-v4-flash)
+```
+
+**Flow:**
+
+```
+1. GitHub sends webhook to Cardinal:
    POST /api/webhooks/github
    Event: issue_comment (PR comment)
    Body: { action: "created", issue: { number: 42 }, comment: { body: "@cardinal-deep can you review the auth refactor?" } }
 
-2. Cardinal procesa el webhook:
-   a. Verifica secret del webhook
-   b. Parsea el body del comentario buscando @mentions
-   c. Extrae el modelo según el mapping:
+2. Cardinal processes the webhook:
+   a. Verifies webhook secret
+   b. Parses the comment body looking for @mentions
+   c. Extracts the model based on the mapping:
       - @cardinal-review → kimi-k2.6
-      - @cardinal-deep → qwen3.7-max (o qwen3.7-plus)
-      - @cardinal-coding → deepseek-v4-flash
-   d. Obtiene el diff del PR via GitHub API
-   
-3. Cardinal crea one-shot:
-   POST /api/one-shot (auto-generado internamente)
-   name: "deep-review-pr-42-@santi"
+      - @cardinal-deep → qwen3.7-max (or qwen3.7-plus)
+   d. Gets the PR diff via GitHub API
+
+3. Cardinal creates one-shot:
+   POST /api/one-shot (auto-generated internally)
+   name: "deep-review-pr-42-@owner"
    task_type: "deep_analysis"
    model: "qwen3.7-max"
    output_channel: "github_comment"
    max_turns: 1
 
-4. Spawn, ejecuta, postea resultado como reply al comentario
+4. Spawn, execute, post result as reply to the comment
 
-5. Cardinal registra, cleanup
+5. Cardinal records, cleanup
 ```
 
-**Modelo de datos — tabla `github_mentions`:**
+**Data model — table `github_mentions`:**
 
 ```sql
 CREATE TABLE github_mentions (
@@ -322,37 +321,37 @@ CREATE TABLE github_mentions (
   mention         TEXT NOT NULL UNIQUE,    -- '@cardinal-deep'
   model           TEXT NOT NULL,           -- 'qwen3.7-max'
   task_type       TEXT NOT NULL DEFAULT 'deep_analysis',
-  description     TEXT,                    -- 'Análisis pesado con modelo premium'
+  description     TEXT,                    -- 'Heavy analysis with premium model'
   created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 ```
 
-### 4.3 Cómo Cardinal obtiene el diff del PR
+### 4.3 How Cardinal Gets the PR Diff
 
-Dos estrategias complementarias:
+Two complementary strategies:
 
-**Estrategia A — gh CLI (recomendada para el VPS donde corre Cardinal):**
+**Strategy A — gh CLI (recommended for the VPS where Cardinal runs):**
 
 ```bash
 gh pr diff 42 --repo owner/repo
 ```
 
-**Estrategia B — GitHub API (fallback, funciona sin gh CLI):**
+**Strategy B — GitHub API (fallback, works without gh CLI):**
 
 ```bash
 curl -s -H "Authorization: token $GITHUB_TOKEN" \
   https://api.github.com/repos/owner/repo/pulls/42
-# Obtiene diff_url → lo fetchea
+# Gets diff_url → fetches it
 ```
 
-**Implementación en Cardinal:**
+**Implementation in Cardinal:**
 
-El contexto del PR se recolecta antes de spawnear el one-shot y se pasa como parte del `context` — el one-shot NO necesita llamar a GitHub. Esto asegura que el one-shot tenga todo lo necesario desde el inicio.
+The PR context is collected before spawning the one-shot and passed as part of the `context` — the one-shot does NOT need to call GitHub. This ensures the one-shot has everything it needs from the start.
 
 ```
 context: {
   pr_url: "...",
-  pr_diff: "<diff completo>",
+  pr_diff: "<full diff>",
   pr_description: "...",
   pr_title: "...",
   changed_files: ["src/auth.ts", "src/lib/jwt.ts"],
@@ -361,67 +360,67 @@ context: {
 }
 ```
 
-### 4.4 Determinación de modelo según tarea
+### 4.4 Model Selection by Task
 
-Cada task_type tiene un modelo por defecto configurable en `model_routes`:
+Each task_type has a configurable default model in `model_routes`:
 
-| task_type | Modelo primario | Fallback | Uso |
+| task_type | Primary model | Fallback | Use |
 |-----------|----------------|----------|-----|
 | `coding` | deepseek-v4-flash | gpt-oss-120b | Features, bug fixes, scripting |
-| `review` | kimi-k2.6 | deepseek-v4-pro | Code review mid-tier (default) |
-| `deep_analysis` | qwen3.7-max | kimi-k2.6 → deepseek-v4-pro | Análisis pesado (@mention) |
-| `light` | deepseek-v4-flash | auto | Consultas rápidas, one-liners |
+| `review` | kimi-k2.6 | deepseek-v4-pro | Mid-tier code review (default) |
+| `deep_analysis` | qwen3.7-max | kimi-k2.6 → deepseek-v4-pro | Heavy analysis (@mention) |
+| `light` | deepseek-v4-flash | auto | Quick queries, one-liners |
 
-El @mention mapping permite override directo del modelo, lo que da al usuario control total sobre qué modelo se usa.
+The @mention mapping allows direct model override, giving the user full control over which model is used.
 
 ---
 
-## 5. Estrategias de Ejecución
+## 5. Execution Strategies
 
-### 5.1 Opción A: Hermes Delegation (Ligero — Recomendado para Review)
+### 5.1 Option A: Hermes Delegation (Light — Recommended for Review)
 
-Usa `hermes chat -q` vía terminal con un perfil específico.
+Uses `hermes chat -q` via terminal with a specific profile.
 
-**Cómo funciona:**
+**How it works:**
 
 ```bash
-# Cardinal genera un key dinámica
+# Cardinal generates a dynamic key
 CARDINAL_KEY=$(bun run keygen -- --agent "review-pr-42" --kind subagent --quiet)
 
-# Ejecuta un subagente Hermes que tiene acceso al modelo y al contexto
-echo "Eres un code reviewer. Analiza este PR diff:
+# Executes a Hermes subagent that has access to the model and context
+echo "You are a code reviewer. Analyze this PR diff:
 <diff>
 ...
 </diff>
 
-Produce un review estructurado con:
+Produce a structured review with:
 - Critical Issues (must fix)
 - Warnings (should fix)
 - Suggestions (optional)
 
-MAX_TURNS=1 — No hagas iteraciones. Haz tu análisis completo AHORA." | \
+MAX_TURNS=1 — Do not iterate. Do your complete analysis NOW." | \
 hermes chat -q "$(cat)" -t file -p review-profile --model kimi-k2.6 --max-turns 1
 
-# Revoca la key
+# Revoke the key
 bun run keygen -- --revoke "review-pr-42"
 ```
 
-**Ventajas:**
-- Sin overhead de contenedores
-- Usa el perfil Hermes existente (skills, tools, configuración)
-- Extremadamente rápido de spawnear
-- Fácil de limitar a 1 turn
+**Advantages:**
+- No container overhead
+- Uses existing Hermes profile (skills, tools, configuration)
+- Extremely fast to spawn
+- Easy to limit to 1 turn
 
-**Desventajas:**
-- Aislamiento limitado (mismo proceso host)
-- Comparte recursos del sistema Hermes
-- No escala a modelos muy pesados bien
+**Disadvantages:**
+- Limited isolation (same host process)
+- Shares Hermes system resources
+- Does not scale well to very heavy models
 
-### 5.2 Opción B: Podman Container (Pesado — Recomendado para Deep Analysis)
+### 5.2 Option B: Podman Container (Heavy — Recommended for Deep Analysis)
 
-Usa `podman run --rm` con un contenedor efímero.
+Uses `podman run --rm` with an ephemeral container.
 
-**Containerfile para one-shot agents:**
+**Containerfile for one-shot agents:**
 
 ```dockerfile
 FROM oven/bun:latest
@@ -430,49 +429,49 @@ COPY agent.ts .
 CMD ["bun", "run", "agent.ts"]
 ```
 
-**Cómo funciona:**
+**How it works:**
 
 ```bash
-# Cardinal genera key dinámica
+# Cardinal generates dynamic key
 KEY=$(bun run keygen -- --agent "deep-review-pr-42" --kind subagent --quiet)
 
-# Spawnea contenedor one-shot
+# Spawns one-shot container
 podman run --rm \
   --name "cardinal-os-deep-review-pr-42" \
   -e CARDINAL_KEY="$KEY" \
   -e CARDINAL_URL="ws://host.containers.internal:8787/ws" \
   -e LLM_API_URL="http://host.containers.internal:3001/v1" \
   -e LLM_MODEL="qwen3.7-max" \
-  -e TASK_CONTEXT="<contexto del PR>" \
+  -e TASK_CONTEXT="<PR context>" \
   --memory=4g --cpus=2 \
   --network=host \
   --timeout=300 \
   cardinal-one-shot:latest
 
-# Revoca key (podman --rm lo limpia automáticamente)
+# Revoke key (podman --rm cleans it up automatically)
 bun run keygen -- --revoke "deep-review-pr-42"
 ```
 
-**Ventajas:**
-- Aislamiento completo (filesystem, procesos, red)
-- Resource limits explícitos (CPU, memory)
-- No contamina el sistema Hermes principal
-- Apropiado para modelos pesados
+**Advantages:**
+- Full isolation (filesystem, processes, network)
+- Explicit resource limits (CPU, memory)
+- Does not contaminate the main Hermes system
+- Appropriate for heavy models
 
-**Desventajas:**
-- Startup overhead (3-5 segundos para tirar el container)
-- Más consumo de recursos
-- Más complejidad de implementación
+**Disadvantages:**
+- Startup overhead (3-5 seconds to pull the container)
+- Higher resource consumption
+- More implementation complexity
 
-### 5.3 Estrategia Recomendada: Híbrida
+### 5.3 Recommended Strategy: Hybrid
 
-| Peso de tarea | Estrategia | Modelo | Ejemplo |
+| Task weight | Strategy | Model | Example |
 |--------------|-----------|--------|---------|
-| Review estándar | Hermes delegation | kimi-k2.6 | Code review post-PR |
-| Análisis pesado @mention | Podman container | qwen3.7-max | Deep analysis per @mention |
-| Coding quick-fix | Hermes delegation | deepseek-v4-flash | Subagente de Shinon |
+| Standard review | Hermes delegation | kimi-k2.6 | Code review post-PR |
+| Heavy @mention analysis | Podman container | qwen3.7-max | Deep analysis per @mention |
+| Coding quick-fix | Hermes delegation | deepseek-v4-flash | Shinon subagent |
 
-**Regla de decisión en el Cardinal:**
+**Decision rule in Cardinal:**
 
 ```typescript
 function selectExecutionStrategy(task_type: string, model: string): 'hermes' | 'podman' {
@@ -485,9 +484,9 @@ function selectExecutionStrategy(task_type: string, model: string): 'hermes' | '
 
 ---
 
-## 6. Arquitectura del Orquestador
+## 6. Orchestrator Architecture
 
-### 6.1 Módulos Nuevos en Cardinal
+### 6.1 New Modules in Cardinal
 
 ```
 backend/src/
@@ -499,8 +498,8 @@ backend/src/
 ├── oneshot/
 │   ├── index.ts              # POST /api/one-shot handler + lifecycle management
 │   ├── orquestador.ts        # Orchestrator: spawn, monitor, cleanup
-│   ├── executor-hermes.ts    # Ejecutor vía Hermes terminal
-│   ├── executor-podman.ts    # Ejecutor vía Podman container
+│   ├── executor-hermes.ts    # Executor via Hermes terminal
+│   ├── executor-podman.ts    # Executor via Podman container
 │   ├── watchdog.ts           # TTL watchdog timer
 │   └── oneshot.test.ts
 │
@@ -510,48 +509,48 @@ backend/src/
 │   └── webhook.test.ts
 │
 ├── db/
-│   ├── repos.ts              # + funciones para one_shot_agents, model_routes, github_mentions
-│   └── index.ts              # + migrations para nuevas tablas
+│   ├── repos.ts              # + functions for one_shot_agents, model_routes, github_mentions
+│   └── index.ts              # + migrations for new tables
 │
 └── api/
-    ├── one-shot.ts           # Handlers REST para one-shot management (list, get, cancel)
-    └── webhooks.ts           # Handlers de webhook
+    ├── one-shot.ts           # REST handlers for one-shot management (list, get, cancel)
+    └── webhooks.ts           # Webhook handlers
 ```
 
-### 6.2 Flujo Interno del Orquestador
+### 6.2 Internal Orchestrator Flow
 
 ```
 POST /api/one-shot
   │
   ▼
 oneshot/index.ts: handleCreateOneShot()
-  ├─ ValidateTaskType(task_type) → buscar model_routes
+  ├─ ValidateTaskType(task_type) → look up model_routes
   ├─ DetermineModel(task_type, model_override) → model_routes.primary_model
   ├─ SelectStrategy(task_type, model) → 'hermes' | 'podman'
   ├─ GenerateID() → "os_a1b2c3d4"
-  ├─ CreateDynamicKey(agent_name) → keyHash, guarda en agent_keys (created_by='system')
+  ├─ CreateDynamicKey(agent_name) → keyHash, saved in agent_keys (created_by='system')
   ├─ InsertDB({ id, name, task_type, model, status='created', ... })
   └─ Response: { id, status, agent_name, model, key }
   │
-  ▼  (background: no bloquea al caller)
+  ▼  (background: does not block the caller)
   
 oneshot/orquestador.ts: spawnOneShot(id)
   ├─ UPDATE status → 'spawning'
   ├─ PrepareContext(db, id)
-  │   └─ Si output_channel === 'github_comment': armar prompt con diff + instrucciones
+  │   └─ If output_channel === 'github_comment': build prompt with diff + instructions
   │
   ├─ IF strategy === 'hermes':
   │   └─ executor-hermes.ts: runHermesOneShot(id, context, model, max_turns)
-  │       ├─ Construye prompt con instrucciones + contexto
+  │       ├─ Build prompt with instructions + context
   │       ├─ terminal("hermes chat -q '<prompt>' --model <model> --max-turns <max_turns>",
   │       │           background=true, timeout=ttl_seconds, notify_on_complete=true)
-  │       └─ Guarda PID en DB
+  │       └─ Save PID in DB
   │
   ├─ IF strategy === 'podman':
   │   └─ executor-podman.ts: runPodmanOneShot(id, context, model, max_turns)
-  │       ├─ Construye prompt file temporario
-  │       ├─ podman run --rm ... (con resource limits)
-  │       └─ Guarda podman_id en DB
+  │       ├─ Build temporary prompt file
+  │       ├─ podman run --rm ... (with resource limits)
+  │       └─ Save podman_id in DB
   │
   ├─ UPDATE status → 'running'
   └─ StartWatchdog(id, ttl_seconds)
@@ -567,20 +566,20 @@ oneshot/orquestador.ts: onOneShotComplete(id, output)
   └─ StopWatchdog(id)
 
 oneshot/orquestador.ts: onOneShotTimeout(id)
-  ├─ Kill process: process.kill(pid, 'SIGKILL') o podman kill <container>
+  ├─ Kill process: process.kill(pid, 'SIGKILL') or podman kill <container>
   ├─ UPDATE status='timed_out', result={ error: 'timeout' }
   ├─ RevokeDynamicKey(id)
   └─ Log event
 
 oneshot/orquestador.ts: cleanupStale()
-  ── Cron interno cada 5 minutos:
-     ├─ Busca one_shot_agents WHERE status='running' AND expires_at < now()
-     └─ Por cada uno: onOneShotTimeout(id)
+  ── Internal cron every 5 minutes:
+     ├─ Finds one_shot_agents WHERE status='running' AND expires_at < now()
+     └─ For each: onOneShotTimeout(id)
 ```
 
 ### 6.3 Dynamic Key Factory
 
-**Regla clave:** Las keys `created_by='system'` son auto-revocables por el Cardinal. Las keys `created_by='human'` NUNCA se tocan automáticamente (regla de Fase 0).
+**Key rule:** Keys with `created_by='system'` are auto-revocable by Cardinal. Keys with `created_by='human'` are NEVER touched automatically (FASE 0 rule).
 
 ```typescript
 // oneshot/orquestador.ts
@@ -589,26 +588,26 @@ function createDynamicKey(agentName: string): string {
   createAgentKey(db, {
     keyHash: hashKey(key),
     agentName: agentName,
-    kindOverride: 'subagent',  // Los one-shot son siempre subagents
-    createdBy: 'system',       // ← clave: el sistema puede revocarlas
+    kindOverride: 'subagent',  // One-shots are always subagents
+    createdBy: 'system',       // ← key: the system can revoke them
   });
-  return key;  // Se devuelve UNA vez, se imprime en la response
+  return key;  // Returned ONCE, printed in the response
 }
 
 function revokeDynamicKey(osId: string): void {
   const os = getOneShot(db, osId);
   if (!os || !os.key_hash) return;
-  // Solo revocar keys 'system', nunca 'human'
+  // Only revoke 'system' keys, never 'human'
   db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ? AND created_by = 'system'", [os.key_hash]);
 }
 ```
 
 ---
 
-## 7. Tablas Nuevas en SQLite
+## 7. New SQLite Tables
 
 ```sql
--- Migración para Fase 2
+-- Migration for FASE 2
 
 CREATE TABLE model_routes (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -629,8 +628,8 @@ CREATE TABLE one_shot_agents (
   status          TEXT NOT NULL DEFAULT 'created'
                   CHECK (status IN ('created','spawning','running','completed','failed','timed_out')),
   context         TEXT NOT NULL,                   -- JSON
-  result          TEXT,                            -- JSON (nullable hasta que complete)
-  key_hash        TEXT,                            -- hash de la key dinámica
+  result          TEXT,                            -- JSON (nullable until complete)
+  key_hash        TEXT,                            -- hash of the dynamic key
   key_revoked_at  TEXT,
   podman_id       TEXT,
   pid             INTEGER,
@@ -638,7 +637,7 @@ CREATE TABLE one_shot_agents (
   expires_at      TEXT NOT NULL,
   max_turns       INTEGER NOT NULL DEFAULT 1,
   output_channel  TEXT,                            -- 'github_comment', 'dashboard', 'webhook', NULL
-  output_url      TEXT,                            -- URL del target (ej: PR comment URL)
+  output_url      TEXT,                            -- target URL (e.g.: PR comment URL)
   created_by      TEXT NOT NULL DEFAULT 'system',   -- 'shinon', 'system', 'github_webhook'
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   completed_at    TEXT
@@ -657,13 +656,13 @@ CREATE TABLE webhook_subscriptions (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   source          TEXT NOT NULL,                   -- 'github'
   event_type      TEXT NOT NULL,                   -- 'pull_request', 'issue_comment'
-  secret          TEXT NOT NULL,                   -- shared secret para verificar
+  secret          TEXT NOT NULL,                   -- shared secret for verification
   config          TEXT NOT NULL DEFAULT '{}',      -- JSON: repo filter, etc.
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(source, event_type)
 );
 
--- Índices
+-- Indexes
 CREATE INDEX idx_one_shot_status ON one_shot_agents(status);
 CREATE INDEX idx_one_shot_expires ON one_shot_agents(expires_at);
 CREATE INDEX idx_one_shot_created ON one_shot_agents(created_by);
@@ -672,174 +671,174 @@ CREATE INDEX idx_agent_keys_created_by ON agent_keys(created_by);
 
 ---
 
-## 8. Nuevos Endpoints REST
+## 8. New REST Endpoints
 
-### 8.1 Endpoints Públicos (no requieren auth)
+### 8.1 Public Endpoints (no auth required)
 
-| Método | Path | Descripción |
+| Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/api/webhooks/github` | Webhook de GitHub (usa secret compartido) |
+| `POST` | `/api/webhooks/github` | GitHub webhook (uses shared secret) |
 
-### 8.2 Endpoints Protegidos (requieren JWT o API key)
+### 8.2 Protected Endpoints (require JWT or API key)
 
-| Método | Path | Descripción |
+| Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/v1/chat/completions` | LLM proxy con model routing |
-| `POST` | `/api/one-shot` | Crear nuevo one-shot agent |
-| `GET` | `/api/one-shot` | Listar one-shots (filtro por status, task_type) |
-| `GET` | `/api/one-shot/:id` | Detalle + resultado de un one-shot |
-| `POST` | `/api/one-shot/:id/cancel` | Cancelar un one-shot en ejecución |
-| `GET` | `/api/routes` | Listar model routes configuradas |
-| `POST` | `/api/routes` | Crear/actualizar model route |
-| `GET` | `/api/mentions` | Listar @mention mappings |
-| `POST` | `/api/mentions` | Crear @mention mapping |
+| `POST` | `/v1/chat/completions` | LLM proxy with model routing |
+| `POST` | `/api/one-shot` | Create new one-shot agent |
+| `GET` | `/api/one-shot` | List one-shots (filter by status, task_type) |
+| `GET` | `/api/one-shot/:id` | Detail + result of a one-shot |
+| `POST` | `/api/one-shot/:id/cancel` | Cancel a running one-shot |
+| `GET` | `/api/routes` | List configured model routes |
+| `POST` | `/api/routes` | Create/update model route |
+| `GET` | `/api/mentions` | List @mention mappings |
+| `POST` | `/api/mentions` | Create @mention mapping |
 
-### 8.3 Mensajes WS Nuevos
+### 8.3 New WS Messages
 
-El protocolo WS se extiende para reportar estado de one-shots:
+The WS protocol is extended to report one-shot agent state:
 
 ```
-# Dashboard recibe updates de one-shot agents
+# Dashboard receives one-shot agent updates
 cardinal → { type: "one_shot_update", os: { id, name, status, task_type, created_at } }
 
-# Dashboard cuando un one-shot completa
+# Dashboard when a one-shot completes
 cardinal → { type: "one_shot_complete", os: { id, name, status: "completed", result_summary: "..." } }
 ```
 
 ---
 
-## 9. Integración con el Dashboard SAO
+## 9. Dashboard SAO Integration
 
-### Nuevas vistas en el frontend
+### New Views in the Frontend
 
-**Página: One-Shot Agents (`/one-shot`)**
-- Tabla de one-shot agents (recientes, filtrable por status)
-- Cada row: nombre, modelo, task_type, status, tiempo transcurrido, creado por
-- Expandible: contexto, resultado
-- Botón "Cancel" para running ones
+**Page: One-Shot Agents (`/one-shot`)**
+- Table of one-shot agents (recent, filterable by status)
+- Each row: name, model, task_type, status, elapsed time, created by
+- Expandable: context, result
+- "Cancel" button for running ones
 
-**Página: Model Routes (`/routes`)**
-- CRUD de task_type → model mappings
-- Editar primary, fallback1, fallback2 para cada tipo de tarea
+**Page: Model Routes (`/routes`)**
+- CRUD for task_type → model mappings
+- Edit primary, fallback1, fallback2 for each task type
 
-**Página: GitHub Mentions (`/mentions`)**
-- CRUD de @mention → model mappings
-- Lista de webhooks activos
+**Page: GitHub Mentions (`/mentions`)**
+- CRUD for @mention → model mappings
+- List of active webhooks
 
-**Sidebar: nuevo ítem "⚡ One-Shot"**
+**Sidebar: new item "One-Shot"**
 
 ---
 
-## 10. Comparación: Hermes Delegation vs Podman Containers
+## 10. Comparison: Hermes Delegation vs Podman Containers
 
-| Aspecto | Hermes Delegation (`hermes chat -q`) | Podman Containers (`podman run --rm`) |
+| Aspect | Hermes Delegation (`hermes chat -q`) | Podman Containers (`podman run --rm`) |
 |---------|---------------------------------------|---------------------------------------|
 | **Startup time** | <1s | 3-5s |
-| **Aislamiento** | Bajo (mismo process tree) | Alto (namespace completo) |
-| **Resource limits** | No nativo (solo vía OS) | Sí (--memory, --cpus) |
-| **Overhead** | Mínimo (un proceso más) | ~50-100MB RAM por container (base image) |
-| **Tool access** | Todo lo que tenga el perfil Hermes | Solo lo que se monte/pase al container |
-| **Network** | Misma red que el host | Aislada o host según flag |
-| **Llama al LLM** | Usa el provider configurado en Hermes | Usa FreeLLMAPI endpoint directo |
-| **Seguridad** | Menor (puede acceder a archivos del host) | Mayor (chroot filesystem) |
-| **Complejidad de impl.** | Baja (wrapper de terminal) | Media (Containerfile, volúmenes, networking) |
-| **Caso de uso ideal** | Review estándar, coding ligero | Deep analysis, @mention con modelos premium |
+| **Isolation** | Low (same process tree) | High (full namespace) |
+| **Resource limits** | Not native (OS only) | Yes (--memory, --cpus) |
+| **Overhead** | Minimal (one more process) | ~50-100MB RAM per container (base image) |
+| **Tool access** | Everything the Hermes profile has | Only what is mounted/passed to the container |
+| **Network** | Same as host | Isolated or host per flag |
+| **LLM calls** | Uses the provider configured in Hermes | Uses FreeLLMAPI endpoint directly |
+| **Security** | Lower (can access host files) | Higher (chroot filesystem) |
+| **Implementation complexity** | Low (terminal wrapper) | Medium (Containerfile, volumes, networking) |
+| **Ideal use case** | Standard review, light coding | Deep analysis, @mention with premium models |
 
-**Recomendación:** Empezar con Hermes Delegation (más rápido de implementar, suficiente para review y coding). Migrar análisis pesados a Podman cuando se necesite aislamiento.
+**Recommendation:** Start with Hermes Delegation (faster to implement, sufficient for review and coding). Migrate heavy analysis to Podman when isolation is needed.
 
 ---
 
-## 11. Consideraciones de Seguridad
+## 11. Security Considerations
 
-### 11.1 Keys Dinámicas vs Keys Humanas
+### 11.1 Dynamic Keys vs Human Keys
 
-| Tipo | created_by | Puede ser revocada automáticamente | Visible en dashboard |
+| Type | created_by | Can be auto-revoked | Visible in dashboard |
 |------|-----------|------------------------------------|---------------------|
-| Humana | `'human'` | **NUNCA** (regla de Fase 0) | Sí, en sección principal |
-| Sistema | `'system'` | **SÍ**, por el one-shot lifecycle | En subsección "One-Shot Keys" |
+| Human | `'human'` | **NEVER** (FASE 0 rule) | Yes, in main section |
+| System | `'system'` | **YES**, by the one-shot lifecycle | In "One-Shot Keys" subsection |
 
 ### 11.2 Rate Limiting
 
-- El endpoint `/v1/chat/completions` tiene rate limiting por key
-- El endpoint `/api/one-shot` tiene rate limiting por caller (`created_by`)
-- Máximo N one-shots concurrentes (configurable, default 5)
+- The `/v1/chat/completions` endpoint has rate limiting per key
+- The `/api/one-shot` endpoint has rate limiting per caller (`created_by`)
+- Maximum N concurrent one-shots (configurable, default 5)
 
 ### 11.3 GitHub Credentials
 
-- El token de GitHub se almacena en variable de entorno (`GITHUB_TOKEN`), no en DB
-- El webhook secret se guarda en `webhook_subscriptions.secret` (hash)
-- Sólo el orquestador usa el token de GitHub (los one-shots no lo reciben)
+- The GitHub token is stored in an environment variable (`GITHUB_TOKEN`), not in DB
+- The webhook secret is saved in `webhook_subscriptions.secret` (hash)
+- Only the orchestrator uses the GitHub token (one-shots do not receive it)
 
-### 11.4 Principio de Mínimo Privilegio
+### 11.4 Principle of Least Privilege
 
-- El one-shot agent recibe solo el contexto necesario (diff, no todo el repo)
-- No tiene acceso a la DB del Cardinal
-- Su key dinámica solo le permite llamar `/v1/chat/completions` (no otros endpoints)
-- La key expira automáticamente al completar o por TTL
+- The one-shot agent receives only the necessary context (diff, not the full repo)
+- It has no access to Cardinal's DB
+- Its dynamic key only allows calling `/v1/chat/completions` (not other endpoints)
+- The key expires automatically upon completion or by TTL
 
 ---
 
-## 12. Implementación por Capas
+## 12. Layered Implementation
 
-### Fase 2a — Core + Hermes Execution (Prioridad Alta)
+### FASE 2a — Core + Hermes Execution (High Priority)
 
-1. Tablas nuevas + migraciones
-2. `/v1/chat/completions` proxy a FreeLLMAPI (sin routing complejo aún)
-3. `POST /api/one-shot` con ejecución vía Hermes delegation
+1. New tables + migrations
+2. `/v1/chat/completions` proxy to FreeLLMAPI (without complex routing yet)
+3. `POST /api/one-shot` with Hermes delegation execution
 4. Dynamic key factory (`created_by='system'`)
-5. Auto-revoke al completar
-6. Output a dashboard (guardar resultado en DB)
-7. Anti-loop: `max_turns=1` hardcodeado en el prompt
+5. Auto-revoke on completion
+6. Output to dashboard (save result in DB)
+7. Anti-loop: `max_turns=1` hardcoded in the prompt
 
-### Fase 2b — GitHub Integration (Prioridad Media)
+### FASE 2b — GitHub Integration (Medium Priority)
 
-1. Webhook receiver para GitHub
-2. Obtención de diff vía API GitHub
-3. Posteo de review como comentario en PR
-4. @mention parsing y mapping a modelo
+1. Webhook receiver for GitHub
+2. Diff retrieval via GitHub API
+3. Post review as PR comment
+4. @mention parsing and model mapping
 5. Output channel `github_comment`
 
-### Fase 2c — Podman Execution + Hardening (Prioridad Baja)
+### FASE 2c — Podman Execution + Hardening (Low Priority)
 
-1. Containerfile para one-shot agents
-2. `executor-podman.ts` — Podman run con resource limits
-3. Watchdog timer con TTL
-4. GC de one-shots expirados
+1. Containerfile for one-shot agents
+2. `executor-podman.ts` — Podman run with resource limits
+3. Watchdog timer with TTL
+4. GC of expired one-shots
 5. Rate limiting
 
 ---
 
-## 13. Éxito vs Hermes `delegate_task` Existente
+## 13. This vs Existing Hermes `delegate_task`
 
-### ¿Por qué no usar simplemente `delegate_task` de Hermes?
+### Why not simply use Hermes `delegate_task`?
 
-`delegate_task` es excelente para subagentes dentro de una sesión de Hermes, pero tiene limitaciones para el pipeline one-shot:
+`delegate_task` is excellent for subagents within a Hermes session, but has limitations for the one-shot pipeline:
 
-| Requisito | `delegate_task` | Cardinal One-Shot |
+| Requirement | `delegate_task` | Cardinal One-Shot |
 |-----------|----------------|-------------------|
-| **Persistencia fuera de sesión** | ❌ Muere si el padre muere | ✅ Corre como proceso independiente |
-| **Output a GitHub** | ❌ Solo devuelve texto al caller | ✅ Postea directamente al PR |
-| **TTL y watchdog** | ❌ No tiene timeout externo | ✅ Watchdog con fuerza bruta |
-| **Key dinámica revocable** | ❌ Usa la misma sesión de Hermes | ✅ Key aislada, auto-revocable |
-| **Visibilidad en dashboard** | ❌ No hay registro | ✅ Historial completo en DB |
-| **Aislamiento de recursos** | ❌ Comparte todo con el padre | ✅ Podman isolation opcional |
-| **Trigger por webhook** | ❌ Solo invocación manual | ✅ GitHub webhook + @mention |
+| **Persistence outside session** | No — dies if parent dies | Yes — runs as independent process |
+| **Output to GitHub** | No — only returns text to caller | Yes — posts directly to PR |
+| **TTL and watchdog** | No external timeout | Yes — watchdog with brute force |
+| **Revocable dynamic key** | No — uses same Hermes session | Yes — isolated key, auto-revocable |
+| **Visibility in dashboard** | No record | Yes — full history in DB |
+| **Resource isolation** | No — shares everything with parent | Yes — optional Podman isolation |
+| **Trigger by webhook** | No — manual invocation only | Yes — GitHub webhook + @mention |
 
-**Conclusión:** `delegate_task` es para subagentes dentro de una sesión activa de Hermes. Cardinal One-Shot es para agentes que trascienden sesiones, se disparan por eventos externos, y necesitan lifecycle management independiente. Son complementarios.
+**Conclusion:** `delegate_task` is for subagents within an active Hermes session. Cardinal One-Shot is for agents that transcend sessions, are triggered by external events, and need independent lifecycle management. They are complementary.
 
 ---
 
-## 14. Diagrama de Secuencia Completo
+## 14. Complete Sequence Diagram
 
-### Escenario: Feature → PR → Review → @mention
+### Scenario: Feature → PR → Review → @mention
 
 ```
-Santi                          Shinon                  Cardinal                  GitHub
+Owner                          Shinon                  Cardinal                  GitHub
   │                              │                        │                        │
-  │ "hacé esta feature"          │                        │                        │
+  │ "implement this feature"     │                        │                        │
   │─────────────────────────────>│                        │                        │
   │                              │                        │                        │
-  │                              │ Spawn subagente coding │                        │
+  │                              │ Spawn coding subagent  │                        │
   │                              │───────────────────────>│                        │
   │                              │  POST /api/one-shot    │                        │
   │                              │  {task_type: "coding", │                        │
@@ -848,7 +847,7 @@ Santi                          Shinon                  Cardinal                 
   │                              │                        │                        │
   │                              │  <─ {id: "os_xxx", key}│                        │
   │                              │                        │                        │
-  │                              │ Ejecuta coding agent   │                        │
+  │                              │ Run coding agent       │                        │
   │                              │ (Hermes delegation)    │                        │
   │                              │────────────────────────>│                        │
   │                              │   git add + commit + push                         │
@@ -859,9 +858,9 @@ Santi                          Shinon                  Cardinal                 
   │                              │ "PR #42 created"       │                        │
   │                              │<───────────────────────│                        │
   │                              │                        │                        │
-  │                              │ NOTA: Santi no lee el PR todavía                  │
+  │                              │ NOTE: Owner has not read the PR yet               │
   │                              │                        │                        │
-  │                              │ Dispara review one-shot│                        │
+  │                              │ Trigger review one-shot│                        │
   │                              │───────────────────────>│                        │
   │                              │  POST /api/one-shot    │                        │
   │                              │  {task_type: "review", │                        │
@@ -877,25 +876,25 @@ Santi                          Shinon                  Cardinal                 
   │                              │  (Hermes delegation)   │                        │
   │                              │  max_turns=1           │                        │
   │                              │────────────────────────>│                        │
-  │                              │                        │  Postea review como     │
-  │                              │                        │  comentario en PR #42   │
+  │                              │                        │  Post review as         │
+  │                              │                        │  comment on PR #42      │
   │                              │                        │────────────────────────>│
   │                              │                        │                        │
   │                              │  <─ completed          │                        │
-  │                              │  Revoca key + cleanup  │                        │
+  │                              │  Revoke key + cleanup  │                        │
   │                              │                        │                        │
-  │ Santi: acá está el PR + el review                      │                        │
+  │ Owner: here is the PR + review                         │                        │
   │<─────────────────────────────│                        │                        │
   │                              │                        │                        │
-  │ @cardinal-deep profundizá   │                        │                        │
-  │ en este análisis             │                        │                        │
+  │ @cardinal-deep deepen        │                        │                        │
+  │ this analysis                │                        │                        │
   │──────────────────────────────────────────────────────────────────────────────>│
   │                              │                        │                        │
-  │                              │  Webhook detecta       │                        │
+  │                              │  Webhook detects       │                        │
   │                              │  @cardinal-deep        │                        │
   │                              │───────────────────────>│                        │
   │                              │  Parse mention → model │                        │
-  │                              │  Crea one-shot deep    │                        │
+  │                              │  Create deep one-shot  │                        │
   │                              │  task_type:            │                        │
   │                              │    "deep_analysis"     │                        │
   │                              │  model: qwen3.7-max    │                        │
@@ -906,49 +905,49 @@ Santi                          Shinon                  Cardinal                 
   │                              │  Podman container      │                        │
   │                              │  with resource limits  │                        │
   │                              │────────────────────────>│                        │
-  │                              │                        │  Postea análisis como  │
-  │                              │                        │  reply al comentario    │
+  │                              │                        │  Post analysis as      │
+  │                              │                        │  reply to comment       │
   │                              │                        │────────────────────────>│
   │                              │                        │                        │
   │                              │  <─ completed          │                        │
-  │                              │  Revoca key + cleanup  │                        │
+  │                              │  Revoke key + cleanup  │                        │
   │                              │                        │                        │
 ```
 
 ---
 
-## 15. Implementación Mínima Viable (MVP)
+## 15. Minimum Viable Implementation (MVP)
 
-Para llegar a un pipeline funcional rápidamente, el orden de implementación es:
+To reach a functional pipeline quickly, the implementation order is:
 
-1. **Migración DB** — tablas `model_routes`, `one_shot_agents`, `github_mentions`, `webhook_subscriptions`
-2. **`/v1/chat/completions`** — proxy a FreeLLMAPI con model routing básico
-3. **`POST /api/one-shot`** — solo Hermes delegation (sin Podman)
+1. **DB migration** — tables `model_routes`, `one_shot_agents`, `github_mentions`, `webhook_subscriptions`
+2. **`/v1/chat/completions`** — proxy to FreeLLMAPI with basic model routing
+3. **`POST /api/one-shot`** — Hermes delegation only (no Podman)
 4. **Dynamic key factory** — `created_by='system'` + auto-revoke
-5. **Output channel `dashboard`** — guarda resultado en DB, disponible en REST
-6. **Webhook GitHub** — `POST /api/webhooks/github` con parseo de @mention
-7. **Output channel `github_comment`** — postea review al PR
-8. **Watchdog + TTL** — seguridad anti-cuelgues
-9. **Podman execution** — para deep analysis
-10. **Frontend** — vistas de one-shot en dashboard
+5. **Output channel `dashboard`** — saves result in DB, available in REST
+6. **GitHub webhook** — `POST /api/webhooks/github` with @mention parsing
+7. **Output channel `github_comment`** — posts review to the PR
+8. **Watchdog + TTL** — anti-hang safety
+9. **Podman execution** — for deep analysis
+10. **Frontend** — one-shot views in dashboard
 
 ---
 
-## Apéndice A: Prompt Template para Review Agent
+## Appendix A: Prompt Template for Review Agent
 
 ```
-Eres un Code Reviewer automático del ecosistema SAO.
+You are an automated Code Reviewer for the SAO ecosystem.
 
-INSTRUCCIONES:
-- Tienes EXACTAMENTE UNA (1) oportunidad para hacer tu análisis.
-- No hay iteraciones, no hay follow-ups, no hay loops.
-- Haz tu análisis completo y estructurado AHORA.
+INSTRUCTIONS:
+- You have EXACTLY ONE (1) opportunity to do your analysis.
+- No iterations, no follow-ups, no loops.
+- Do your complete and structured analysis NOW.
 
-TAREA: Revisa el siguiente Pull Request diff.
+TASK: Review the following Pull Request diff.
 
 PR: #{pr_number} — {pr_title}
 REPO: {repo}
-DESCRIPCIÓN: {pr_description}
+DESCRIPTION: {pr_description}
 
 FILES CHANGED:
 {changed_files}
@@ -956,27 +955,27 @@ FILES CHANGED:
 DIFF:
 {pr_diff}
 
-FORMATO DE RESPUESTA (usar GitHub Markdown):
+RESPONSE FORMAT (use GitHub Markdown):
 ## Code Review: {pr_title}
 
-### ✅ Resumen
-[1-2 párrafos describiendo qué hace el PR y evaluación general]
+### Summary
+[1-2 paragraphs describing what the PR does and overall assessment]
 
-### 🔴 Critical Issues
-[Problemas que DEBEN corregirse antes de merge: bugs, seguridad, regresión]
+### Critical Issues
+[Issues that MUST be fixed before merge: bugs, security, regression]
 
-### 🟡 Warnings
-[Problemas importantes que deberían corregirse: code smells, perf, mantenibilidad]
+### Warnings
+[Important issues that should be fixed: code smells, perf, maintainability]
 
-### 🔵 Suggestions
-[Mejoras opcionales: estilo, refactors menores, convenciones]
+### Suggestions
+[Optional improvements: style, minor refactors, conventions]
 
-### 📊 Verdict
+### Verdict
 **APPROVED** | **CHANGES_REQUESTED** | **COMMENT**
-[razón breve]
+[brief reason]
 ```
 
-## Apéndice B: Configuración Inicial de Model Routes
+## Appendix B: Initial Model Routes Configuration
 
 ```sql
 INSERT INTO model_routes (task_type, primary_model, fallback1, fallback2, max_tokens, temperature) VALUES
@@ -986,7 +985,7 @@ INSERT INTO model_routes (task_type, primary_model, fallback1, fallback2, max_to
 ('light',        'deepseek-v4-flash', 'auto',          NULL,          2048,  0.7);
 
 INSERT INTO github_mentions (mention, model, task_type, description) VALUES
-('@cardinal-review', 'kimi-k2.6',        'review',        'Code review mid-tier (modelo recomendado)'),
-('@cardinal-deep',   'qwen3.7-max',      'deep_analysis', 'Análisis pesado con modelo premium'),
-('@cardinal-coding', 'deepseek-v4-flash', 'coding',        'Coding ligero y scripting');
+('@cardinal-review', 'kimi-k2.6',        'review',        'Mid-tier code review (recommended model)'),
+('@cardinal-deep',   'qwen3.7-max',      'deep_analysis', 'Heavy analysis with premium model'),
+('@cardinal-coding', 'deepseek-v4-flash', 'coding',        'Light coding and scripting');
 ```

@@ -1,38 +1,38 @@
 # WS Protocol
 
-Implementás el protocolo WebSocket nativo en `packages/ws/`.
+Implement the native WebSocket protocol in `packages/ws/`.
 
 <!-- REGION: when -->
-## Cuándo sí
+## When
 
-- `packages/ws/**`: parseo de mensajes, state machine, ping/pong, timeouts, hub.
-- TDD: este ámbito es obligatorio — GREEN sobre tests RED de `tester`.
+- `packages/ws/**`: message parsing, state machine, ping/pong, timeouts, hub.
+- TDD: this scope is mandatory — GREEN over RED tests from `tester`.
 
-## Cuándo no
+## When not
 
-- Handlers HTTP o composición en `backend/` que solo *usan* el hub → `builder`.
-- Cliente React / dashboard → `frontend`.
+- HTTP handlers or composition in `backend/` that only *use* the hub -> `builder`.
+- React client / dashboard -> `frontend`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Stack: TypeScript + Bun, WebSocket nativo. No reinventar orquestación de agentes.
-- Mismos constraints de builder: spec exacta, sin extras, Podman, no leaks.
-- No escribas tests RED (eso es `tester`). No verifiques claims (eso es `verifier`).
+- Stack: TypeScript + Bun, native WebSocket. Do not reinvent agent orchestration.
+- Same builder constraints: exact spec, no extras, Podman, no leaks.
+- Do not write RED tests (that is `tester`). Do not verify claims (that is `verifier`).
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (final message)
 
-Incluí un fence markdown en tu último mensaje con:
+Include a markdown fence in your final message with:
 
 ```
 ## Files
 - path (created|modified)
 
 ## Verify
-comando + resultado
+command + result
 
 ## Spec deviations
 none

@@ -17,7 +17,22 @@ export interface AgentEvent {
 
 export type ServerEvent =
   | { type: "roster"; agents: AgentPayload[] }
-  | { type: "agent_update"; agent: AgentPayload };
+  | { type: "agent_update"; agent: AgentPayload }
+  | { type: "task_update"; task: TaskPayload };
+
+/** Wire shape from WS `task_update` (camelCase). REST `/api/tasks` is snake_case. */
+export interface TaskPayload {
+  id: string;
+  goal: string;
+  status: "open" | "claimed" | "done" | "blocked";
+  assignedTo: string | null;
+  createdBy: string;
+  parentId: string | null;
+  summary: string | null;
+  artifactRef: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
 
 /** Raw shape from GET /api/system */
 export interface SystemInfo {
@@ -28,6 +43,62 @@ export interface SystemInfo {
   agents_online: number;
   keys_active: number;
   keys_revoked: number;
+}
+
+/** Raw shape from GET /api/keys, POST /api/keys, and POST /api/keys/:id/revoke */
+export interface KeyItem {
+  id: number;
+  agentName: string;
+  createdBy: string;
+  scopes: string[];
+  budgetLimit: number | null;
+  budgetUsed: number;
+  expiresAt: string | null;
+  budgetUsdLimit: number | null;
+  budgetUsdUsed: number;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+/** Raw shape from GET /api/router/providers */
+export interface RouterProvider {
+  id: number;
+  name: string;
+  base_url: string;
+  wire_format: "openai" | "anthropic" | "gemini";
+  status: "active" | "disabled";
+  rpm_limit: number | null;
+  tpm_limit: number | null;
+  cost_per_mtok: number;
+  created_at: string;
+}
+
+export interface RouterModel {
+  provider_id: number;
+  model_id: string;
+  capabilities: string;
+  context_window: number | null;
+}
+
+/** Raw shape from GET /api/router/routes */
+export interface RouterHop {
+  provider: string;
+  model: string;
+}
+
+export interface RouterRoute {
+  alias: string;
+  fallback_chain: RouterHop[];
+  created_at: string;
+}
+
+/** Raw shape from GET /api/router/catalog */
+export type RouterCatalogKind = "model" | "alias" | "fusion";
+
+export interface RouterCatalogItem {
+  id: string;
+  kind: RouterCatalogKind;
 }
 
 export function fmtUptime(s: number): string {

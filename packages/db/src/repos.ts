@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { Database, SQLQueryBindings } from "bun:sqlite";
 import type {
   AgentKind,
   AgentRow,
@@ -8,6 +8,7 @@ import type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  MessageRow,
   ModelRouteRow,
   ProfileKind,
   ProfileRow,
@@ -34,6 +35,7 @@ export type {
   DeviceRow,
   MemoryMirrorRow,
   MemoryTarget,
+  MessageRow,
   ModelRouteRow,
   ProfileKind,
   ProfileRow,
@@ -325,10 +327,12 @@ export function createAgentKey(
     createdBy?: "human" | "system";
     scopes?: string[];
     budgetLimit?: number;
+    expiresAt?: string | null;
+    budgetUsdLimit?: number | null;
   },
 ): void {
   db.run(
-    "INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by, scopes, budget_limit) VALUES (?, ?, ?, ?, ?, ?)",
+    "INSERT INTO agent_keys (key_hash, agent_name, kind_override, created_by, scopes, budget_limit, expires_at, budget_usd_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
     [
       args.keyHash,
       args.agentName,
@@ -336,16 +340,20 @@ export function createAgentKey(
       args.createdBy ?? "human",
       JSON.stringify(args.scopes ?? ["*"]),
       args.budgetLimit ?? null,
+      args.expiresAt ?? null,
+      args.budgetUsdLimit ?? null,
     ],
   );
 }
 
 export function findActiveKeyByHash(db: Database, keyHash: string): AgentKeyRow | null {
-  return (
+  const row =
     (db
       .query("SELECT * FROM agent_keys WHERE key_hash = ? AND revoked_at IS NULL")
-      .get(keyHash) as AgentKeyRow | null) ?? null
-  );
+      .get(keyHash) as AgentKeyRow | null) ?? null;
+  if (row === null) return null;
+  if (row.expires_at !== null && Date.parse(row.expires_at) <= Date.now()) return null;
+  return row;
 }
 
 export function touchKey(db: Database, id: number): void {
@@ -364,6 +372,25 @@ export function consumeBudget(db: Database, keyHash: string, tokens: number): bo
   return result.changes > 0;
 }
 
+export function consumeBudgetUsd(db: Database, keyHash: string, usd: number): boolean {
+  const key = findActiveKeyByHash(db, keyHash);
+  if (key === null) return false;
+  if (key.budget_usd_limit === null) return true;
+  const used = Math.round(key.budget_usd_used * 1e6);
+  const increment = Math.round(usd * 1e6);
+  const limit = Math.round(key.budget_usd_limit * 1e6);
+  if (used + increment > limit) return false;
+  const result = db
+    .query(
+      `UPDATE agent_keys
+       SET budget_usd_used = ?
+       WHERE key_hash = ? AND revoked_at IS NULL
+         AND budget_usd_limit IS NOT NULL`,
+    )
+    .run((used + increment) / 1e6, keyHash);
+  return result.changes > 0;
+}
+
 export function revokeKeysForAgent(db: Database, agentName: string): void {
   db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE agent_name = ? AND revoked_at IS NULL", [
     agentName,
@@ -372,6 +399,30 @@ export function revokeKeysForAgent(db: Database, agentName: string): void {
 
 export function listKeys(db: Database): AgentKeyRow[] {
   return db.query("SELECT * FROM agent_keys ORDER BY id").all() as AgentKeyRow[];
+}
+
+export function listHumanKeys(db: Database, status: "active" | "revoked"): AgentKeyRow[] {
+  const revokedClause = status === "active" ? "revoked_at IS NULL" : "revoked_at IS NOT NULL";
+  const expiryClause =
+    status === "active" ? " AND (expires_at IS NULL OR expires_at > datetime('now'))" : "";
+  return db
+    .query(
+      `SELECT * FROM agent_keys
+       WHERE created_by = 'human' AND ${revokedClause}${expiryClause}
+       ORDER BY id DESC`,
+    )
+    .all() as AgentKeyRow[];
+}
+
+export function getKeyById(db: Database, id: number): AgentKeyRow | null {
+  return (db.query("SELECT * FROM agent_keys WHERE id = ?").get(id) as AgentKeyRow | null) ?? null;
+}
+
+export function revokeKeyById(db: Database, id: number): AgentKeyRow | null {
+  const existing = getKeyById(db, id);
+  if (existing === null || existing.revoked_at !== null) return null;
+  db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE id = ?", [id]);
+  return getKeyById(db, id);
 }
 
 export interface ProviderFields {
@@ -418,8 +469,70 @@ export function getProviderByName(db: Database, name: string): ProviderRow | nul
   return (db.query("SELECT * FROM providers WHERE name = ?").get(name) as ProviderRow | null) ?? null;
 }
 
+export function getProviderById(db: Database, id: number): ProviderRow | null {
+  return (db.query("SELECT * FROM providers WHERE id = ?").get(id) as ProviderRow | null) ?? null;
+}
+
 export function setProviderStatus(db: Database, name: string, status: ProviderStatus): void {
   db.run("UPDATE providers SET status = ? WHERE name = ?", [status, name]);
+}
+
+export interface ProviderConfigUpdate {
+  baseUrl?: string;
+  wireFormat?: WireFormat;
+  status?: ProviderStatus;
+  costPerMtok?: number;
+  apiKeyEnc?: string;
+}
+
+export function updateProviderConfig(db: Database, id: number, args: ProviderConfigUpdate): boolean {
+  const existing = getProviderById(db, id);
+  if (!existing) return false;
+
+  const sets: string[] = [];
+  const values: SQLQueryBindings[] = [];
+
+  if (args.baseUrl !== undefined) {
+    sets.push("base_url = ?");
+    values.push(args.baseUrl);
+  }
+  if (args.wireFormat !== undefined) {
+    sets.push("wire_format = ?");
+    values.push(args.wireFormat);
+  }
+  if (args.status !== undefined) {
+    sets.push("status = ?");
+    values.push(args.status);
+  }
+  if (args.costPerMtok !== undefined) {
+    sets.push("cost_per_mtok = ?");
+    values.push(args.costPerMtok);
+  }
+  if (args.apiKeyEnc !== undefined) {
+    sets.push("api_key_enc = ?");
+    values.push(args.apiKeyEnc);
+  }
+
+  if (sets.length === 0) return true;
+
+  values.push(id);
+  db.run(`UPDATE providers SET ${sets.join(", ")} WHERE id = ?`, values);
+  return true;
+}
+
+export function replaceProviderModels(db: Database, providerId: number, modelIds: string[]): void {
+  db.run("DELETE FROM provider_models WHERE provider_id = ?", [providerId]);
+  for (const modelId of modelIds) {
+    addProviderModel(db, { providerId, modelId });
+  }
+}
+
+export function deleteProvider(db: Database, id: number): boolean {
+  const existing = getProviderById(db, id);
+  if (!existing) return false;
+  db.run("DELETE FROM provider_models WHERE provider_id = ?", [id]);
+  db.run("DELETE FROM providers WHERE id = ?", [id]);
+  return true;
 }
 
 export interface ProviderModelFields {
@@ -526,8 +639,12 @@ export function getSystemCounts(db: Database): SystemCounts {
   return {
     agentsTotal: count("SELECT COUNT(*) AS count FROM agents"),
     agentsOnline: count("SELECT COUNT(*) AS count FROM agents WHERE connected = 1"),
-    keysActive: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL"),
-    keysRevoked: count("SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL"),
+    keysActive: count(
+      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NULL AND created_by = 'human' AND (expires_at IS NULL OR expires_at > datetime('now'))",
+    ),
+    keysRevoked: count(
+      "SELECT COUNT(*) AS count FROM agent_keys WHERE revoked_at IS NOT NULL AND created_by = 'human'",
+    ),
   };
 }
 
@@ -777,4 +894,35 @@ export function completeTask(
     [args.summary ?? null, args.artifactRef ?? null, id],
   );
   return getTask(db, id);
+}
+
+export function getMessage(db: Database, id: string): MessageRow | null {
+  return (db.query("SELECT * FROM messages WHERE id = ?").get(id) as MessageRow | null) ?? null;
+}
+
+export function sendMessage(
+  db: Database,
+  args: { fromAgent: string; toAgent: string; type: string; payloadRef?: string | null },
+): MessageRow {
+  const id = crypto.randomUUID();
+  db.run("INSERT INTO messages (id, from_agent, to_agent, type, payload_ref) VALUES (?, ?, ?, ?, ?)", [
+    id,
+    args.fromAgent,
+    args.toAgent,
+    args.type,
+    args.payloadRef ?? null,
+  ]);
+  return getMessage(db, id)!;
+}
+
+export function listInbox(db: Database, toAgent: string): MessageRow[] {
+  return db
+    .query("SELECT * FROM messages WHERE to_agent = ? ORDER BY created_at ASC")
+    .all(toAgent) as MessageRow[];
+}
+
+export function markMessageRead(db: Database, id: string): MessageRow | null {
+  if (getMessage(db, id) === null) return null;
+  db.run("UPDATE messages SET read = 1 WHERE id = ?", [id]);
+  return getMessage(db, id);
 }

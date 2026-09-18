@@ -147,6 +147,20 @@ describe("handleCreateTask", () => {
     expect(await res.json()).toEqual({ error: "bad_request" });
     db.close();
   });
+
+  test("createdByOverride ignora created_by del body", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "spoof", created_by: "kirito" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { created_by: string } };
+    expect(body.task.created_by).toBe("shinon");
+    db.close();
+  });
 });
 
 describe("handleGetTask", () => {
@@ -261,6 +275,38 @@ describe("handleClaimTask", () => {
     expect(await res.json()).toEqual({ error: "bad_request" });
     db.close();
   });
+
+  test("byOverride ignora by del body", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "claim override");
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "kirito" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { assigned_to: string } };
+    expect(body.task.assigned_to).toBe("shinon");
+    db.close();
+  });
+
+  test("byOverride permite omitir by", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "claim omit by");
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", {}),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { assigned_to: string } };
+    expect(body.task.assigned_to).toBe("shinon");
+    db.close();
+  });
 });
 
 describe("handleCompleteTask", () => {
@@ -313,6 +359,62 @@ describe("handleCompleteTask", () => {
       status: "done",
       summary: null,
     });
+    db.close();
+  });
+
+  test("actorAgent completando task de otro → 403 {error: 'forbidden'}", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "not yours");
+    await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "kirito" }),
+    );
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", { summary: "nope" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "forbidden" });
+    db.close();
+  });
+
+  test("actorAgent completando task open/sin claim → 403 {error: 'forbidden'}", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "unclaimed");
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", { summary: "nope" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "forbidden" });
+    db.close();
+  });
+
+  test("actorAgent completando la task que claimó → 200 done", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "mine");
+    await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "shinon" }),
+    );
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", { summary: "did it" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { status: string } };
+    expect(body.task.status).toBe("done");
     db.close();
   });
 });

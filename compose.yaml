@@ -63,6 +63,39 @@ services:
       - cardinal-net
     restart: unless-stopped
 
+  mcp:
+    image: docker.io/oven/bun:1
+    container_name: cardinal-mcp
+    working_dir: /app
+    command:
+      - sh
+      - -c
+      - bun install && bun --watch packages/mcp/src/main.ts
+    ports:
+      - "127.0.0.1:8789:8789"
+    volumes:
+      # Mount workspace sources for hot-reload via bun --watch
+      - ./packages:/app/packages
+      # backend/frontend dirs must exist for the root workspaces glob (bun install)
+      - ./backend:/app/backend
+      - ./frontend:/app/frontend
+      # Root workspace manifests (bun install must run from monorepo root)
+      - ./package.json:/app/package.json
+      - ./bun.lock:/app/bun.lock
+      # Vaults markdown, fuente de verdad de memoria, read-only
+      - ${VAULTS_HOST_PATH:-./vaults}:/data/vaults:ro
+    environment:
+      PORT: 8789
+      CARDINAL_BACKEND_URL: http://backend:8787
+      CARDINAL_VAULTS_ROOT: /data/vaults
+      CARDINAL_VAULTS: "${CARDINAL_VAULTS:-personal,cardinal-system,projects,knowledge,agents}"
+      CARDINAL_SERVICE_KEY: ${CARDINAL_SERVICE_KEY}
+    depends_on:
+      - backend
+    networks:
+      - cardinal-net
+    restart: unless-stopped
+
 networks:
   cardinal-net:
     driver: bridge

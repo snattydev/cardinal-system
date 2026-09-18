@@ -175,6 +175,22 @@ CREATE TABLE usage_log (
   created_at         TEXT NOT NULL DEFAULT (datetime('now'))
 );
 `,
+  `
+CREATE TABLE messages (
+  id          TEXT PRIMARY KEY,
+  from_agent  TEXT NOT NULL,
+  to_agent    TEXT NOT NULL,
+  type        TEXT NOT NULL,
+  payload_ref TEXT,
+  read        INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+`,
+  `
+ALTER TABLE agent_keys ADD COLUMN expires_at TEXT;
+ALTER TABLE agent_keys ADD COLUMN budget_usd_limit REAL;
+ALTER TABLE agent_keys ADD COLUMN budget_usd_used REAL NOT NULL DEFAULT 0;
+`,
 ];
 
 export function migrate(db: Database): void {

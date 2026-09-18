@@ -1,54 +1,58 @@
-# Bun Workspaces Refactor — Fase 0 → Fase 1 Migration
+# Bun Workspaces Refactor — Fase 0 -> Fase 1 Migration
 
 **Date:** 2026-07-29
-**Phase:** Preparación para Fase 1 (Context Store)
+**Phase:** Preparation for Fase 1 (Context Store)
 
 ## What
 
-El backend monolítico (`backend/src/`) fue descompuesto en 5 paquetes Bun workspace bajo `packages/`, cada uno con responsabilidad y límites claros. `backend/src/` quedó reducido a una capa de composición (server, handlers, static serve).
+The monolithic backend (`backend/src/`) was decomposed into 5 Bun workspace packages under `packages/`, each with clear responsibilities and boundaries. `backend/src/` was reduced to a composition layer (server, handlers, static serve).
 
 ## Why
 
-El backend de Fase 0 era un solo directorio con todo mezclado: auth, keys, db, protocolo, handlers. Para Fase 1 (Context Store), se necesita que:
-- Los paquetes sean testeables de forma aislada (TDD en paquetes, tests de integración en backend)
-- Las dependencias sean explícitas y acíclicas
-- El CLI (`keygen`) viva junto al paquete que expone la lógica, no en el backend
+The Fase 0 backend was a single directory with everything mixed together: auth, keys, db, protocol, handlers. For Fase 1 (Context Store), requirements included:
+- Packages must be testable in isolation (TDD in packages, integration tests in backend)
+- Dependencies must be explicit and acyclic
+- The CLI (`keygen`) must live alongside the package exposing the logic, not in the backend
 
 ## Architecture — Dependency Graph
 
 ```
-@cardinal/core          (tipos compartidos, config, http, protocolo)
-    ↓
-@cardinal/db            (schema, migraciones, repos)
-    ↓
+@cardinal/core          (shared types, config, http, protocol)
+    |
+    v
+@cardinal/db            (schema, migrations, repos)
+    |
+    v
 @cardinal/auth  @cardinal/keys   (JWT/session, key gen/hash)
-    ↓               ↓
-@cardinal/ws            (hub, agent lifecycle, mensajes)
-    ↓
-backend/                (composición: server, api handlers, static)
+    |               |
+    v               v
+@cardinal/ws            (hub, agent lifecycle, messages)
+    |
+    v
+backend/                (composition: server, api handlers, static)
 ```
 
-**Regla:** las dependencias van de arriba hacia abajo. Ningún paquete importa de otro que lo precede en el grafo.
+**Rule:** dependencies flow from top to bottom. No package imports from another that precedes it in the graph.
 
 ## Decisions
 
-### 5 paquetes (no 1, no 10)
+### 5 packages (not 1, not 10)
 
-- **No 1:** un solo mega-paquete no resuelve el problema de testing aislado ni límites explícitos
-- **No 10:** granularidad excesiva para la fase actual (ej: separar migrations de repos, o protocol de types)
-- **5 paquetes** alineados con el modelo de seguridad del sistema: core → db → auth/keys → ws
+- **Not 1:** a single mega-package does not solve isolated testing or explicit boundary problems
+- **Not 10:** excessive granularity for the current phase (e.g. separating migrations from repos, or protocol from types)
+- **5 packages** aligned with the system's security model: core -> db -> auth/keys -> ws
 
-Cada paquete mapea a una columna de TDD obligatorio definida en AGENTS.md.
+Each package maps to a mandatory TDD column defined in AGENTS.md.
 
-### json() en @cardinal/core
+### json() in @cardinal/core
 
-El helper `json()` (response wrapper con content-type) estaba en `backend/src/http.ts`. Se movió a `@cardinal/core/src/http.ts` para que cualquier paquete pueda usarlo sin acoplar al backend.
+The `json()` helper (response wrapper with content-type) was in `backend/src/http.ts`. It was moved to `@cardinal/core/src/http.ts` so any package can use it without coupling to the backend.
 
-Se dejó un shim en `backend/src/http.ts` que re-exporta desde `@cardinal/core` para transición suave durante la migración.
+A shim was left in `backend/src/http.ts` that re-exports from `@cardinal/core` for a smooth transition during migration.
 
-### Paths config en backend/tsconfig.json
+### Paths config in backend/tsconfig.json
 
-El tsconfig del backend usa `paths` para resolver `@cardinal/*` a `packages/*/src`. Esto permite que Bun resuelva los paquetes en desarrollo sin build intermedio (Bun entiende TypeScript nativo).
+The backend tsconfig uses `paths` to resolve `@cardinal/*` to `packages/*/src`. This allows Bun to resolve packages in development without an intermediate build step (Bun supports native TypeScript).
 
 ## Files Created
 
@@ -94,20 +98,20 @@ packages/ws/src/hub.test.ts
 ## Files Modified
 
 ```
-package.json                    ← "workspaces": ["packages/*", "backend", "frontend"]
-backend/package.json            ← dependencias @cardinal/* en lugar de lógica inline
-backend/tsconfig.json           ← paths + references para resolver @cardinal/*
-backend/src/index.ts            ← usar @cardinal/* en lugar de imports locales
-backend/src/server.ts           ← ídem
-backend/src/api/system.ts       ← import json() from @cardinal/core
-backend/src/api/health.ts       ← ídem
-backend/src/api/agents.ts       ← ídem
-backend/src/http.ts             ← shim: re-export from @cardinal/core
-backend/src/websocket.ts        ← usar @cardinal/ws, @cardinal/db, @cardinal/keys
+package.json                    <- "workspaces": ["packages/*", "backend", "frontend"]
+backend/package.json            <- @cardinal/* dependencies instead of inline logic
+backend/tsconfig.json           <- paths + references to resolve @cardinal/*
+backend/src/index.ts            <- use @cardinal/* instead of local imports
+backend/src/server.ts           <- ditto
+backend/src/api/system.ts       <- import json() from @cardinal/core
+backend/src/api/health.ts       <- ditto
+backend/src/api/agents.ts       <- ditto
+backend/src/http.ts             <- shim: re-export from @cardinal/core
+backend/src/websocket.ts        <- use @cardinal/ws, @cardinal/db, @cardinal/keys
 ```
 
 ## Alternatives Considered
 
-- **NX / Turborepo:** overhead innecesario para 5 paquetes. Bun workspaces nativo es suficiente.
-- **Publicar a npm registry:** no necesario para desarrollo interno. Los paths del tsconfig resuelven en tiempo de desarrollo.
-- **Monorepo con `bun build --target bun`:** se evaluó compilar los packages a `.js` pero Bun entiende `.ts` nativo, así que no hace falta. Se reconsiderará en producción si hay problemas de cold start.
+- **NX / Turborepo:** unnecessary overhead for 5 packages. Native Bun workspaces is sufficient.
+- **Publishing to npm registry:** unnecessary for internal development. tsconfig paths resolve at development time.
+- **Monorepo with `bun build --target bun`:** compiling packages to `.js` was evaluated, but Bun natively supports `.ts`, making it unnecessary. Will be reconsidered in production if cold-start issues arise.

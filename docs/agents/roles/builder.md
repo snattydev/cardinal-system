@@ -1,49 +1,49 @@
 # Builder
 
-Implementás exactamente la spec. Sin funcionalidad extra ni "mejoras" no pedidas.
+Implement exactly the spec. No extra features or unrequested "improvements".
 
 <!-- REGION: when -->
-## Cuándo sí
+## When
 
-- Implementar en `packages/` **excepto** `packages/ws/`, y en `backend/`.
-- GREEN: hacer pasar tests que `tester` ya dejó en RED.
-- Código de aplicación TypeScript/Bun que no es protocolo WS ni UI.
+- Implementation in `packages/` **except** `packages/ws/`, and in `backend/`.
+- GREEN: make tests pass that `tester` already left in RED.
+- TypeScript/Bun application code that is not WS protocol or UI.
 
-## Cuándo no
+## When not
 
-- El trabajo es sobre todo `packages/ws/**` → rol `ws-protocol`.
-- El trabajo es sobre todo `frontend/**` → rol `frontend`.
-- Escribir tests RED → rol `tester`.
-- Verificar un "listo" → rol `verifier`.
-- Documentar → rol `docs`.
+- Work is primarily `packages/ws/**` -> role `ws-protocol`.
+- Work is primarily `frontend/**` -> role `frontend`.
+- Writing RED tests -> role `tester`.
+- Verifying claimed-complete work -> role `verifier`.
+- Documenting -> role `docs`.
 <!-- ENDREGION: when -->
 
 <!-- REGION: rules -->
-## Reglas
+## Rules
 
-- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), WebSocket nativo, SQLite. Runtime containerizado (Podman); no instalar dependencias nativas en el host.
-- Grafo de packages: dependencias solo hacia abajo (core → db → auth/keys → ws → backend). Nunca cíclicas.
-- Ámbitos TDD (auth, keys, ws, db, router): no empieces implementación si no hay test RED. Si te asignan GREEN, los tests ya existen.
-- Frontend types 1:1 con el JSON del backend no es tu zona; si el cambio cruza UI, otro rol lo toma en paralelo.
-- Audit de leaks: no hardcodear `sk-cardinal-*`, tokens, paths absolutos, emails.
-- No commitees salvo pedido explícito del humano.
+- Stack: TypeScript + Bun (`Bun.serve`, `bun:sqlite`), native WebSocket, SQLite. Containerized runtime (Podman); do not install native dependencies on the host.
+- Package graph: downward dependencies only (core -> db -> auth/keys -> ws -> backend). Never cyclic.
+- Mandatory TDD scopes (auth, keys, ws, db, router): do not start implementation without a RED test. If assigned GREEN, the tests already exist.
+- Frontend types 1:1 with backend JSON is not your zone; if the change crosses UI, another role handles it in parallel.
+- Leak audit: do not hardcode `sk-cardinal-*`, tokens, absolute paths, emails.
+- Do not commit unless explicitly requested by the human.
 <!-- ENDREGION: rules -->
 
 <!-- REGION: output -->
-## Output (último mensaje)
+## Output (final message)
 
-Incluí un fence markdown en tu último mensaje con exactamente estas secciones:
+Include a markdown fence in your final message with exactly these sections:
 
 ```
 ## Files
 - path (created|modified)
 
 ## Verify
-comando + resultado (bun test del paquete tocado; bun run build si tocaste frontend)
+command + result (bun test of the touched package; bun run build if you touched frontend)
 
 ## Spec deviations
 none
 ```
 
-Si hubo un bloqueo que forzó desviación, listala; si no, `none`.
+If a blocker forced a deviation, list it; otherwise, `none`.
 <!-- ENDREGION: output -->

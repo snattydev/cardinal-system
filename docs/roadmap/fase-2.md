@@ -1,40 +1,42 @@
-# Fase 2 — Cardinal v2 (Blackboard + MCP Hub + Key Pool)
+# Phase 2 — Cardinal v2 (Blackboard + MCP Hub + Key Pool)
 
 > Spec: [`../superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](../superpowers/specs/2026-08-12-cardinal-v2-architecture.md)
-> Plan de ejecución: [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md)
-> Estado: En curso.
+> Execution plan: [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md)
+> Status: Closing on `dev` (v0.2.6, updated 2026-09-14). Freeze: PR [#12](https://github.com/snattydev/cardinal-system/pull/12) / issue [#16](https://github.com/snattydev/cardinal-system/issues/16).
+> Router surface sprint: [`../sprints/2026-09-03-router-surface.md`](../sprints/2026-09-03-router-surface.md)
+> Index: [`../features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md)
 
 ---
 
 ## Re-scope (2026-08-12)
 
-La Fase 2 original (One-Shot Pipeline) fue re-scopeada por Cardinal v2. Tesis:
-**orquestación es commodity** — Cardinal es el cerebro (identidad + contexto +
-blackboard); herdr/Hermes/CLIs son las manos.
+The original Phase 2 (One-Shot Pipeline) was re-scoped for Cardinal v2. Thesis:
+**orchestration is commodity** — Cardinal is the brain (identity + context +
+blackboard); herdr/Hermes/CLIs are the hands.
 
-Cuatro pilares:
+Four pillars:
 
-| # | Pilar | Estado |
-|---|-------|--------|
-| 4 | Identidad `sk-cardinal-*` | ✅ Fase 0 |
-| 3 | Blackboard + mailbox | 🚧 tasks CRUD + WS broadcast; falta mailbox, UI, MCP tools |
-| 1 | MCP context hub multi-vault | 📋 diseño (spike-002) |
-| 2 | Key pool + router | 📋 diseño (spike-003) |
+| # | Pillar | Status |
+|---|--------|--------|
+| 4 | Identity `sk-cardinal-*` | Complete (Phase 0) |
+| 3 | Blackboard + mailbox | Complete (mailbox MCP 2026-08-31) |
+| 1 | Multi-vault MCP context hub | Complete (memory + board + mailbox tools in `packages/mcp`) |
+| 2 | Key pool + router | Complete (router + key factory + `/keys` create/expiry/USD + dashboard JWT `/router` + fusion/MoA — v0.2.5) |
 
-## Lo que se mantiene del diseño original
+## What is retained from original design
 
-Del roadmap Fase 2 original (2.1–2.5), solo se mantienen **2.1 LLM Router** y
-**2.2 API Key Factory** (ahora dentro del pilar 2). 2.3/2.4/2.5 (one-shot Podman,
-PR Review Pipeline, @mention) se reemplazan por blackboard + integración
-herdr/MCP — no reimplementar orquestación.
+From the original Phase 2 roadmap (2.1–2.5), only **2.1 LLM Router** and
+**2.2 API Key Factory** are retained (now inside pillar 2). 2.3/2.4/2.5 (one-shot Podman,
+PR Review Pipeline, @mention) are replaced by blackboard + herdr/MCP
+integration — do not reimplement orchestration.
 
-## Progreso
+## Progress
 
 ```
-Pilar 3 (blackboard): tasks CRUD ✅ · WS broadcast ✅ · mailbox ░ · UI ░ · MCP tools ░
-Pilar 1 (MCP):        spike-002 ░
-Pilar 2 (pool):       spike-003 ░ · router ░ · key factory ░
+Pillar 3 (blackboard): tasks CRUD [x] · WS broadcast [x] · mailbox API [x] · UI /tasks [x] · MCP board tools [x] · mailbox MCP [x]
+Pillar 1 (MCP):        memory tools [x] · board tools [x] · mailbox tools [x] · compose :8789 [x]
+Pillar 2 (pool):       router [x] · key factory [x] · `/keys` create+limits [x] · `/router` dashboard JWT [x] · fusion/MoA [x] · pool opencode-go spike-003 [ ]
 ```
 
-Detalle del backlog y orden de ejecución en
+Backlog details and execution order in
 [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md).

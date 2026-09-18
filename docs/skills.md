@@ -1,32 +1,31 @@
-# Skills Planeadas
+# Skills
 
-> Skills a implementar cuando las integraciones correspondientes estén listas.
+In-repo skills live in `skills/`. That directory is the source of truth; `skills/sync-skills.sh` copies them out to Hermes.
 
----
+Do not duplicate `AGENTS.md` inside a skill. Skills are procedures or pointers. Skills are written in English (`AGENTS/docs.md`).
 
-## 🟢 Ya creadas
+## Active
 
-| Skill | Archivo | Qué cubre |
-|-------|---------|-----------|
-| `cardinal-dev` | `skills/cardinal-dev.md` | Workflow completo: branching, commits, versionado, doc, seguridad |
-| `cardinal-pr` | `skills/cardinal-pr.md` | Crear PR paso a paso: branch → bump → commit → push → template → revisores |
-| `cardinal-commit` | `skills/cardinal-commit.md` | Formato de commits: conventional commits, tipos, scope, ejemplos |
+| Skill | File | Covers |
+|-------|------|--------|
+| `cardinal-dev` | `skills/cardinal-dev.md` | Index into `AGENTS.md` + the other skills |
+| `cardinal-commit` | `skills/cardinal-commit.md` | Conventional commits, English subject and body |
+| `cardinal-pr` | `skills/cardinal-pr.md` | Branch → bump → commit → push → template → reviewers |
+| `cardinal-system` | `skills/cardinal-system.md` | Runtime URLs; pointers to API, pitfalls, stack |
 
----
+## Covered elsewhere (no extra skill)
 
-## 🟡 Pendientes (próximas)
+| Need | Where |
+|------|--------|
+| REST + WS + JWT recipe | `docs/api.md` |
+| Compose / Quadlet | `README.md`, `docs/guides/pitfalls.md` |
+| Standard + security review | `AGENTS/prs.md`, `docs/agents/prompts/` |
+| Keygen | `README.md`, `docs/guides/pitfalls.md` |
+| Production deploy | `README.md`, `deploy/` |
+| Feature-doc template | `AGENTS/docs.md` |
 
-| Skill | Dependencia | Qué cubrirá |
-|-------|-------------|-------------|
-| `cardinal-container` | Podman + compose funcional | Build, run, debug del pod local (`compose up/down`, logs, rebuild) |
-| `cardinal-review` | Standard + Security reviewers | Flujo unificado: correr standard review + security review |
-| `cardinal-api` | Endpoints estables | Referencia rápida de REST + WS para testear y debuggear |
-| `cardinal-vault-doc` | — | Template fijo para docs de vault (qué incluir, formato, ejemplos) |
+## Future
 
-## 🔵 Futuras (Fase 2+)
-
-| Skill | Dependencia | Qué cubrirá |
-|-------|-------------|-------------|
-| `cardinal-keygen` | Key Factory | Crear, revocar, listar API keys vía CLI del Cardinal |
-| `cardinal-deploy` | VPS lista | Deploy a producción: build imágenes, push, quadlet, verificar |
-| `cardinal-pentest` | Pentester integrado | Disparar pentest one-shot y leer reporte |
+| Skill | When it becomes worth a skill |
+|-------|-------------------------------|
+| `cardinal-pentest` | If one-shot pentest is wired as a repeatable repo command, not just the Agil role |

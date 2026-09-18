@@ -1,74 +1,207 @@
 # Cardinal System
 
-Backend central del ecosistema de agentes SAO: login humano (JWT), dashboard web con estética SAO, Agent Hub en tiempo real vía WebSocket y API keys por agente (`sk-cardinal-*`). Monolito Bun + SQLite que sirve API, WS y los estáticos del frontend desde un único proceso — y en producción, desde un único contenedor.
+Central backend of the SAO agent ecosystem: identity (`sk-cardinal-*`), context (memories, RAG, profiles), task blackboard, agent-to-agent mailbox, LLM router, and web dashboard. A [Bun](https://bun.sh) + SQLite monolith that serves API, WebSocket, and static assets from a single process. In production, a rootless Podman pod (Caddy → nginx SPA → Bun backend).
 
-**Versión:** v0.0.1 (Fase 0 — Esqueleto Vivo). Spec de diseño: [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md).
+Cardinal v2 thesis: **orchestration is commodity**. Cardinal is the brain (identity + context + blackboard); herdr, Hermes, and CLIs are the hands.
 
-## Requisitos
+**Version:** v0.2.6 (Phase 2 — Blackboard + MCP + Pool, closing). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
 
-- [Bun](https://bun.sh) ≥ 1.2
-- Podman (opcional, solo para el deploy de producción)
+| Phase | What | Status |
+|-------|------|--------|
+| 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
+| 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
+| 2 | Blackboard, MCP hub, key pool / router | Closing (v0.2.6 on `dev`; freeze PR [#12](https://github.com/snattydev/cardinal-system/pull/12)) |
+| 2.5 | Cardinal v3 (workers, /vaults, cockpit) | Planning ([#28](https://github.com/snattydev/cardinal-system/issues/28)) |
 
-## Setup de desarrollo
+Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). v2 spec: [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md).
+
+## What is in today
+
+- **Human auth:** JWT in `httpOnly` cookie (dashboard login)
+- **Agent auth:** `sk-cardinal-*` keys (SHA-256 in DB, scopes + budget tokens/USD + expiry)
+- **Agent Hub:** native WebSocket on `/ws` (roster, ping/pong, events)
+- **Context Store:** profiles, souls, skills, memory mirror, sessions, RAG proxy
+- **Blackboard:** tasks CRUD + claim/complete, UI `/tasks`, WS broadcast
+- **Mailbox:** `GET/POST /api/messages` (agent-to-agent handoff; key = identity)
+- **MCP hub:** `packages/mcp` on `:8789` (memory, board, mailbox tools)
+- **Router:** `POST /v1/chat/completions` + `GET /v1/models` (Bearer `sk-cardinal-*`); Fusion/MoA with `model=fusion`
+- **Router UI:** operative catalog at `/router` (JWT; providers, aliases, chains)
+- **Keys UI:** create / list / revoke at `/keys` (scopes, tokens, expiry, USD cap)
+
+## Requirements
+
+- Git
+- OpenSSL (secret generation)
+- [Podman](https://podman.io) + a Compose provider (`podman-compose` package, or `podman compose` plugin)
+- A copy of `deploy/env.example` as `.env` at the repo root
+
+Host Bun is **not** required for the canonical path.
+
+## Development setup
+
+Bun workspaces monorepo (`packages/*`, `backend`, `frontend`). Canonical engine: **Podman**. `compose.yaml` is Compose spec, so `podman compose up` or `docker compose up` also consume this file; Podman is the project engine ([`AGENTS.md`](AGENTS.md)).
+
+### Install the engine
+
+Debian / Ubuntu / other apt-based:
+
+```bash
+sudo apt update
+sudo apt install -y git openssl podman podman-compose
+```
+
+Fedora:
+
+```bash
+sudo dnf install -y git openssl podman podman-compose
+```
+
+Arch / Manjaro / other pacman-based:
+
+```bash
+sudo pacman -S --needed git openssl podman podman-compose
+```
+
+Canonical compose command: **`podman-compose`** (matches `compose.yaml` and [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md)). If a distro ships `podman` but not the `podman-compose` package, install the provider at user level with `pipx install podman-compose` and keep using `podman-compose`.
+
+If rootless Podman fails with subordinate UID/GID errors on **Debian-based** hosts, add subuids once and re-login (Fedora and Arch normally ship this with the `podman` package):
+
+```bash
+sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$USER"
+```
+
+### First-run secrets (no host Bun)
 
 ```bash
 git clone <repo-url> && cd cardinal-system
-
-# Dependencias (backend y frontend son paquetes independientes)
-cd backend && bun install && cd ..
-cd frontend && bun install && cd ..
-
-# Variables de entorno
 cp deploy/env.example .env
-bun -e 'console.log(await Bun.password.hash("your-password"))'  # → ADMIN_PASSWORD_HASH en .env
-openssl rand -hex 32                                            # → JWT_SECRET en .env
 
-# Crear la API key de un agente (se imprime UNA sola vez — guardarla)
-bun run keygen -- --agent shinon
+openssl rand -hex 32   # JWT_SECRET
+openssl rand -hex 32   # POOL_SECRET
+podman run --rm docker.io/oven/bun:1 bun -e 'console.log(await Bun.password.hash("YOUR_PASSWORD"))'
+# paste the hash into ADMIN_PASSWORD_HASH; set ADMIN_USER (default admin)
+```
 
-# Terminal 1: backend en http://localhost:8787
+Do not put the plaintext password on the compose command line. If Bun is already on the host, `bun run bootstrap:password` remains valid (`scripts/bootstrap-admin-password.sh`).
+
+Optional MCP: set `VAULTS_HOST_PATH` to an absolute host directory of markdown vaults. After the backend is up, set `CARDINAL_SERVICE_KEY` via keygen **inside** the container (`podman exec`), never host `bun run keygen` against a different DB — see [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md).
+
+### Start
+
+```bash
+podman-compose up
+```
+
+Published ports (all `127.0.0.1` only):
+
+| Service | URL |
+|---------|-----|
+| Backend API + WS | http://127.0.0.1:8787 |
+| Dashboard (Vite) | http://127.0.0.1:5173 |
+| MCP | http://127.0.0.1:8789 |
+
+Health: `GET http://127.0.0.1:8787/api/health` → `{"status":"ok","version":"0.2.6"}`. Open the dashboard at `http://127.0.0.1:5173` (not `localhost` — cookie origin). Login: `ADMIN_USER` + the password that produced the hash.
+
+Dashboard: Overview, Agents, Keys (`/keys`), Tasks (`/tasks`), Router (`/router`), Settings.
+
+Stop: `podman-compose down`. Wipe SQLite volume: `podman-compose down -v`.
+
+Compose gotchas (`EBUSY` lockfile, env-not-injected, `--infra=false` port bugs): [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md).
+
+### Alternative: host Bun
+
+Optional path for Cloud Agent (`.cursor/install.sh`) or hosts without a container engine. Same `.env` keys as above.
+
+```bash
+git clone <repo-url> && cd cardinal-system
+bun install
+
+cp deploy/env.example .env
+bun -e 'console.log(await Bun.password.hash("your-password"))'  # -> ADMIN_PASSWORD_HASH
+openssl rand -hex 32                                            # -> JWT_SECRET
+openssl rand -hex 32                                            # -> POOL_SECRET (encrypts provider API keys)
+
+# API key for an agent (printed ONCE only — save it)
+bun run keygen -- --agent <agent-name>
+
+# Terminal 1: backend at http://127.0.0.1:8787
 bun run dev:backend
 
-# Terminal 2: frontend en http://localhost:5173 (proxy de /api y /ws al 8787)
+# Terminal 2: frontend at http://127.0.0.1:5173
 bun run dev:frontend
 ```
 
-Abrir http://localhost:5173 y loguearse con `ADMIN_USER` y la password hasheada.
+Open http://127.0.0.1:5173 (use `127.0.0.1`, not `localhost` — cookies do not cross over). Login: `ADMIN_USER` + the hashed password.
 
-## Agente de ejemplo
+## Termux (Android)
 
-Con el backend corriendo, conectar el cliente WS de referencia con la key generada:
+**Supported:** Termux is a git/SSH/browser client. Run Cardinal on a Debian/Fedora/Arch machine or VPS using the same `podman-compose` commands above. Native Android Termux cannot host Podman or Docker: the kernel usually lacks the cgroup/namespace setup those engines need. `proot-distro` is **not** a substitute.
+
+### Experimental / unsupported — on-device containers
+
+This subsection is **unsupported**: no CI, bind mounts and cgroups may fail. Do not file bugs against this path as if it were Linux Podman.
+
+1. There is no supported Podman-on-Termux path.
+2. The only known container path is a QEMU VM with Docker inside Termux, following [docker-in-termux](https://github.com/cyberkernelofficial/docker-in-termux) (Alpine x86_64 under `qemu-system-x86_64-headless`). On aarch64 phones this is full x86 emulation and is slow.
+3. After `docker run hello-world` works **inside the VM**, clone this repo in the VM, copy `.env` as in Development setup, install a Compose plugin in the VM (`apk add docker-cli-compose` or equivalent), and run `docker compose up` using root `compose.yaml`.
+4. Extra QEMU `hostfwd` entries beyond SSH `:2222` that Cardinal needs: `tcp::8787-:8787`, `tcp::5173-:5173`, `tcp::8789-:8789`. Then the Android browser uses `http://127.0.0.1:5173`.
+
+## Example agent
+
+With the backend running, connect the reference WS client:
 
 ```bash
 CARDINAL_AGENT_KEY=sk-cardinal-... bun examples/ws-agent.ts
 ```
 
-El agente aparece online en el dashboard; al cerrarlo (Ctrl+C) envía `bye` y pasa a offline.
+The agent appears online in the dashboard; on close (Ctrl+C) it sends `bye` and goes offline.
 
-## Producción (Podman + Quadlet + Caddy)
+## Production (Podman + Quadlet + Caddy)
 
-```bash
-# 1. Build de la imagen (un solo contenedor: API + WS + estáticos)
-podman build -t cardinal-system -f deploy/Containerfile .
+Production is a **rootless Podman pod** with three containers (Caddy :80 → nginx SPA :8000 → Bun backend :8787). The pod publishes `127.0.0.1:8080:80`. SQLite lives on volume `cardinal-data`.
 
-# 2. Unidades Quadlet y secretos
-mkdir -p ~/.config/containers/systemd ~/.config/cardinal
-cp deploy/quadlet/cardinal.container deploy/quadlet/cardinal-data.volume ~/.config/containers/systemd/
-cp deploy/env.example ~/.config/cardinal/env   # editar y completar los valores
+All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://127.0.0.1:8080/api/health`.
 
-# 3. Activar el servicio
-systemctl --user daemon-reload
-systemctl --user start cardinal
-```
+## Root scripts
 
-El contenedor publica en `127.0.0.1:8787` y persiste la DB en el volumen `cardinal-data` (`/data/cardinal.db`). Para exponerlo, usar `deploy/Caddyfile.example` como base en el Caddy del host (bloque `:8080` para local, o el bloque comentado de producción con el dominio).
-
-## Scripts raíz
-
-| Script | Descripción |
+| Script | Description |
 |--------|-------------|
-| `bun run dev:backend` | Backend con watch en http://localhost:8787 |
-| `bun run dev:frontend` | Vite dev server en http://localhost:5173 (proxy `/api` y `/ws` → 8787) |
-| `bun run keygen -- ...` | CLI de API keys: `--agent <name>`, `--revoke <name>`, `--list` |
-| `bun run build` | Build de producción del frontend → `frontend/dist/` |
-| `bun test backend/src` | Suite de tests del backend |
+| `bun run dev:backend` | Backend with watch on http://127.0.0.1:8787 |
+| `bun run dev:frontend` | Vite dev server on http://127.0.0.1:5173 |
+| `bun run keygen -- ...` | API keys CLI: `--agent <name>`, `--revoke <name>`, `--list` |
+| `bun run build` | Frontend production build -> `frontend/dist/` |
+| `bun test` | Packages + backend suite |
+| `bun run typecheck` | `tsc --noEmit` backend + frontend |
+
+## Documentation
+
+| Doc | Purpose |
+|-----|---------|
+| [`docs/roadmap.md`](docs/roadmap.md) | Phase priorities and status |
+| [`docs/stack.md`](docs/stack.md) | Stack and technical decisions |
+| [`docs/security.md`](docs/security.md) | Security model |
+| [`docs/api.md`](docs/api.md) | REST, WebSocket, JWT recipe |
+| [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md) | Operational gotchas |
+| [`deploy/README.md`](deploy/README.md) | Production Quadlet pod |
+| [`AGENTS.md`](AGENTS.md) | Development rules (language: English only, branching, TDD, roles) |
+| [`docs/features/`](docs/features/) | What was done, why, decisions per feature |
+| [`docs/features/2026-09-03-router-surface.md`](docs/features/2026-09-03-router-surface.md) | Router v0.2.5 index (dashboard + keys + fusion) |
+| [`docs/guides/router-usage.md`](docs/guides/router-usage.md) | LLM router manual |
+
+## Future: split the monorepo
+
+Recorded intent only. No extraction in this repository yet.
+
+Today the repo is Bun workspaces (`packages/*`, `backend`, `frontend`) with one `bun.lock`. Compose bind-mounts the workspace root. Both Containerfiles `COPY` every workspace `package.json` so `bun install` resolves, including `frontend/package.json` inside the backend image.
+
+The frontend has **zero** `@cardinal/*` imports. It talks HTTP/WS only (`VITE_API_URL` / `VITE_WS_URL` / `VITE_HOST` in `frontend/vite.config.ts`) and is the first extractable repo.
+
+MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The worker (unmerged N1) depends on `@cardinal/core` only.
+
+**Extraction order (when later scheduled):**
+
+1. Publish or vendor `@cardinal/core` (and then `db`, `keys`, …) as versioned packages so workspaces are not required at install time.
+2. Extract `frontend/` first (own repo, own Containerfile; env `VITE_API_URL` / `VITE_WS_URL` already exist).
+3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
+4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
+5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.

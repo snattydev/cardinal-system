@@ -1,34 +1,34 @@
 ---
 name: cardinal-commit
-description: Formato y flujo de commits para Cardinal System — conventional commits, idioma, scope, ejemplos.
+description: Commit format for Cardinal System — conventional commits, English subject and body, scope, examples, pre-commit checks.
 category: development
 ---
 
 # Cardinal System — Commits
 
-## Formato
+## Format
 
 ```
-<type>(<scope>): <descripción breve en inglés>
+<type>(<scope>): <short description in English>
 
-<Cuerpo en español: qué y por qué, no el cómo>
+<Body in English: what and why, not how>
 ```
 
-## Tipos
+## Types
 
-| Tipo | Cuándo |
-|------|--------|
-| `feat` | Nueva funcionalidad |
+| Type | When |
+|------|------|
+| `feat` | New functionality |
 | `fix` | Bug fix |
-| `chore` | Tareas de mantenimiento (bump, config, build) |
-| `docs` | Solo documentación |
-| `refactor` | Cambio de código sin feat ni fix |
-| `test` | Agregar o modificar tests |
-| `style` | Formato, linting, whitespace |
+| `chore` | Maintenance (bump, config, build) |
+| `docs` | Docs only |
+| `refactor` | Code change without feat or fix |
+| `test` | Add or modify tests |
+| `style` | Formatting, linting, whitespace |
 
 ## Scope
 
-Opcional pero recomendado. Usar el módulo o archivo principal:
+Optional but recommended. Main module or file:
 
 ```
 feat(ws): add agent heartbeat
@@ -37,49 +37,51 @@ chore(deps): update bun to 1.2.0
 docs(agents): add review workflow
 ```
 
-## Reglas
+## Rules
 
-1. **Primera línea ≤ 72 chars, en inglés**
-2. **Cuerpo en español** — explicar *qué* y *por qué*
-3. Separar subject del cuerpo con línea en blanco
-4. Si cierra un issue: `Closes #N` al final del cuerpo
-5. Un commit = un cambio lógico. No mezclar feat con fix.
-6. **Autoría:** el commit debe usar el nombre y email del usuario de GitHub (`git config user.name` / `user.email`), no el del agente. Todos los agentes heredan la identidad del owner.
+1. First line ≤ 72 chars, in English.
+2. Body in English — explain *what* and *why*. Code comments and identifiers in the same change are English too (`AGENTS/docs.md`).
+3. Blank line between subject and body.
+4. If it closes an issue: `Closes #N` at the end of the body.
+5. One commit = one logical change. Do not mix feat with fix.
+6. Authorship is the GitHub user (`git config user.name` / `user.email`), never the agent.
+7. No `Generated with` / coding-agent `Co-authored-by` trailers.
 
-## Ejemplos
+## Examples
 
-✅ Bueno:
+Good:
+
 ```
 feat(ws): add agent heartbeat with ping/pong protocol
 
-Implementación del keep-alive sobre WebSocket. El Cardinal
-envía ping cada 30s y espera pong. Si fallan 2 pings
-consecutivos, el agente se marca offline en el dashboard
-y se emite evento agent_update a los suscriptores.
+Keep-alive over WebSocket. Cardinal sends ping every 30s and
+expects pong. Two consecutive misses mark the agent offline
+and emit agent_update to subscribers.
 ```
 
-✅ Bueno:
 ```
 fix(auth): return 401 instead of 500 on expired JWT
 
-El middleware tiraba 500 genérico. Ahora verifica exp
-explícitamente y responde 401 con mensaje descriptivo.
+The middleware returned a generic 500. It now checks exp
+explicitly and responds 401 with a descriptive error.
 ```
 
-❌ Malo:
+Bad:
+
 ```
 fix stuff
 ```
+
 ```
-feat(ws): add agent heartbeat with ping/pong protocol. Implementación del keep-alive...
+feat(ws): add agent heartbeat with ping/pong protocol. Keep-alive over WebSocket...
 ```
 
-## Verificación pre-commit
+## Pre-commit verification
 
 ```bash
-# Auditar leaks
 git diff --cached | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'
 
-# Verificar formato
 git log -1 --pretty=format:"%s" | grep -E '^(feat|fix|chore|docs|refactor|test|style)(\(.+\))?: .{1,72}'
+
+git log origin/dev..HEAD --format='%B' | grep -iE 'generated with|co-authored-by.*(cursor|copilot|claude|openai|anthropic|aider)|cursor\.com' || true
 ```

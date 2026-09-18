@@ -6,8 +6,8 @@ readonly: false
 is_background: false
 ---
 
-Leé `docs/agents/roles/frontend.md` y seguilo. Si el read falla:
+Read `docs/agents/roles/frontend.md` and follow it. If the read fails:
 
-- Types 1:1 con JSON del backend (flat). WS a `ws://127.0.0.1:8787/ws`.
-- Verify con `bun run build`. No TDD unitario obligatorio.
+- Types 1:1 with backend JSON (flat). WS to `ws://127.0.0.1:8787/ws`.
+- Verify with `bun run build`. No mandatory unit TDD.
 - Output: Files / Verify / Spec deviations.

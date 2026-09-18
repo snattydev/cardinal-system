@@ -1,61 +1,61 @@
 # Dashboard Fase 0 — UI Overhaul & System Endpoint
 
-> Fecha: 2026-07-24 · Rama: `dev` · Commit: `1be0052`
+> Date: 2026-07-24 · Branch: `dev` · Commit: `1be0052`
 
-## Qué se hizo
+## What was done
 
-Segunda iteración sobre la UI del dashboard Fase 0. Se refactorizó la navegación, se agregó un endpoint de sistema, se implementó uptime en vivo, y se self-hostearon las fonts.
+Second iteration on the Fase 0 dashboard UI. Refactored navigation, added a system endpoint, implemented live uptime, and self-hosted fonts.
 
-## Decisiones
+## Decisions
 
-### 1. Sidebar con dropdown "Agents"
+### 1. Sidebar with "Agents" dropdown
 
-**Por qué:** La sidebar plana no escalaba. Con Agents como dropdown colapsable (Hub + Keys disabled "Fase 2"), la navegación queda preparada para el crecimiento del producto sin sobrecargar la barra.
+**Why:** The flat sidebar did not scale. With Agents as a collapsible dropdown (Hub + Keys disabled "Fase 2"), navigation is prepared for product growth without overcrowding the bar.
 
-**Alternativa considerada:** Tabs dentro del contenido principal. Descartada porque ensucia el área de contenido y rompe la consistencia de navegación.
+**Alternative considered:** Tabs within the main content. Discarded because it clutters the content area and breaks navigation consistency.
 
-### 2. Endpoint `/api/system`
+### 2. `/api/system` endpoint
 
-**Por qué:** Overview y Settings necesitaban datos del sistema (uptime, DB stats, counts). Un solo endpoint autenticado que devuelve todo evita múltiples requests y centraliza la lógica.
+**Why:** Overview and Settings needed system data (uptime, DB stats, counts). A single authenticated endpoint returning everything avoids multiple requests and centralizes logic.
 
-**Campos:** `version`, `uptime_seconds`, `db_path`, `db_size_bytes`, `agents_total`, `agents_online`, `keys_active`, `keys_revoked`.
+**Fields:** `version`, `uptime_seconds`, `db_path`, `db_size_bytes`, `agents_total`, `agents_online`, `keys_active`, `keys_revoked`.
 
-### 3. Uptime en vivo client-side
+### 3. Client-side live uptime
 
-**Por qué:** El uptime del servidor cambia cada segundo — no tiene sentido re-fetchearlo. El backend da el valor base y el frontend lo incrementa con `setInterval`.
+**Why:** Server uptime changes every second — re-fetching it continuously makes no sense. The backend provides the base value and the frontend increments it via `setInterval`.
 
-**Implementación:** Hook `useSystem()` compartido a nivel módulo. Un solo `sharedBase`, un solo timer. Overview y Settings leen el mismo valor → cero drift entre páginas.
+**Implementation:** Module-level shared `useSystem()` hook. Single `sharedBase`, single timer. Overview and Settings read the same value -> zero drift between pages.
 
-### 4. WebSocket directo al backend
+### 4. Direct WebSocket to backend
 
-**Por qué:** Vite en Bun crashea el proxy de WebSocket (`socket.destroySoon is not a function`). El frontend no recibía el roster. La solución: `ws.ts` conecta directo a `ws://127.0.0.1:8787/ws`, bypassing el proxy. La cookie JWT (`SameSite=Strict`, `Path=/`) se envía cross-port en localhost.
+**Why:** Vite on Bun crashes the WebSocket proxy (`socket.destroySoon is not a function`). The frontend was not receiving the roster. Solution: `ws.ts` connects directly to `ws://127.0.0.1:8787/ws`, bypassing the proxy. The JWT cookie (`SameSite=Strict`, `Path=/`) is sent cross-port on localhost.
 
-### 5. Fonts self-hosted
+### 5. Self-hosted fonts
 
-**Por qué:** Eliminar dependencia de Google Fonts (privacidad, performance, offline-ready). Inter y JetBrains Mono como woff2 variables (latin subset) en `frontend/public/fonts/`. 80KB total, cero requests externos.
+**Why:** Eliminate Google Fonts dependency (privacy, performance, offline-ready). Inter and JetBrains Mono as variable woff2 (latin subset) in `frontend/public/fonts/`. 80KB total, zero external requests.
 
-### 6. Versionado MAJOR.FASE.PATCH
+### 6. MAJOR.FASE.PATCH versioning
 
-**Por qué:** El formato `vMAJOR.FASE.UPDATE` original era confuso (UPDATE vs PATCH). Se unificó en `MAJOR.FASE.PATCH` donde FASE refleja el roadmap y PATCH es incremental. Ambos docs (`context/ecosystem.md`, `AGENTS.md`) alineados.
+**Why:** The original `vMAJOR.FASE.UPDATE` format was confusing (UPDATE vs PATCH). Unified into `MAJOR.FASE.PATCH` where FASE reflects the roadmap and PATCH is incremental. Both docs (`context/ecosystem.md`, `AGENTS.md`) aligned.
 
-## Archivos creados/modificados
+## Created/modified files
 
-| Archivo | Cambio |
-|---------|--------|
-| `backend/src/api/system.ts` | Nuevo — endpoint GET /api/system |
-| `backend/src/server.ts` | Modificado — registra ruta /api/system |
-| `frontend/src/pages/Overview.tsx` | Nuevo — dashboard con stat cards |
-| `frontend/src/pages/Agents.tsx` | Nuevo — roster movido desde Home |
-| `frontend/src/pages/Settings.tsx` | Reescribo — system info + placeholders Fase 2 |
-| `frontend/src/components/Layout.tsx` | Refactor — sidebar con dropdown Agents |
-| `frontend/src/App.tsx` | Modificado — nuevas rutas |
-| `frontend/src/lib/system.ts` | Nuevo — hook useSystem() compartido |
-| `frontend/src/lib/types.ts` | Modificado — interfaz SystemInfo + helpers |
-| `frontend/src/lib/ws.ts` | Modificado — WS directo al backend |
-| `frontend/index.html` | Modificado — elimina Google Fonts |
-| `frontend/src/index.css` | Modificado — @font-face rules |
-| `frontend/public/fonts/` | Nuevo — inter.woff2 + jetbrains-mono.woff2 |
-| `frontend/src/pages/AgentDetail.tsx` | Modificado — back link a /agents |
-| `context/ecosystem.md` | Modificado — Fase 0 completa, Fase 1/2 links, versionado |
-| `AGENTS.md` | Modificado — tabla de fases, versionado MAJOR.FASE.PATCH |
-| `docs/superpowers/specs/` | Nuevo — specs de Fase 1 y Fase 2 |
+| File | Change |
+|------|--------|
+| `backend/src/api/system.ts` | New — GET /api/system endpoint |
+| `backend/src/server.ts` | Modified — registers /api/system route |
+| `frontend/src/pages/Overview.tsx` | New — dashboard with stat cards |
+| `frontend/src/pages/Agents.tsx` | New — roster moved from Home |
+| `frontend/src/pages/Settings.tsx` | Rewritten — system info + Fase 2 placeholders |
+| `frontend/src/components/Layout.tsx` | Refactor — sidebar with Agents dropdown |
+| `frontend/src/App.tsx` | Modified — new routes |
+| `frontend/src/lib/system.ts` | New — shared useSystem() hook |
+| `frontend/src/lib/types.ts` | Modified — SystemInfo interface + helpers |
+| `frontend/src/lib/ws.ts` | Modified — direct WS to backend |
+| `frontend/index.html` | Modified — removes Google Fonts |
+| `frontend/src/index.css` | Modified — @font-face rules |
+| `frontend/public/fonts/` | New — inter.woff2 + jetbrains-mono.woff2 |
+| `frontend/src/pages/AgentDetail.tsx` | Modified — back link to /agents |
+| `context/ecosystem.md` | Modified — Fase 0 complete, Fase 1/2 links, versioning |
+| `AGENTS.md` | Modified — phases table, MAJOR.FASE.PATCH versioning |
+| `docs/superpowers/specs/` | New — Fase 1 and Fase 2 specs |

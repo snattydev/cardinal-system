@@ -1,78 +1,77 @@
-# Keys Dashboard — diseño (listar + revocar)
+# Keys Dashboard — Design (list + revoke)
 
-> Fecha: 2026-08-20
-> Estado: **aprobado** (brainstorm Santi). Spec persistida. Sin implementar.
-> Relación: cierra el hueco UI de Fase 0 (“Keys → Fase 2”) ahora que el backend de keys existe.
-> Próxima sesión: plan de implementación (`writing-plans`) → TDD API → página `/keys`.
-> Fuera de este slice (anotado, no implementar): bloque live one-shot y borrado duro de keys one-shot.
+> Date: 2026-08-20
+> Status: **implemented** (plan `2026-08-21-keys-dashboard.md`, 2026-08-21).
+> Relationship: closes the UI gap from FASE 0 ("Keys → FASE 2") now that the keys backend exists.
+> Out of this slice (noted, do not implement): live one-shot block and hard-delete of one-shot keys.
 
 ---
 
-## 0. Decisiones del brainstorm
+## 0. Brainstorm Decisions
 
-| Pregunta | Elección |
+| Question | Choice |
 |----------|----------|
-| Primera task del gap UI | Keys (no router, no Overview global, no Hub) |
-| Alcance | Ver + revocar. Crear sigue en `bun run keygen` |
-| Granularidad revoke | Una key por `id` (no todas las del agente) |
-| Dónde vive | Página `/keys` (ítem ya previsto en el dropdown Agents) |
-| Historial | Fuera de la lista viva: control mínimo con **icono de log** |
-| One-shot en esta pantalla | **No se construye ahora.** Layout acordado: bloque compacto **abajo a la izquierda**. Al terminar: hard-delete + rastro en el log del one-shot |
+| First UI gap task | Keys (not router, not global Overview, not Hub) |
+| Scope | View + revoke. Creation stays in `bun run keygen` |
+| Revoke granularity | One key by `id` (not all keys of an agent) |
+| Where it lives | `/keys` page (item already listed in the Agents dropdown) |
+| History | Outside the live list: minimal control with **log icon** |
+| One-shot on this screen | **Not built now.** Agreed layout: compact block **bottom left**. When done: hard-delete + trace in the one-shot log |
 
 ---
 
-## 1. Problema
+## 1. Problem
 
-El backend tiene `agent_keys` (Fase 0 + factory: scopes, budget, revoke). La CLI
-`bun run keygen` lista / crea / revoca. El dashboard no: el ítem Keys está
-disabled con badge “Fase 2”, Settings dice “coming in Fase 2”, y Overview
-muestra “Keys Active” sin a dónde ir.
+The backend has `agent_keys` (FASE 0 + factory: scopes, budget, revoke). The CLI
+`bun run keygen` lists / creates / revokes. The dashboard does not: the Keys item is
+disabled with badge "FASE 2", Settings says "coming in FASE 2", and Overview
+shows "Keys Active" with nowhere to go.
 
-Crear keys sigue en la CLI (el plaintext se imprime una vez). Esta spec no
-agrega create en UI.
-
----
-
-## 2. Alcance de este slice
-
-**Entra:**
-
-- Página `/keys` (habilitar el NavLink del dropdown Agents).
-- `GET /api/keys` y `GET /api/keys?status=revoked` (JWT).
-- `POST /api/keys/:id/revoke` (JWT) — una fila, no todas las del agente.
-- Lista grande: keys **activas** de agentes persistentes (`created_by=human`).
-- Historial: control **muy chico** (icono de log) que revela keys human
-  **revocadas**. No conviven en la misma lista que las vivas.
-- Overview “Keys Active” linkea a `/keys` y cuenta solo persistentes activas.
-- Settings: sacar el placeholder “API KEYS MANAGEMENT coming in Fase 2”;
-  link a `/keys`.
-
-**No entra (anotado — arquitectura futura):**
-
-Ver sección 6.
+Key creation stays in the CLI (plaintext printed once). This spec does not
+add create in the UI.
 
 ---
 
-## 3. Persistente vs one-shot
+## 2. Scope of This Slice
 
-Marcador existente: `agent_keys.created_by`.
+**In scope:**
 
-| | Persistente (`human`) | One-shot (`system`) |
+- `/keys` page (enable the NavLink in the Agents dropdown).
+- `GET /api/keys` and `GET /api/keys?status=revoked` (JWT).
+- `POST /api/keys/:id/revoke` (JWT) — one row, not all keys of an agent.
+- Main list: **active** persistent agent keys (`created_by=human`).
+- History: **very small** control (log icon) that reveals revoked human keys.
+  Does not coexist in the same list as live keys.
+- Overview "Keys Active" links to `/keys` and counts only active persistent keys.
+- Settings: remove the placeholder "API KEYS MANAGEMENT coming in FASE 2";
+  link to `/keys`.
+
+**Not in scope (noted — future architecture):**
+
+See section 6.
+
+---
+
+## 3. Persistent vs One-Shot
+
+Existing marker: `agent_keys.created_by`.
+
+| | Persistent (`human`) | One-shot (`system`) |
 |--|----------------------|---------------------|
-| Dónde se ve (este slice) | Lista grande si activa; historial (icono log) si revocada | No se lista |
-| Revocar | Humano, explícito, por `id` | Auto / pipeline (no UI ahora) |
-| Al terminar | `revoked_at` — queda en historial | **Hard delete** de la fila (futuro). No historial en `/keys`. El rastro vive en el **log del one-shot** |
+| Where shown (this slice) | Main list if active; history (log icon) if revoked | Not listed |
+| Revoke | Human, explicit, by `id` | Auto / pipeline (no UI now) |
+| When done | `revoked_at` — stays in history | **Hard delete** of the row (future). No history in `/keys`. Trace lives in the **one-shot log** |
 
-Regla F0 intacta: keys `human` jamás se tocan automáticamente. Revocar desde el
-dashboard **es** acción explícita del humano.
+FASE 0 rule intact: `human` keys are never touched automatically. Revoking from the
+dashboard **is** an explicit human action.
 
 ---
 
 ## 4. API
 
-Auth: cookie JWT, igual que `/api/system`. Nunca Bearer de agente.
+Auth: JWT cookie, same as `/api/system`. Never agent Bearer.
 
-El JSON **no incluye** `key_hash` ni el plaintext.
+The JSON **does not include** `key_hash` or plaintext.
 
 ### `GET /api/keys`
 
@@ -82,132 +81,129 @@ Query:
 
 - `status=active` (default) → `revoked_at IS NULL AND created_by='human'`
 - `status=revoked` → `revoked_at IS NOT NULL AND created_by='human'`
-- otro valor → 400
+- other value → 400
 
-Item (camelCase, wire del dashboard):
+Item (camelCase, dashboard wire):
 
 ```
 id, agentName, createdBy, scopes[],
 budgetLimit, budgetUsed, createdAt, lastUsedAt, revokedAt
 ```
 
-`scopes` ya parseado (array). `budgetLimit` / `revokedAt` / `lastUsedAt` pueden
-ser `null`.
+`scopes` already parsed (array). `budgetLimit` / `revokedAt` / `lastUsedAt` can be `null`.
 
-Orden: `id` descendente (más reciente primero).
+Order: `id` descending (most recent first).
 
 ### `POST /api/keys/:id/revoke`
 
-Setea `revoked_at = datetime('now')` en **esa** fila (`revokeKeyById`).
+Sets `revoked_at = datetime('now')` on **that** row (`revokeKeyById`).
 
-| Código | Cuándo |
+| Code | When |
 |--------|--------|
-| 200 | Fila actualizada; body = el item ya revocado |
-| 401 | Sin sesión |
-| 404 | id inexistente |
-| 409 | Ya estaba revocada |
-| 400 | id no numérico |
+| 200 | Row updated; body = the revoked item |
+| 401 | No session |
+| 404 | id does not exist |
+| 409 | Already revoked |
+| 400 | id is not numeric |
 
-No hay DELETE HTTP. La CLI `keygen --revoke <agente>` (todas las activas de un
-nombre) **no cambia**.
+No HTTP DELETE. The CLI `keygen --revoke <agent>` (all active keys for a
+name) **does not change**.
 
-TDD obligatorio (`packages/db` + `backend/src/api/keys`).
+Mandatory TDD (`packages/db` + `backend/src/api/keys`).
 
 ---
 
 ## 5. UI
 
-Ruta `/keys`, layout actual (sidebar SAO).
+Route `/keys`, current layout (SAO sidebar).
 
-**Zona principal — persistentes vivas.**  
-Tabla o stack de filas a ancho útil: agente, scopes, budget
-(`used / limit` o `used / ∞`), created, last used, botón Revocar.
-Confirmación corta antes de revocar (no modal pesado). Vacío: copy que apunte a
-`bun run keygen -- --agent <name>` (crear sigue en CLI).
+**Main area — live persistent keys.**
+Table or row stack at useful width: agent, scopes, budget
+(`used / limit` or `used / ∞`), created, last used, Revoke button.
+Short confirmation before revoking (no heavy modal). Empty state: copy pointing to
+`bun run keygen -- --agent <name>` (creation stays in CLI).
 
-**Historial — componente mínimo.**  
-No es una segunda tabla siempre visible. Un control chico (icono de log + label
-corto tipo “pasadas” o sin label, solo icono) abre/cierra el listado de
-revocadas human. Sin revoke. Si no hay ninguna, el control puede existir igual
-(historial vacío).
+**History — minimal component.**
+Not a second always-visible table. A small control (log icon + short
+label or icon-only) opens/closes the list of revoked human keys. No revoke. If
+there are none, the control may still exist (empty history).
 
-**Sidebar.**  
-El span disabled “Keys / Fase 2” pasa a `NavLink to="/keys"`.
+**Sidebar.**
+The disabled span "Keys / FASE 2" becomes `NavLink to="/keys"`.
 
-**Overview.**  
-Card “Keys Active” es un link a `/keys`. El número es persistentes activas, no
-one-shot — hay que ajustar `getSystemCounts().keysActive` (hoy cuenta todas
-las no revocadas).
+**Overview.**
+Card "Keys Active" is a link to `/keys`. The number is active persistent keys, not
+one-shot — `getSystemCounts().keysActive` must be adjusted (currently counts all
+non-revoked).
 
-**Settings.**  
-Reemplazar el párrafo “coming in Fase 2” de API KEYS MANAGEMENT por un link a
-`/keys`. El placeholder MODEL ROUTER se deja (otro slice).
+**Settings.**
+Replace the "coming in FASE 2" paragraph under API KEYS MANAGEMENT with a link to
+`/keys`. The MODEL ROUTER placeholder is left (another slice).
 
-Frontend: `bun run build` (sin TDD de componentes).
-
----
-
-## 6. Fuera de scope — decisiones de arquitectura (no implementar ahora)
-
-Anotado 2026-08-20 para no reabrir el debate cuando existan one-shots.
-
-### 6.1 Bloque live one-shot en `/keys`
-
-Cuando haya keys `created_by=system` **activas**, no van a la lista grande.
-Van a un **componente aparte, compacto, abajo a la izquierda** de `/keys`:
-título tipo `one-shot · N`, una línea/chip por key (nombre + budget restante),
-revocar posible pero el bloque no reserva el layout de las persistentes. Si
-N=0, el bloque no ocupa lugar.
-
-Este slice **no** pinta ese bloque. `GET /api/keys` tampoco devuelve system
-keys todavía; se agregará cuando exista el componente.
-
-### 6.2 Ciclo de vida de la key one-shot
-
-Hoy el router **auto-revoca** al explotar `budget_limit` (deja fila con
-`revoked_at`). Eso sirve para persistentes y para e2e.
-
-Cuando exista el pipeline one-shot:
-
-1. Al terminar el agente (done / budget / timeout) → **borrar** la fila de
-   `agent_keys` (hard delete), no revocar.
-2. No entra al historial de `/keys`.
-3. El rastro concreto (key id, tokens, por qué murió) vive en el **log de ese
-   one-shot** — pieza de arquitectura propia, no este dashboard.
-
-Hasta que eso exista, un `system` revocado por budget puede quedar en DB; la UI
-de este slice lo ignora (`created_by='human'` en ambos GET).
+Frontend: `bun run build` (no component TDD).
 
 ---
 
-## 7. Seguridad
+## 6. Out of Scope — Architecture Decisions (do not implement now)
+
+Noted 2026-08-20 to avoid reopening the debate when one-shots exist.
+
+### 6.1 Live One-Shot Block in `/keys`
+
+When `created_by=system` keys are **active**, they do not go in the main list.
+They go in a **separate, compact component, bottom left** of `/keys`:
+title like `one-shot · N`, one line/chip per key (name + remaining budget),
+revoke possible but the block does not reserve the persistent layout. If
+N=0, the block takes no space.
+
+This slice **does not** render that block. `GET /api/keys` also does not return system
+keys yet; it will be added when the component exists.
+
+### 6.2 One-Shot Key Lifecycle
+
+Today the router **auto-revokes** when `budget_limit` is exhausted (leaves a row with
+`revoked_at`). That works for persistent keys and for e2e.
+
+When the one-shot pipeline exists:
+
+1. When the agent finishes (done / budget / timeout) → **delete** the row from
+   `agent_keys` (hard delete), do not revoke.
+2. Does not enter the `/keys` history.
+3. The concrete trace (key id, tokens, cause of death) lives in the **log of that
+   one-shot** — its own architecture piece, not this dashboard.
+
+Until that exists, a `system` key revoked by budget may remain in DB; the UI
+of this slice ignores it (`created_by='human'` in both GETs).
+
+---
+
+## 7. Security
 
 - JWT admin only.
-- Nunca `key_hash` ni `sk-cardinal-*` en responses ni en el DOM.
-- Revoke es acción humana explícita; no se tocan keys human en background.
-- Audit pre-push: cero `sk-cardinal-` en frontend.
+- Never `key_hash` or `sk-cardinal-*` in responses or in the DOM.
+- Revoke is an explicit human action; no `human` keys are touched in the background.
+- Pre-push audit: zero `sk-cardinal-` in frontend.
 
 ---
 
-## 8. Archivos previstos (implementación)
+## 8. Planned Files (implementation)
 
-| Área | Archivos |
+| Area | Files |
 |------|----------|
-| DB | `packages/db/src/repos.ts` (`revokeKeyById`; `keysActive` solo human) + `db.test.ts` |
-| API | `backend/src/api/keys.ts` + `keys.test.ts`; registro en `server.ts` |
-| UI | `frontend/src/pages/Keys.tsx`, `App.tsx`, `Layout.tsx`; link en `Overview.tsx` y `Settings.tsx` |
+| DB | `packages/db/src/repos.ts` (`revokeKeyById`; `keysActive` human-only) + `db.test.ts` |
+| API | `backend/src/api/keys.ts` + `keys.test.ts`; registered in `server.ts` |
+| UI | `frontend/src/pages/Keys.tsx`, `App.tsx`, `Layout.tsx`; link in `Overview.tsx` and `Settings.tsx` |
 
 ---
 
-## 9. Verificación
+## 9. Verification
 
-- `bun test` — cases: list active/revoked filtra human; revoke 200/404/409;
-  list response sin `key_hash`; 401 sin cookie.
+- `bun test` — cases: list active/revoked filters human; revoke 200/404/409;
+  list response without `key_hash`; 401 without cookie.
 - `bun run build` — frontend typecheck + Vite.
-- Smoke: sidebar Keys abre `/keys`; revoke una key de prueba; icono log muestra
-  historial; Overview card navega.
+- Smoke: sidebar Keys opens `/keys`; revoke a test key; log icon shows
+  history; Overview card navigates.
 
 ---
 
-*Diseño de un slice. El bloque one-shot y el hard-delete viven en una spec
-futura cuando el pipeline one-shot exista.*
+*Slice design. The one-shot block and hard-delete live in a future spec once the one-shot pipeline exists.*

@@ -1,63 +1,73 @@
 # Cardinal System — Roadmap
 
-> Actualizado: 2026-08-06. Single source of truth de prioridades.
+> Updated: 2026-09-14. Single source of truth for priorities.
 
 ---
 
-## 📋 Ahora: Fase 1 — Context Store (✅ Completa — v0.2.0, 2026-08-06)
+## Now: Phase 2 — Cardinal v2 (closing — v0.2.6)
 
-Pre-Fase 1 (refactors Bun workspaces) completada en PR #5 (v0.1.1).
-Ver [`roadmap/fase-1.md`](roadmap/fase-1.md) para el detalle de features.
+Phase 1 (Context Store) complete in `dev` since v0.2.0. Phase 2 is complete
+in `dev`: blackboard + MCP hub + router/keys + SAO baseline + Playwright
+start. See [`roadmap/fase-2.md`](roadmap/fase-2.md).
 
-> Nota (2026-08-10): features 1.3–1.8 mergeadas en `dev` + bump a 0.2.0. Falta PR `dev → main` con la Fase 1 completa cuando se decida estabilizar.
+**Freeze:** PR [`dev → main` #12](https://github.com/snattydev/cardinal-system/pull/12)
+closes issues [#16](https://github.com/snattydev/cardinal-system/issues/16)
+(release), [#17](https://github.com/snattydev/cardinal-system/issues/17) (N5),
+[#19](https://github.com/snattydev/cardinal-system/issues/19) (dual tracking).
+Human merges; never auto-merge.
 
----
+N1 worker is **not** in this freeze. v3 tracking:
+[#28](https://github.com/snattydev/cardinal-system/issues/28).
 
-## 🗺️ Fases
+Next batch after merge:
+1. **N1** [#20](https://github.com/snattydev/cardinal-system/issues/20) — maintenance worker
+2. **N9** [#26](https://github.com/snattydev/cardinal-system/issues/26) — wrapper hops internal-only (parallel to N1)
+3. **N2** [#21](https://github.com/snattydev/cardinal-system/issues/21) — Tasks v2 (blocked on N1)
+4. **N3** [#22](https://github.com/snattydev/cardinal-system/issues/22) — `/vaults` ACL (blocked on N1)
+5. **N8** [#25](https://github.com/snattydev/cardinal-system/issues/25) — `/keys` Hermes snippet (blocked on N9)
+6. **N4** [#23](https://github.com/snattydev/cardinal-system/issues/23) / **N6** [#24](https://github.com/snattydev/cardinal-system/issues/24) — cockpit / notifications
+7. **N7** [#18](https://github.com/snattydev/cardinal-system/issues/18) — remaining Playwright (`/keys`, `/router`)
 
-| Fase | Nombre | Estado | Roadmap |
-|------|--------|--------|---------|
-| 0 | Esqueleto Vivo | ✅ Completa | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
-| 1 | Context Store | ✅ Completa (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
-| 2 | Cardinal v2 (Blackboard + MCP + Pool) | 🚧 En curso | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
-| 3 | Grafo de Conocimiento | 🔮 Futuro | — |
-| 4 | Automations | 🔮 Futuro | — |
-
-### Fase 2 — estado
-
-Re-scopeada por Cardinal v2 (2026-08-12): la orquestación es commodity, el
-Cardinal es cerebro (identidad + contexto + blackboard). El cuello de botella
-ya no es el VPS (webhooks); ahora es **validar los pilares con spikes** (001
-blackboard ✅, 002 MCP multi-vault, 003 pool opencode-go). Ver
-[`roadmap/fase-2.md`](roadmap/fase-2.md) y el
-[plan de backlog](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md).
-
-El desbloqueo por polling local de la API de GitHub (decisión 2026-08-10) sigue
-válido como alternativa para triggers externos, pero dejó de ser el cuello de
-botella de Fase 2.
+Backlog: [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md).
 
 ---
 
-## 🎯 Arsenal
+## Phases
 
-| Herramienta | Hasta | Rol |
-|-------------|-------|-----|
-| Antigravity Pro | recurrente | Features pesadas, reviews |
-| OpenCode GO | ~20 días | Daily coding |
-| Cursor Pro | 4 meses | Refactors grandes, frontend |
-| DeepSeek API | $4 crédito | Pentesting |
+| Phase | Name | Status | Roadmap |
+|-------|------|--------|---------|
+| 0 | Living Skeleton | Complete | [`roadmap/fase-0.md`](roadmap/fase-0.md) |
+| 1 | Context Store | Complete (v0.2.0) | [`roadmap/fase-1.md`](roadmap/fase-1.md) |
+| 2 | Cardinal v2 (Blackboard + MCP + Pool) | Closing (v0.2.6) | [`roadmap/fase-2.md`](roadmap/fase-2.md) |
+| 2.5 | Cardinal v3 (Maintenance workers + Vaults Memory + SAO Cockpit) | Planning | [`superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
+| 3 | Knowledge Graph | Future | — |
+| 4 | Automations | Future | — |
+
+### Phase 2 — state (2026-09-14)
+
+| Pillar | Done | Pending (GitHub) |
+|--------|------|---------|
+| 3 Blackboard | tasks CRUD, WS, mailbox API, UI `/tasks`, MCP board tools, mailbox MCP | N2 Tasks v2 [#21](https://github.com/snattydev/cardinal-system/issues/21) |
+| 1 MCP hub | `packages/mcp` memory + board + mailbox, compose `:8789` | N3 `/vaults` [#22](https://github.com/snattydev/cardinal-system/issues/22) |
+| 2 Pool/router | router, key factory, `/keys` create+expiry+USD, dashboard `/router`, fusion/MoA | N8 snippet [#25](https://github.com/snattydev/cardinal-system/issues/25); N9 wrappers [#26](https://github.com/snattydev/cardinal-system/issues/26) |
+| 5 Worker pool | — | N1 worker [#20](https://github.com/snattydev/cardinal-system/issues/20) |
+
+Thesis: Cardinal is the 24/7 SSOT brain (identity + memory vaults + blackboard + router).
+Heavy development belongs to persistent agents in Herdr (Kirito, Lisbeth, Agil) and workstation CLIs.
+Internal workers handle automated maintenance, summarization, and memory hygiene.
 
 ---
 
-## 📐 Convenciones
+## Conventions
 
-- **Versionado:** `MAJOR.FASE.PATCH` (source: `package.json`)
-- **Commits:** Conventional Commits (inglés ≤72 chars, body español)
+- **Versioning:** `MAJOR.FASE.PATCH` (source: `package.json`)
+- **Language:** English only (docs, skills, comments, commits, PRs) — `AGENTS/docs.md`
+- **Commits:** Conventional Commits (English ≤72 chars, English body)
 - **Branches:** `feature/* → dev → main` (merge commit)
-- **TDD:** Obligatorio para core. No para frontend/docs
-- **Agentes:** Nombres fuera del repo. Solo roles
-- **Contexto:** `context/` → knowledge base. `AGENTS.md` → dev rules
+- **TDD:** Required for core. Not for frontend/docs
+- **Agents:** Names outside the repo. Roles only
+- **Context:** `context/` → knowledge base. `AGENTS.md` → dev rules
 
 ---
 
-*Se actualiza cuando cambian prioridades o se completa una fase.*
+*Updated when priorities change or a phase completes.*

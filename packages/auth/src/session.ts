@@ -3,6 +3,12 @@ import { verifySession } from "./jwt";
 export const SESSION_COOKIE = "cardinal_session";
 export const SESSION_MAX_AGE = 43200;
 
+export function cookieSecure(req?: Request): boolean {
+  if (process.env.NODE_ENV === "production") return true;
+  const proto = req?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim().toLowerCase();
+  return proto === "https";
+}
+
 export function sessionCookie(token: string, secure = false): string {
   return `${SESSION_COOKIE}=${token}; HttpOnly; ${secure ? "Secure; " : ""}Path=/; SameSite=Strict; Max-Age=${SESSION_MAX_AGE}`;
 }
