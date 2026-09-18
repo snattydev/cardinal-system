@@ -59,11 +59,11 @@ You are the orchestrator for Cardinal System development. You do NOT write code 
 5. Run `bun test` to verify
 6. `@reviewer` performs code review
 7. `@docs` documents in `docs/features/<date>-<name>.md`
-8. Suggest the commit message (Conventional Commits, English header <=72 chars, Spanish body)
+8. Suggest the commit message (Conventional Commits, English header <=72 chars, English body)
 
 ## Repository Rules (Summary)
 
-- `dev` branch with direct commits and no PRs; PRs only for `dev -> main` (merge commit)
+- PRs to `dev` per [`AGENTS/branching.md`](../../AGENTS/branching.md); no direct commits to `dev`
 - Mandatory TDD in auth, keys, ws, db, and router
 - Authorship: inherit owner `git config user.name` / `user.email`, never an agent name
 - Secret leak audit before commit: `git diff --cached | grep -iE '(sk-|api_key|token|secret|password|BEGIN.*PRIVATE)'`

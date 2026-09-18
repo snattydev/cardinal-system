@@ -1054,6 +1054,17 @@ describe("keys repo", () => {
     db.close();
   });
 
+  test("listHumanKeys active excludes unrevoked expired keys", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-expired", agentName: "shinon", expiresAt: "1999-01-01T00:00:00Z" });
+
+    expect(listHumanKeys(db, "active").map((k) => k.key_hash)).toEqual(["h-live"]);
+    expect(listHumanKeys(db, "revoked").map((k) => k.key_hash)).toEqual([]);
+    db.close();
+  });
+
   test("getKeyById returns the row or null", () => {
     const db = createDb(":memory:");
     registerAgent(db, "shinon", "agent");
@@ -1278,6 +1289,18 @@ describe("consumeBudgetUsd", () => {
     expect(row.budget_usd_used).toBe(0);
     db.close();
   });
+
+  test("consumeBudgetUsd accepts increment equal to limit when compared as micro-USD", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "hash-usd-micro", agentName: "shinon", budgetUsdLimit: 0.03 });
+    expect(consumeBudgetUsd(db, "hash-usd-micro", (30 / 1e6) * 1000)).toBe(true);
+    const row = db.query("SELECT budget_usd_used FROM agent_keys WHERE key_hash = ?").get("hash-usd-micro") as {
+      budget_usd_used: number;
+    };
+    expect(row.budget_usd_used).toBeCloseTo(0.03);
+    db.close();
+  });
 });
 
 describe("usage_log repo", () => {
@@ -1369,6 +1392,21 @@ describe("getSystemCounts", () => {
       agentsOnline: 0,
       keysActive: 1,
       keysRevoked: 1,
+    });
+    db.close();
+  });
+
+  test("keysActive does not count unrevoked expired human keys", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, { keyHash: "h-live", agentName: "shinon" });
+    createAgentKey(db, { keyHash: "h-expired", agentName: "shinon", expiresAt: "1999-01-01T00:00:00Z" });
+
+    expect(getSystemCounts(db)).toEqual({
+      agentsTotal: 1,
+      agentsOnline: 0,
+      keysActive: 1,
+      keysRevoked: 0,
     });
     db.close();
   });

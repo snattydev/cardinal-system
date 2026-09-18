@@ -77,8 +77,8 @@ describe("routes", () => {
     };
   });
 
-  function loginReq(body: string): Request {
-    return new Request("http://t/api/auth/login", { method: "POST", body });
+  function loginReq(body: string, headers?: HeadersInit): Request {
+    return new Request("http://t/api/auth/login", { method: "POST", body, headers });
   }
 
   test("handleLogin: correct credentials return 200 and set-cookie", async () => {
@@ -89,6 +89,39 @@ describe("routes", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ user: "admin" });
     expect(res.headers.get("set-cookie")).toContain("cardinal_session=");
+  });
+
+  test("handleLogin: default set-cookie has no Secure", async () => {
+    const res = await handleLogin(
+      loginReq(JSON.stringify({ user: "admin", password: "sao123" })),
+      config,
+    );
+    expect(res.headers.get("set-cookie")).not.toContain("Secure");
+  });
+
+  test("handleLogin: NODE_ENV production adds Secure", async () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const res = await handleLogin(
+        loginReq(JSON.stringify({ user: "admin", password: "sao123" })),
+        config,
+      );
+      expect(res.headers.get("set-cookie")).toContain("Secure");
+    } finally {
+      if (prev === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev;
+    }
+  });
+
+  test("handleLogin: X-Forwarded-Proto https adds Secure", async () => {
+    const res = await handleLogin(
+      loginReq(JSON.stringify({ user: "admin", password: "sao123" }), {
+        "X-Forwarded-Proto": "https",
+      }),
+      config,
+    );
+    expect(res.headers.get("set-cookie")).toContain("Secure");
   });
 
   test("handleLogin: wrong password returns 401", async () => {
@@ -136,5 +169,14 @@ describe("routes", () => {
   test("handleLogout: clears the session cookie", () => {
     const res = handleLogout();
     expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  test("handleLogout: X-Forwarded-Proto https adds Secure", () => {
+    const req = new Request("http://t/api/auth/logout", {
+      method: "POST",
+      headers: { "X-Forwarded-Proto": "https" },
+    });
+    const res = handleLogout(req);
+    expect(res.headers.get("set-cookie")).toContain("Secure");
   });
 });

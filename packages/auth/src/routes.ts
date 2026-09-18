@@ -1,7 +1,7 @@
 import type { Config } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import { signSession } from "./jwt";
-import { clearSessionCookie, getSessionUser, sessionCookie } from "./session";
+import { clearSessionCookie, cookieSecure, getSessionUser, sessionCookie } from "./session";
 
 export async function handleLogin(req: Request, config: Config): Promise<Response> {
   let body: unknown;
@@ -18,12 +18,12 @@ export async function handleLogin(req: Request, config: Config): Promise<Respons
     return json({ error: "invalid_credentials" }, 401);
   }
   const token = await signSession(config.jwtSecret, config.adminUser);
-  const secure = process.env.NODE_ENV === "production";
+  const secure = cookieSecure(req);
   return json({ user: config.adminUser }, 200, { "set-cookie": sessionCookie(token, secure) });
 }
 
-export function handleLogout(): Response {
-  return json({ ok: true }, 200, { "set-cookie": clearSessionCookie() });
+export function handleLogout(req?: Request): Response {
+  return json({ ok: true }, 200, { "set-cookie": clearSessionCookie(cookieSecure(req)) });
 }
 
 export async function handleMe(req: Request, config: Config): Promise<Response> {
