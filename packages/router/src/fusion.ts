@@ -1,6 +1,13 @@
 import type { Database } from "bun:sqlite";
 import type { AgentKeyRow, ProviderRow } from "@cardinal/db";
-import { consumeBudget, findActiveKeyByHash, getModelRoute, getProviderByName, logUsage } from "@cardinal/db";
+import {
+  consumeBudget,
+  consumeBudgetUsd,
+  findActiveKeyByHash,
+  getModelRoute,
+  getProviderByName,
+  logUsage,
+} from "@cardinal/db";
 import { RouterError } from "./error";
 import { resolveModelChain, type ResolvedHop } from "./resolve";
 import { callUpstream, type UpstreamBody } from "./upstream";
@@ -133,11 +140,20 @@ function meterSuccess(
   hop: ResolvedHop,
   usage: { promptTokens: number; completionTokens: number; totalTokens: number },
 ): void {
+  const usdLimit = findActiveKeyByHash(db, keyHash)?.budget_usd_limit ?? null;
   const consumed = consumeBudget(db, keyHash, usage.totalTokens);
   if (!consumed) {
     db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ? AND revoked_at IS NULL", [
       keyHash,
     ]);
+  }
+  if (usdLimit !== null) {
+    const usdConsumed = consumeBudgetUsd(db, keyHash, (usage.totalTokens / 1e6) * hop.costPerMtok);
+    if (!usdConsumed) {
+      db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ? AND revoked_at IS NULL", [
+        keyHash,
+      ]);
+    }
   }
   logUsage(db, {
     agentName,

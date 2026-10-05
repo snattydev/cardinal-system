@@ -27,6 +27,7 @@ import {
   createDb,
   findActiveKeyByHash,
   getProviderByName,
+  listKeys,
   listUsage,
   registerAgent,
   upsertProvider,
@@ -132,7 +133,12 @@ function seedProvider(db: Database, name: string, baseUrl: string, modelId: stri
 
 function makeKey(
   db: Database,
-  opts: { scopes?: string[]; budgetLimit?: number; budgetUsed?: number } = {},
+  opts: {
+    scopes?: string[];
+    budgetLimit?: number;
+    budgetUsed?: number;
+    budgetUsdLimit?: number;
+  } = {},
 ): string {
   registerAgent(db, "fusion-agent", "agent");
   const keyHash = hashKey(generateKey());
@@ -141,6 +147,7 @@ function makeKey(
     agentName: "fusion-agent",
     scopes: opts.scopes,
     budgetLimit: opts.budgetLimit,
+    budgetUsdLimit: opts.budgetUsdLimit,
   });
   if (opts.budgetUsed !== undefined) {
     db.run("UPDATE agent_keys SET budget_used = ? WHERE key_hash = ?", [opts.budgetUsed, keyHash]);
@@ -433,6 +440,43 @@ describe("routeCompletion fusion", () => {
     expect(names).toContain("pp-p1");
     expect(names).toContain("pp-judge");
     expect(names).not.toContain("pp-p2");
+    db.close();
+  });
+
+  test("meters USD from hop cost_per_mtok when budget_usd_limit is set", async () => {
+    const db = createDb(":memory:");
+    seedFusionStack(db, { p1: "usd-p1", p2: "usd-p2", judge: "usd-judge" });
+    db.run("UPDATE providers SET cost_per_mtok = 2");
+    const keyHash = makeKey(db, { budgetUsdLimit: 1 });
+
+    const response = await routeCompletion(db, keyHash, fusionRequest, { decryptKey });
+    expect(response.status).toBe(200);
+
+    const key = findActiveKeyByHash(db, keyHash);
+    expect(key).not.toBeNull();
+    // Proposers report 6 and 8 tokens; the judge reports 14.
+    expect(key!.budget_usd_used).toBeCloseTo((28 / 1e6) * 2, 8);
+    db.close();
+  });
+
+  test("USD budget overshoot on proposers revokes the key and skips the judge", async () => {
+    const db = createDb(":memory:");
+    seedFusionStack(db, { p1: "usdo-p1", p2: "usdo-p2", judge: "usdo-judge" });
+    db.run("UPDATE providers SET cost_per_mtok = 1_000_000");
+    const keyHash = makeKey(db, { budgetUsdLimit: 1 });
+
+    await expectRouterError(
+      () => routeCompletion(db, keyHash, fusionRequest, { decryptKey }),
+      "budget_exceeded",
+    );
+    expect(judgeCalls).toBe(0);
+    expect(p1Calls).toBe(1);
+    expect(p2Calls).toBe(1);
+    expect(findActiveKeyByHash(db, keyHash)).toBeNull();
+    const stored = listKeys(db).find((row) => row.key_hash === keyHash);
+    expect(stored).toBeDefined();
+    expect(stored!.revoked_at).not.toBeNull();
+    expect(stored!.budget_usd_used).toBe(0);
     db.close();
   });
 });
