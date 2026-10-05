@@ -18,7 +18,7 @@ Health is `/api/health`, not `/health`.
 
 | Method | Path | Returns |
 |--------|------|---------|
-| `GET` | `/api/system` | flat `{version, uptime_seconds, db_path, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked}` |
+| `GET` | `/api/system` | flat `{version, uptime_seconds, db_path, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked}` — `keys_active` counts human keys with `revoked_at` null and `expires_at` null or in the future |
 | `GET` | `/api/agents` | `{agents}` |
 | `GET` | `/api/agents/:name` | `{agent, events}` |
 | `GET` | `/api/devices` | `{devices}` |
