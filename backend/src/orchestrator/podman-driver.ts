@@ -11,6 +11,33 @@ export interface PodmanDriverOptions {
   cpuLimit?: string;
 }
 
+export function buildPodmanRunArgs(
+  options: SpawnWorkerOptions,
+  limits: Required<Pick<PodmanDriverOptions, "imageName" | "network" | "memoryLimit" | "cpuLimit">>,
+  containerName: string,
+): string[] {
+  return [
+    "podman",
+    "run",
+    "--name",
+    containerName,
+    "--replace",
+    "--rm",
+    "-i",
+    "--cap-drop=ALL",
+    `--network=${limits.network}`,
+    `--memory=${limits.memoryLimit}`,
+    `--cpus=${limits.cpuLimit}`,
+    "-e",
+    `CARDINAL_URL=${options.backendUrl}`,
+    "-e",
+    `CARDINAL_KEY=${options.ephemeralKey}`,
+    "-e",
+    `TASK_ID=${options.taskId}`,
+    limits.imageName,
+  ];
+}
+
 export class PodmanWorkerDriver implements WorkerDriver {
   private imageName: string;
   private network: string;
@@ -37,25 +64,16 @@ export class PodmanWorkerDriver implements WorkerDriver {
       timeoutSeconds,
     });
 
-    const cmd = [
-      "podman",
-      "run",
-      "--name",
+    const cmd = buildPodmanRunArgs(
+      options,
+      {
+        imageName: this.imageName,
+        network: this.network,
+        memoryLimit: this.memoryLimit,
+        cpuLimit: this.cpuLimit,
+      },
       containerName,
-      "--replace",
-      "--rm",
-      "-i",
-      `--network=${this.network}`,
-      `--memory=${this.memoryLimit}`,
-      `--cpus=${this.cpuLimit}`,
-      "-e",
-      `CARDINAL_URL=${options.backendUrl}`,
-      "-e",
-      `CARDINAL_KEY=${options.ephemeralKey}`,
-      "-e",
-      `TASK_ID=${options.taskId}`,
-      this.imageName,
-    ];
+    );
 
     const proc = Bun.spawn(cmd, {
       stdin: "pipe",

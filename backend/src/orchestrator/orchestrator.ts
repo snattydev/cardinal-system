@@ -1,9 +1,4 @@
-import {
-  parseWorkerOutput,
-  type TaskType,
-  type WorkerInput,
-  type WorkerOutput,
-} from "@cardinal/worker";
+import { parseWorkerOutput, type TaskType, type WorkerOutput } from "@cardinal/worker";
 import type { EphemeralKeyProvider, WorkerDriver } from "./types";
 
 export interface OrchestratorOptions {
@@ -38,7 +33,7 @@ export class WorkerOrchestrator {
 
     let ephemeralKey = "";
     try {
-      ephemeralKey = await this.keyProvider.createEphemeralKey(task.taskId, scopes);
+      ephemeralKey = await this.keyProvider.createEphemeralKey(task.taskId, scopes, timeoutSeconds);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return {

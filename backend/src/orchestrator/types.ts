@@ -1,5 +1,3 @@
-import type { WorkerInput, WorkerOutput } from "@cardinal/worker";
-
 export interface SpawnWorkerOptions {
   taskId: string;
   taskType: "maintenance" | "summary" | "hygiene";
@@ -22,6 +20,6 @@ export interface WorkerDriver {
 }
 
 export interface EphemeralKeyProvider {
-  createEphemeralKey(taskId: string, scopes: string[]): Promise<string>;
+  createEphemeralKey(taskId: string, scopes: string[], ttlSeconds?: number): Promise<string>;
   revokeEphemeralKey(key: string): Promise<void>;
 }

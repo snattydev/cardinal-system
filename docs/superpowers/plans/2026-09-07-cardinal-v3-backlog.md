@@ -81,7 +81,7 @@ with a JSON stdin/stdout contract and bounded scope**.
 > Items marked with `[done]` belong to the v2 backlog and are already closed.
 > GitHub Issues are the SDLC board (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)).
 > Dual tracking: [`AGENTS/issues.md`](../../../AGENTS/issues.md).
-> N1 is implemented on `feature/#20-cardinal-worker` and is **out of** the v0.2.6 freeze.
+> N1 is implemented on `feature/#20-cardinal-worker` (rebased on current `dev`) and is **out of** the v0.2.6 freeze. Open the PR to `dev`; do not treat it as landed until that PR merges.
 
 ## Decisions
 
@@ -206,8 +206,8 @@ P2: N6 (notification center) ───┘─ feedback loop
 
 ## Next Step
 
-1. Human review and merge of PR [#12](https://github.com/snattydev/cardinal-system/pull/12) (`Closes #16 #17 #19`).
-2. PR `feature/#20-cardinal-worker` → `dev` after the freeze (N1, issue [#20](https://github.com/snattydev/cardinal-system/issues/20)).
+1. [done] PR [#12](https://github.com/snattydev/cardinal-system/pull/12) merged (`Closes #16 #17 #19`).
+2. PR `feature/#20-cardinal-worker` → `dev` (N1, issue [#20](https://github.com/snattydev/cardinal-system/issues/20)).
 3. Parallel: N9 wrapper enforcement ([#26](https://github.com/snattydev/cardinal-system/issues/26)).
 4. Then N2 / N3 / item 13 following table order.
 
