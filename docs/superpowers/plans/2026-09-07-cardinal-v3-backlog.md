@@ -68,7 +68,7 @@ with a JSON stdin/stdout contract and bounded scope**.
 | 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | [#16](https://github.com/snattydev/cardinal-system/issues/16) | release | F2 | P1 | — | all |
 | 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | — | security/deploy | F2 | P0 | — | cloud blocker |
 | 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | [#27](https://github.com/snattydev/cardinal-system/issues/27) | feature | F2 | P1 | Yes | N1 |
-| **N1** | **Internal maintenance worker** | [#20](https://github.com/snattydev/cardinal-system/issues/20) | infra | F2 | **P0** | Yes | router closed ([done]) |
+| **N1** | **[done] Internal maintenance worker** | [#20](https://github.com/snattydev/cardinal-system/issues/20) | infra | F2 | **P0** | Yes | router closed ([done]) |
 | **N2** | **Tasks v2: assignment triggers maintenance worker, auto-fire toggle** | [#21](https://github.com/snattydev/cardinal-system/issues/21) | feature | F2 | **P1** | Yes | N1 |
 | **N3** | **Memory Monolith (`/vaults`) & Path ACL** | [#22](https://github.com/snattydev/cardinal-system/issues/22) | feature | F3 | **P1** | Yes | N1 |
 | **N4** | **Cockpit Command & Herdr Web TUI** | [#23](https://github.com/snattydev/cardinal-system/issues/23) | feature | F2 | **P2** | Yes | N1, N5 |
@@ -81,7 +81,9 @@ with a JSON stdin/stdout contract and bounded scope**.
 > Items marked with `[done]` belong to the v2 backlog and are already closed.
 > GitHub Issues are the SDLC board (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)).
 > Dual tracking: [`AGENTS/issues.md`](../../../AGENTS/issues.md).
-> N1 is implemented on `feature/#20-cardinal-worker` (rebased on current `dev`) and is **out of** the v0.2.6 freeze. Open the PR to `dev`; do not treat it as landed until that PR merges.
+> N1 merged to `dev` via PR [#36](https://github.com/snattydev/cardinal-system/pull/36) (2026-10-05).
+> Doc: [`docs/features/2026-10-05-internal-maintenance-worker.md`](../../features/2026-10-05-internal-maintenance-worker.md).
+> Orchestrator is library-only until N2 wires task assignment.
 
 ## Decisions
 
@@ -101,20 +103,17 @@ with a JSON stdin/stdout contract and bounded scope**.
 - **Target version:** v0.3.0 once N1+N2+N3 land in `dev`.
 ## Item Details (Minimum Scope)
 
-### N1 — Internal Maintenance Worker
+### N1 — Internal Maintenance Worker [done]
 
-- Base container image `cardinal-worker:latest` (minimal Bun runtime + `@cardinal/mcp` client,
-  no heavy dev tools; network bounded to Cardinal internal ports).
-- I/O contract: JSON via stdin/stdout.
-  - Input: `{ task_id, task_type: "maintenance" | "summary" | "hygiene", prompt, memory_scopes, timeout_s, callback_url }`.
-  - Output: `{ task_id, status: "success" | "failure", summary, memory_writes, escalation?: string }`.
-- Lifecycle: backend spawns worker container via Podman with dedicated ephemeral `sk-cardinal-*` key.
-  Awaits stdout or hard timeout (default 5 min), collects output, and runs `podman rm -f`.
-- Security: container has NO direct SQLite DB access, NO host root, NO provider keys.
-  Communicates solely via Cardinal Router and MCP using scoped ephemeral key.
-- TDD: JSON protocol + timeout handler + mock podman driver.
-- Estimated files: `packages/worker/` (new), `backend/src/orchestrator/` (new),
-  `infra/containers/cardinal-worker.Containerfile`.
+- Base container image `localhost/cardinal-worker:latest` — `deploy/Containerfile.worker`
+  (Bun slim, `@cardinal/worker` entrypoint; no MCP server in the image).
+- I/O contract: JSON via stdin/stdout (camelCase fields — see feature doc).
+- Lifecycle: `WorkerOrchestrator` + `PodmanWorkerDriver`; ephemeral `sk-cardinal-*` key
+  for agent `cardinal-worker`; default timeout 300s; `podman rm -f` on timeout.
+- Default worker behavior: router probe `GET /v1/models` with the ephemeral key
+  (validates key injection; not full MCP/memory work yet).
+- Security: no SQLite in container, `--cap-drop=ALL`, internal network only, no host mounts.
+- Implemented: `packages/worker/`, `backend/src/orchestrator/`, tests in both trees.
 
 ### N2 — Tasks v2 (Maintenance Trigger)
 
@@ -207,7 +206,7 @@ P2: N6 (notification center) ───┘─ feedback loop
 ## Next Step
 
 1. [done] PR [#12](https://github.com/snattydev/cardinal-system/pull/12) merged (`Closes #16 #17 #19`).
-2. PR `feature/#20-cardinal-worker` → `dev` (N1, issue [#20](https://github.com/snattydev/cardinal-system/issues/20)).
+2. [done] PR [#36](https://github.com/snattydev/cardinal-system/pull/36) merged (N1, [#20](https://github.com/snattydev/cardinal-system/issues/20)).
 3. Parallel: N9 wrapper enforcement ([#26](https://github.com/snattydev/cardinal-system/issues/26)).
 4. Then N2 / N3 / item 13 following table order.
 

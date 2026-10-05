@@ -186,6 +186,7 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 | [`AGENTS.md`](AGENTS.md) | Development rules (language: English only, branching, TDD, roles) |
 | [`docs/features/`](docs/features/) | What was done, why, decisions per feature |
 | [`docs/features/2026-09-03-router-surface.md`](docs/features/2026-09-03-router-surface.md) | Router v0.2.5 index (dashboard + keys + fusion) |
+| [`docs/features/2026-10-05-internal-maintenance-worker.md`](docs/features/2026-10-05-internal-maintenance-worker.md) | N1 internal maintenance worker (orchestrator + Podman) |
 | [`docs/guides/router-usage.md`](docs/guides/router-usage.md) | LLM router manual |
 
 ## Future: split the monorepo
@@ -196,12 +197,12 @@ Today the repo is Bun workspaces (`packages/*`, `backend`, `frontend`) with one 
 
 The frontend has **zero** `@cardinal/*` imports. It talks HTTP/WS only (`VITE_API_URL` / `VITE_WS_URL` / `VITE_HOST` in `frontend/vite.config.ts`) and is the first extractable repo.
 
-MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The worker (unmerged N1) depends on `@cardinal/core` only.
+MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The maintenance worker (`packages/worker`, N1 on `dev`) depends on `@cardinal/core` only and runs as a separate Podman image.
 
 **Extraction order (when later scheduled):**
 
 1. Publish or vendor `@cardinal/core` (and then `db`, `keys`, …) as versioned packages so workspaces are not required at install time.
 2. Extract `frontend/` first (own repo, own Containerfile; env `VITE_API_URL` / `VITE_WS_URL` already exist).
 3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
-4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
+4. Extract `packages/worker` with `deploy/Containerfile.worker` (N1 is on `dev`; optional split when scheduled).
 5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.

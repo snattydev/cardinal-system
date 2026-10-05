@@ -42,6 +42,7 @@
 | Environment | Tool | Config |
 |-------------|------|--------|
 | Local dev | Podman + `compose.yaml` | `cardinal-backend` (:8787) + `cardinal-frontend` (:5173) |
+| Internal worker (N1) | Podman one-shot | `deploy/Containerfile.worker` → `cardinal-worker:latest` on `cardinal-net` |
 | Prod | Podman Quadlet + Caddy | Reverse proxy, auto-SSL |
 
 ## Monorepo
@@ -55,10 +56,10 @@
 
 | Type | Tool | When |
 |------|------|------|
-| Unit + integration | `bun test` | Required for core (auth, keys, ws, db, router) |
+| Unit + integration | `bun test` | Required for core (auth, keys, ws, db, router, worker orchestrator) |
 | Typecheck | `tsc --noEmit` | Frontend |
 | Build | `bun run build` (Vite) | Frontend |
 
 ---
 
-*Updated: 2026-07-28. If the stack changes, this file is updated.*
+*Updated: 2026-10-05. If the stack changes, this file is updated.*
