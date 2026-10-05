@@ -21,6 +21,7 @@ Facts that have already burned a session. Not a second README.
 
 - Vite's WS proxy calls `socket.destroySoon()`, missing on Bun `node:http`. Dashboard WS: `ws://127.0.0.1:8787/ws` in `frontend/src/lib/ws.ts`. Not `location.host`.
 - `localhost` and `127.0.0.1` are different cookie origins. Always `http://127.0.0.1:5173`.
+- Playwright defaults to `http://127.0.0.1:5173` (`frontend/playwright.config.ts`). Prod pod on Caddy `:8080` needs `PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080`. E2E login uses `E2E_ADMIN_USER` / `E2E_ADMIN_PASSWORD` or dev defaults `admin` / `cardinal-dev`.
 - `SystemInfo` and every other payload type must match the backend JSON 1:1 (flat fields). Nested mocks pass tests and black-screen in the browser.
 - Shared uptime: one module-level timer (`frontend/src/lib/system.ts`). Per-component `Date.now()` drifts.
 

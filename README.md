@@ -171,6 +171,8 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 | `bun run keygen -- ...` | API keys CLI: `--agent <name>`, `--revoke <name>`, `--list` |
 | `bun run build` | Frontend production build -> `frontend/dist/` |
 | `bun test` | Packages + backend suite |
+| `bun run test:e2e` | Playwright UI tests (`frontend/e2e/*.e2e.ts`; needs backend + Vite running) |
+| `bun run bootstrap:password` | Interactive admin password hash → `.env` (required before cloud deploy) |
 | `bun run typecheck` | `tsc --noEmit` backend + frontend |
 
 ## Documentation

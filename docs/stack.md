@@ -58,7 +58,10 @@
 | Unit + integration | `bun test` | Required for core (auth, keys, ws, db, router) |
 | Typecheck | `tsc --noEmit` | Frontend |
 | Build | `bun run build` (Vite) | Frontend |
+| UI E2E | `@playwright/test` (`bun run test:e2e`) | Dashboard flows; default `baseURL` `http://127.0.0.1:5173` |
+
+Specs live under `frontend/e2e/*.e2e.ts`. Backend and Vite must be running (or use Cloud Agent `.cursor/start.sh`). See [`docs/features/2026-09-10-playwright-e2e-expansion.md`](features/2026-09-10-playwright-e2e-expansion.md).
 
 ---
 
-*Updated: 2026-07-28. If the stack changes, this file is updated.*
+*Updated: 2026-10-05. If the stack changes, this file is updated.*

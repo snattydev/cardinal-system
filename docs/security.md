@@ -16,7 +16,7 @@
 
 | Actor | Method | Storage | Lifetime |
 |-------|--------|---------|----------|
-| Human (dashboard) | JWT (HS256) via `POST /api/auth/login` | `httpOnly` cookie, `SameSite=Strict` | 12h |
+| Human (dashboard) | JWT (HS256) via `POST /api/auth/login` | `httpOnly` cookie, `SameSite=Strict`; `Secure` when `NODE_ENV=production` or `X-Forwarded-Proto: https` (TLS at Caddy/Quadlet) | 12h |
 | Agent (WS) | API key `sk-cardinal-*` in `hello` message | DB: `key_hash` (SHA-256) | Revocable |
 | Agent (REST) | API key `sk-cardinal-*` via `Authorization: ***` | Same as WS | Revocable |
 | Subagent (localhost) | API key `created_by=system`, auto-revocable | DB: `key_hash` | Ephemeral |
@@ -64,6 +64,11 @@ Before the first cloud deploy — even if the only user is the owner — the cre
 4. The agent can verify that the bootstrap ran (exit 0). Never sees or generates the plaintext.
 
 Implemented in `scripts/bootstrap-admin-password.sh` (item 11 of the v2 backlog plan).
+
+## Session cookie behind TLS
+
+Login and logout set/clear `cardinal_session` with matching `Secure` flags via `cookieSecure(req)` in `packages/auth/src/session.ts`. Do not infer HTTPS from the Bun process URL alone when TLS terminates at the reverse proxy — use `X-Forwarded-Proto` (Caddy sets this in the Quadlet pod).
+
 ## Pre-push audit
 
 Before every push to `dev`:
@@ -81,4 +86,4 @@ Before every push to `dev`:
 
 ---
 
-*Updated: 2026-09-06.*
+*Updated: 2026-10-05.*

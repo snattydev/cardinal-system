@@ -34,5 +34,6 @@ Repo TDD rules. Policy: RED → GREEN → REFACTOR → COMMIT.
 - `bun test` — full suite (packages + backend)
 - `bun run typecheck` — `tsc --noEmit` backend + frontend
 - `bun run build` — frontend production build
+- `bun run test:e2e` — Playwright dashboard flows (optional gate for UI changes; requires running backend + Vite)
 
-These three commands are the "gate" before merge.
+These commands are the gate before merge (`bun test`, `typecheck`, and `build` are mandatory; E2E when touching dashboard flows).

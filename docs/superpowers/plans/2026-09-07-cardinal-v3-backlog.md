@@ -171,11 +171,14 @@ with a JSON stdin/stdout contract and bounded scope**.
 - Future visual refinement (post-v0.3.0): extract palette directly from anime frames + authentic chamfered HUD elements (see spec §7).
 ### N7 — Automated UI Testing via Cloud Cursor & Playwright
 
-- Framework: `@playwright/test` configured in `frontend/playwright.config.ts`.
-- E2E specs: `frontend/e2e/auth-and-dashboard.spec.ts` (Login, redirects, SAO elements).
-- Execution modes:
-  - Local: `bun run --cwd frontend playwright test` against `http://127.0.0.1:8080`.
-  - Cloud Cursor: Uses `@cursor/sdk` to dispatch cloud agents on feature branches for visual regression and PR generation once `CURSOR_API_KEY` is supplied in `.env`.
+- Framework: `@playwright/test` in `frontend/playwright.config.ts` (`testMatch: *.e2e.ts`).
+- E2E specs: `frontend/e2e/auth-and-dashboard.e2e.ts` (login, redirects, SAO chrome); `frontend/e2e/tasks-and-overview.e2e.ts` (tasks + overview metrics). Helper: `frontend/e2e/helpers/auth.ts`.
+- **Done on `dev`:** auth, tasks, overview (5 tests). **Open:** `/keys`, `/router` ([#18](https://github.com/snattydev/cardinal-system/issues/18)).
+- Execution:
+  - Local dev: start backend + Vite, then `bun run test:e2e` (default `PLAYWRIGHT_BASE_URL` → `http://127.0.0.1:5173`).
+  - Prod pod: `PLAYWRIGHT_BASE_URL=http://127.0.0.1:8080 bun run test:e2e`.
+  - Cloud Agent: services via `.cursor/start.sh`; same `bun run test:e2e`.
+- Detail: [`docs/features/2026-09-10-playwright-e2e-expansion.md`](../../features/2026-09-10-playwright-e2e-expansion.md).
 ### N6 — In-App Notification Center
 
 - `notifications` table (id, target, type, payload, read, created_at).
