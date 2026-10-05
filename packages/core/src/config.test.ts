@@ -58,4 +58,25 @@ describe("loadConfig", () => {
     expect(config.staticDir).toBe("public");
     expect(config.pingIntervalMs).toBe(5000);
   });
+
+  test("unescapes systemd dollar escapes and strips enclosing quotes from ADMIN_PASSWORD_HASH", async () => {
+    const password = "correct-horse-battery";
+    const hash = await Bun.password.hash(password);
+    const fromEnv = `  "${hash.replaceAll("$", "\\$")}"  `;
+    const config = loadConfig({ ...requiredEnv, ADMIN_PASSWORD_HASH: fromEnv });
+    expect(config.adminPasswordHash).toBe(hash);
+    expect(await Bun.password.verify(password, config.adminPasswordHash)).toBe(true);
+  });
+
+  test("strips a single pair of single quotes around ADMIN_PASSWORD_HASH", () => {
+    const hash = "$argon2id$v=19$m=65536$c29tZXNhbHQ$c29tZWhhc2g";
+    const config = loadConfig({ ...requiredEnv, ADMIN_PASSWORD_HASH: `'${hash}'` });
+    expect(config.adminPasswordHash).toBe(hash);
+  });
+
+  test("leaves an unquoted ADMIN_PASSWORD_HASH unchanged", () => {
+    const hash = "$argon2id$v=19$m=65536$c29tZXNhbHQ$c29tZWhhc2g";
+    const config = loadConfig({ ...requiredEnv, ADMIN_PASSWORD_HASH: hash });
+    expect(config.adminPasswordHash).toBe(hash);
+  });
 });
