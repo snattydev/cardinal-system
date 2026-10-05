@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import rootPkg from "../../../package.json";
 import { createMcpServer } from "./server";
 
 const VAULTS = ["the portal", "for-my-agents"] as const;
@@ -187,6 +188,7 @@ describe("MCP server /mcp", () => {
     expect(status).toBe(200);
     expect(json.result.protocolVersion).toBe("2024-11-05");
     expect(json.result.capabilities.tools).toBeDefined();
+    expect(json.result.serverInfo).toEqual({ name: "cardinal-mcp", version: rootPkg.version });
     expect(json.id).toBe(1);
   });
 
