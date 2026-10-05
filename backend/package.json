@@ -13,6 +13,7 @@
     "@cardinal/ws": "workspace:*",
     "@cardinal/rag": "workspace:*",
     "@cardinal/router": "workspace:*",
+    "@cardinal/worker": "workspace:*",
     "jose": "^6.2.4",
     "zod": "^4.4.3"
   },
