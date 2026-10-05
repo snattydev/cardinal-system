@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, test } from "bun:test";
 import { SignJWT } from "jose";
 import type { Config } from "@cardinal/core";
 import { signSession, verifySession } from "./jwt";
-import { clearSessionCookie, readCookie, sessionCookie } from "./session";
+import { clearSessionCookie, cookieSecure, readCookie, sessionCookie } from "./session";
 import { handleLogin, handleLogout, handleMe } from "./routes";
 
 describe("jwt", () => {
@@ -33,6 +33,14 @@ describe("jwt", () => {
       .sign(new TextEncoder().encode("s1"));
     expect(await verifySession("s1", token)).toBeNull();
   });
+
+  test("non-HS256 token returns null", async () => {
+    const token = await new SignJWT({ sub: "admin" })
+      .setProtectedHeader({ alg: "HS384" })
+      .setExpirationTime("1h")
+      .sign(new TextEncoder().encode("s1"));
+    expect(await verifySession("s1", token)).toBeNull();
+  });
 });
 
 describe("session", () => {
@@ -58,6 +66,52 @@ describe("session", () => {
 
   test("readCookie returns null for null header", () => {
     expect(readCookie(null, "cardinal_session")).toBeNull();
+  });
+
+  test("readCookie keeps equals signs inside the value", () => {
+    expect(readCookie("cardinal_session=aaa.bbb.ccc=", "cardinal_session")).toBe("aaa.bbb.ccc=");
+  });
+
+  test("readCookie returns null for an empty value", () => {
+    expect(readCookie("cardinal_session=", "cardinal_session")).toBeNull();
+  });
+
+  test("sessionCookie and clearSessionCookie include Secure only when requested", () => {
+    expect(sessionCookie("tok", true)).toContain("Secure; ");
+    expect(clearSessionCookie(true)).toContain("Secure; ");
+    expect(sessionCookie("tok")).not.toContain("Secure");
+    expect(clearSessionCookie()).not.toContain("Secure");
+  });
+
+  test("cookieSecure is true in production even when forwarded proto is http", () => {
+    const prev = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    try {
+      const req = new Request("http://t/", { headers: { "x-forwarded-proto": "http" } });
+      expect(cookieSecure(req)).toBe(true);
+    } finally {
+      if (prev === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev;
+    }
+  });
+
+  test("cookieSecure uses the first forwarded proto, ignoring case and later values", () => {
+    const prev = process.env.NODE_ENV;
+    delete process.env.NODE_ENV;
+    try {
+      const httpsFirst = new Request("http://t/", {
+        headers: { "x-forwarded-proto": " HTTPS , http" },
+      });
+      const httpFirst = new Request("http://t/", {
+        headers: { "x-forwarded-proto": "http, https" },
+      });
+      expect(cookieSecure(httpsFirst)).toBe(true);
+      expect(cookieSecure(httpFirst)).toBe(false);
+      expect(cookieSecure()).toBe(false);
+    } finally {
+      if (prev === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = prev;
+    }
   });
 });
 

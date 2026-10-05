@@ -144,6 +144,21 @@ test("auth flow: bad login 401, good login sets cookie, /me with and without coo
   expect(anon.status).toBe(401);
 });
 
+test("POST /api/auth/logout forwards X-Forwarded-Proto into the Secure cookie flag", async () => {
+  const secure = await fetch(`http://localhost:${port}/api/auth/logout`, {
+    method: "POST",
+    headers: { "x-forwarded-proto": "https" },
+  });
+  expect(secure.status).toBe(200);
+  const secureCookie = secure.headers.get("set-cookie") ?? "";
+  expect(secureCookie).toContain("Secure");
+  expect(secureCookie).toContain("Max-Age=0");
+
+  const plain = await fetch(`http://localhost:${port}/api/auth/logout`, { method: "POST" });
+  expect(plain.status).toBe(200);
+  expect(plain.headers.get("set-cookie") ?? "").not.toContain("Secure");
+});
+
 test("GET /api/agents requires a session cookie", async () => {
   const anon = await fetch(`http://localhost:${port}/api/agents`);
   expect(anon.status).toBe(401);
