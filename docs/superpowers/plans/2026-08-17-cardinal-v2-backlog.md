@@ -1,7 +1,8 @@
 # Cardinal v2 — Backlog & Execution Plan
 
 > Complements the living spec `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`.
-> Current status: v0.2.5 (2026-09-03). Fase 1 complete. Fase 2 advanced in `dev`.
+> Snapshot: v0.2.5 (2026-09-03). Fase 1 complete. Fase 2 was then in progress on `dev`.
+> Later: Phase 2 freeze merged to `main` on 2026-09-18 (PR #12, v0.2.6). Current priorities: [`docs/roadmap.md`](../../roadmap.md).
 > Reprioritized 2026-08-20: router + key pool first; then blackboard/MCP.
 > Router surface 2026-09-03: `/router` dashboard + key create/limits + fusion.
 

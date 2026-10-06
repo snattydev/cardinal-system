@@ -59,15 +59,19 @@ Planned and pending skills: [`docs/skills.md`](./docs/skills.md).
 
 ---
 
-## Current state (2026-09-14)
+## Current state (2026-10-06)
+
+Root `package.json` is **0.2.6** on both `main` and `dev`. There are no git tags and no GitHub Actions workflows. A CHANGELOG, a `v0.2.6` tag, and a PATCH bump on `dev` are proposed in [#47](https://github.com/snattydev/cardinal-system/issues/47). CI is proposed in [#42](https://github.com/snattydev/cardinal-system/issues/42).
 
 | Phase | Status | Spec |
 |-------|--------|------|
 | Phase 0 — Living Skeleton | Complete | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
 | Phase 1 — Context Store | Complete (v0.2.0+) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
-| Phase 2 — Cardinal v2 (Blackboard + MCP + Pool) | Closing (v0.2.6; PR [#12](https://github.com/snattydev/cardinal-system/pull/12), issue [#16](https://github.com/snattydev/cardinal-system/issues/16)) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
-| Phase 2.5 — Cardinal v3 | Planning (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)) | [`docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](./docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
+| Phase 2 — Cardinal v2 (Blackboard + MCP + Pool) | Complete on `main` (v0.2.6). Freeze PR [#12](https://github.com/snattydev/cardinal-system/pull/12) merged 2026-09-18 (`Closes #16`, `#17`, `#19`) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
+| Phase 2.5 — Cardinal v3 | Started on `dev` only. N1 worker is PR [#36](https://github.com/snattydev/cardinal-system/pull/36), merged 2026-10-05. Tracking [#28](https://github.com/snattydev/cardinal-system/issues/28). [#20](https://github.com/snattydev/cardinal-system/issues/20) stays open: `Closes` applies on the default branch (`main`) | [`docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](./docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
 | Phase 3+ — Graph + Automations | Future | — |
+
+Product code on `dev` that is not on `main`: `packages/worker`, `backend/src/orchestrator`, `deploy/Containerfile.worker` (PR [#36](https://github.com/snattydev/cardinal-system/pull/36)). Priorities and the 2026-10-06 follow-up issues: [`docs/roadmap.md`](./docs/roadmap.md). Recorded decisions: [`context/ecosystem.md`](./context/ecosystem.md). `docs/stack.md` still needs the rewrite in [#46](https://github.com/snattydev/cardinal-system/issues/46).
 
 SDLC lives in GitHub Issues. Runtime coordination lives on the Blackboard. Policy: [`AGENTS/issues.md`](./AGENTS/issues.md).
 

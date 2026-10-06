@@ -45,5 +45,6 @@ Additional qualifiers: `security`, `frontend`, `backend`, `protocol`, `good firs
 3. **Commits:**
    - Commits addressing or finishing the issue must reference it in the body: `Closes #<id>` or `Relates to #<id>` (`AGENTS/commits.md`).
 4. **Pull Requests:**
-   - The PR body must explicitly state `Closes #<id>` so merging to `dev` / `main` automatically closes the issue (`AGENTS/prs.md`).
-   - PR description links to the issue and summarizes resolution against the issue's acceptance criteria.
+   - When the PR finishes an issue, the body states `Closes #<id>` (`AGENTS/prs.md`).
+   - GitHub auto-closes that keyword only when the PR merges into the default branch (`main`). A merge to `dev` leaves the issue open. PR [#36](https://github.com/snattydev/cardinal-system/pull/36) merged to `dev` with `Closes #20` on 2026-10-05; the 2026-10-06 QA reported [#20](https://github.com/snattydev/cardinal-system/issues/20) still open. Close it by hand, or let a later `dev` → `main` PR that still contains the keyword close it. Housekeeping: [#49](https://github.com/snattydev/cardinal-system/issues/49).
+   - PR description links to the issue and summarizes resolution against the issue's acceptance criteria. Use `Refs #N` when the PR only records status and does not finish the issue.

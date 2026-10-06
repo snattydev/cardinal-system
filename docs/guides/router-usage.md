@@ -4,8 +4,8 @@ Cardinal's internal LLM router: configurable provider pool + OpenAI-compatible
 endpoints with transparent failover, per-key scopes, and metering.
 
 > Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (section 6).
-> Status: v0.2.5 (2026-09-03). Index:
-> [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
+> Guide snapshot: v0.2.5 (2026-09-03). The router shipped in the v0.2.6 freeze on `main` (PR #12, 2026-09-18). Current phase status: [`docs/roadmap.md`](../roadmap.md).
+> Index: [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
 
 ---
 

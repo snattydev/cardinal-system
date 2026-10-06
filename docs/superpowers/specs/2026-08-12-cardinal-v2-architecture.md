@@ -1,7 +1,9 @@
 # Cardinal v2 — Architecture (MCP Hub + Blackboard + Key Pool)
 
 > Date: 2026-08-12
-> Status: Living design (captures 2026-08-12 brainstorm decisions). Open items are validated via spikes before implementation.
+> Status: Design record (2026-08-12 decisions). Pillar rows below are that snapshot.
+> Implementation status (2026-10-06): Phase 2 is complete on `main` at v0.2.6 (PR #12, merged 2026-09-18). Current priorities live in [`docs/roadmap.md`](../../roadmap.md).
+> v3 added Cardinal-owned maintenance workers. N1 is on `dev` only (PR #36, 2026-10-05). See [`docs/features/2026-10-05-internal-maintenance-worker.md`](../../features/2026-10-05-internal-maintenance-worker.md).
 > Roadmap relationship: re-scopes Phase 2 (see final section).
 
 ---
@@ -235,7 +237,7 @@ Order: 001 first.
 |-----------------------|-------------|
 | 2.1 LLM Router (`/v1/chat/completions`) | [done] Retained — core of pillar 2 |
 | 2.2 API Key Factory (scopes + budgets) | [done] Retained — pillar 2 |
-| 2.3 One-Shot Agents (Podman API) | [superseded] Replaced by blackboard + herdr/MCP (do not reimplement orchestration) |
+| 2.3 One-Shot Agents (Podman API) | [superseded] Generic CLI orchestration stays with herdr. v3 N1 (2026-10-05, `dev` only) is a separate Cardinal-owned worker with a JSON contract |
 | 2.4 PR Review Pipeline (GitHub webhook) | [deferred] Postponed — handled via blackboard + external trigger when needed |
 | 2.5 @mention trigger | [deferred] Postponed — same |
 

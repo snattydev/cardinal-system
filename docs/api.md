@@ -54,12 +54,12 @@ On these routes the agent key **is** identity (`agent_name`).
 
 ## Router (agent key)
 
-| Method | Path |
-|--------|------|
-| `POST` | `/v1/chat/completions` |
-| `GET` | `/v1/models` |
+| Method | Path | Auth today |
+|--------|------|------------|
+| `POST` | `/v1/chat/completions` | Bearer `sk-cardinal-*` |
+| `GET` | `/v1/models` | None. The handler lists active providers, models, and aliases. Requiring auth is [#41](https://github.com/snattydev/cardinal-system/issues/41). |
 
-Fusion: `model=fusion`. Manual: `docs/guides/router-usage.md`.
+`GET /api/router/catalog` (dashboard session) is separate from `GET /v1/models`. Catalog documentation is also [#41](https://github.com/snattydev/cardinal-system/issues/41). Fusion: `model=fusion` (token metering; USD on fusion hops is [#40](https://github.com/snattydev/cardinal-system/issues/40)). Manual: `docs/guides/router-usage.md`.
 
 ## WebSocket
 

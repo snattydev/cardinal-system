@@ -27,7 +27,7 @@ Repo PR flow. Detailed execution steps live in the `cardinal-pr` skill.
 - [ ] Version bump in `package.json` if applicable
 - [ ] `docs/features/<date>-<name>.md` created or updated
 - [ ] PR title, body, and any new comments/docs in English (`AGENTS/docs.md`)
-- [ ] Linked GitHub Issue with proper labels (`enhancement`, `bug`, etc.) and `Closes #N` in PR body (`AGENTS/issues.md`)
+- [ ] Linked GitHub Issue with proper labels (`enhancement`, `bug`, etc.) and `Closes #N` in the PR body when the issue is finished (`AGENTS/issues.md`). GitHub auto-closes that keyword on `main` only.
 
 ## Merge strategy
 

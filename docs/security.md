@@ -77,8 +77,8 @@ Before every push to `dev`:
 
 - **Close codes:** 4401 (auth failed), 4400 (invalid message)
 - **Timeout:** 2 lost pings (60s) → disconnect
-- **Rate limit:** Not implemented in F0. Pending F2.
+- **Rate limit:** Not implemented. Phase 2 closed on `main` (2026-09-18) without it. Proposed in [#43](https://github.com/snattydev/cardinal-system/issues/43) (login, chat completions, WS auth).
 
 ---
 
-*Updated: 2026-09-06.*
+*Updated: 2026-10-06.*

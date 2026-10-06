@@ -4,14 +4,14 @@ Central backend of the SAO agent ecosystem: identity (`sk-cardinal-*`), context 
 
 Cardinal v2 thesis: **orchestration is commodity**. Cardinal is the brain (identity + context + blackboard); herdr, Hermes, and CLIs are the hands.
 
-**Version:** v0.2.6 (Phase 2 — Blackboard + MCP + Pool, closing). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
+**Version:** v0.2.6 (`MAJOR.FASE.PATCH` in root `package.json`). Phase 2 is complete on `main` (freeze PR [#12](https://github.com/snattydev/cardinal-system/pull/12), merged 2026-09-18). `dev` adds the N1 maintenance worker (PR [#36](https://github.com/snattydev/cardinal-system/pull/36), merged 2026-10-05) and keeps the same version. No git tag yet ([#47](https://github.com/snattydev/cardinal-system/issues/47)).
 
 | Phase | What | Status |
 |-------|------|--------|
 | 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
 | 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
-| 2 | Blackboard, MCP hub, key pool / router | Closing (v0.2.6 on `dev`; freeze PR [#12](https://github.com/snattydev/cardinal-system/pull/12)) |
-| 2.5 | Cardinal v3 (workers, /vaults, cockpit) | Planning ([#28](https://github.com/snattydev/cardinal-system/issues/28)) |
+| 2 | Blackboard, MCP hub, key pool / router | Complete on `main` (v0.2.6, PR [#12](https://github.com/snattydev/cardinal-system/pull/12)) |
+| 2.5 | Cardinal v3 (workers, /vaults, cockpit) | N1 on `dev` only (PR [#36](https://github.com/snattydev/cardinal-system/pull/36)); rest planning ([#28](https://github.com/snattydev/cardinal-system/issues/28)) |
 
 Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). v2 spec: [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md).
 
@@ -24,7 +24,8 @@ Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/v
 - **Blackboard:** tasks CRUD + claim/complete, UI `/tasks`, WS broadcast
 - **Mailbox:** `GET/POST /api/messages` (agent-to-agent handoff; key = identity)
 - **MCP hub:** `packages/mcp` on `:8789` (memory, board, mailbox tools)
-- **Router:** `POST /v1/chat/completions` + `GET /v1/models` (Bearer `sk-cardinal-*`); Fusion/MoA with `model=fusion`
+- **Router:** `POST /v1/chat/completions` requires Bearer `sk-cardinal-*`. `GET /v1/models` lists providers, models, and aliases with no auth check; requiring auth is [#41](https://github.com/snattydev/cardinal-system/issues/41). Fusion/MoA uses `model=fusion` and meters tokens; USD metering on fusion hops is [#40](https://github.com/snattydev/cardinal-system/issues/40)
+- **N1 worker (`dev` only):** `packages/worker`, `backend/src/orchestrator`, `deploy/Containerfile.worker` (PR [#36](https://github.com/snattydev/cardinal-system/pull/36)). Absent from `main`
 - **Router UI:** operative catalog at `/router` (JWT; providers, aliases, chains)
 - **Keys UI:** create / list / revoke at `/keys` (scopes, tokens, expiry, USD cap)
 
@@ -196,12 +197,12 @@ Today the repo is Bun workspaces (`packages/*`, `backend`, `frontend`) with one 
 
 The frontend has **zero** `@cardinal/*` imports. It talks HTTP/WS only (`VITE_API_URL` / `VITE_WS_URL` / `VITE_HOST` in `frontend/vite.config.ts`) and is the first extractable repo.
 
-MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The worker (unmerged N1) depends on `@cardinal/core` only.
+MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The N1 worker on `dev` depends on `@cardinal/core` only. It is absent from `main`.
 
 **Extraction order (when later scheduled):**
 
 1. Publish or vendor `@cardinal/core` (and then `db`, `keys`, …) as versioned packages so workspaces are not required at install time.
 2. Extract `frontend/` first (own repo, own Containerfile; env `VITE_API_URL` / `VITE_WS_URL` already exist).
 3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
-4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
+4. Extract `packages/worker` with `deploy/Containerfile.worker` (N1 is on `dev` as of PR #36; it still ships to `main` with the next `dev` → `main` PR).
 5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.

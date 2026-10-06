@@ -2,7 +2,10 @@
 
 > Complements the living spec `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`
 > and its backlog `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`.
-> Status: v0.2.6 (2026-09-14). Fase 2 complete in `dev`. SDLC: GitHub Issues
+> Status: v0.2.6 (2026-10-06). Phase 2 freeze is on `main` (PR #12, 2026-09-18).
+> N1 is on `dev` only (PR #36, 2026-10-05) and is absent from `main`. No PATCH
+> bump and no git tag (proposed in [#47](https://github.com/snattydev/cardinal-system/issues/47)).
+> SDLC: GitHub Issues
 > ([#28](https://github.com/snattydev/cardinal-system/issues/28)). Runtime: Blackboard.
 > Re-scoped 2026-09-10: Cardinal 24/7 server model, division of labor (lightweight
 > internal maintenance workers vs persistent Herdr agents), memory monolith (`/vaults`),
@@ -65,40 +68,35 @@ with a JSON stdin/stdout contract and bounded scope**.
 | # | Item | GitHub | Type | Fase | Priority | TDD | Depends on |
 |---|------|--------|------|------|----------|-----|------------|
 | 5 | [done] Seed providers/routes (`scripts/seed-router.py`) | — | spike/e2e | F2 | P0 | — | 6, 7 (v2) |
-| 10 | PR `dev->main` — stabilize Fase 1 + blackboard + router + MCP | [#16](https://github.com/snattydev/cardinal-system/issues/16) | release | F2 | P1 | — | all |
+| 10 | [done] PR #12 `dev` → `main` (2026-09-18) — Fase 1 + blackboard + router + MCP | [#16](https://github.com/snattydev/cardinal-system/issues/16) | release | F2 | P1 | — | all |
 | 11 | [done] Bootstrap admin password without the model (`scripts/bootstrap-admin-password.sh`) | — | security/deploy | F2 | P0 | — | cloud blocker |
 | 13 | One-shot keys — compact block + hard-delete on completion (revive with N1) | [#27](https://github.com/snattydev/cardinal-system/issues/27) | feature | F2 | P1 | Yes | N1 |
-| **N1** | **Internal maintenance worker** | [#20](https://github.com/snattydev/cardinal-system/issues/20) | infra | F2 | **P0** | Yes | router closed ([done]) |
+| **N1** | **Internal maintenance worker** [done on `dev`, PR #36, 2026-10-05; absent from `main`] | [#20](https://github.com/snattydev/cardinal-system/issues/20) still open (`Closes` applies on `main` only) | infra | F2 | **P0** | Yes | router closed ([done]) |
 | **N2** | **Tasks v2: assignment triggers maintenance worker, auto-fire toggle** | [#21](https://github.com/snattydev/cardinal-system/issues/21) | feature | F2 | **P1** | Yes | N1 |
 | **N3** | **Memory Monolith (`/vaults`) & Path ACL** | [#22](https://github.com/snattydev/cardinal-system/issues/22) | feature | F3 | **P1** | Yes | N1 |
 | **N4** | **Cockpit Command & Herdr Web TUI** | [#23](https://github.com/snattydev/cardinal-system/issues/23) | feature | F2 | **P2** | Yes | N1, N5 |
-| **N5** | **SAO Design System** [done on `dev`] | [#17](https://github.com/snattydev/cardinal-system/issues/17) | feature | F2 | **P2** | No | parallel to N1 |
+| **N5** | **SAO Design System** [done on `main`, PR #12] | [#17](https://github.com/snattydev/cardinal-system/issues/17) | feature | F2 | **P2** | No | parallel to N1 |
 | **N6** | **In-app notification center** | [#24](https://github.com/snattydev/cardinal-system/issues/24) | feature | F2 | **P2** | Yes | N2 |
 | **N7** | **Playwright E2E** (auth/tasks/overview landed; keys/router open) | [#18](https://github.com/snattydev/cardinal-system/issues/18) | test | F2 | **P2** | — | N5 |
 | **N8** | **QOL: `/keys` Hermes setup snippet** (refuse wrapper aliases as `model.default`) | [#25](https://github.com/snattydev/cardinal-system/issues/25) | frontend | F2 | **P2** | No | N9 |
 | **N9** | **Wrapper hops internal-only** | [#26](https://github.com/snattydev/cardinal-system/issues/26) | feature | F2 | **P1** | Yes | findings 2026-09-12 |
 
-> Items marked with `[done]` belong to the v2 backlog and are already closed.
+> Rows marked `[done]` without a branch are on `main` with the v0.2.6 freeze. N1 is done on `dev` and [#20](https://github.com/snattydev/cardinal-system/issues/20) is still open.
 > GitHub Issues are the SDLC board (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)).
 > Dual tracking: [`AGENTS/issues.md`](../../../AGENTS/issues.md).
-> N1 is implemented on `feature/#20-cardinal-worker` (rebased on current `dev`) and is **out of** the v0.2.6 freeze. Open the PR to `dev`; do not treat it as landed until that PR merges.
+> N1 landed on `dev` in PR [#36](https://github.com/snattydev/cardinal-system/pull/36) (2026-10-05) and stayed out of the v0.2.6 freeze on `main`. [#20](https://github.com/snattydev/cardinal-system/issues/20) needs a manual close ([#49](https://github.com/snattydev/cardinal-system/issues/49)). Feature doc: [`docs/features/2026-10-05-internal-maintenance-worker.md`](../../features/2026-10-05-internal-maintenance-worker.md).
 
 ## Decisions
 
-- **N1 is lightweight maintenance only (Division of Labor).** Workers in Cardinal
-  run minimal Bun + MCP loops. They do NOT compile or replace Herdr/OMP for heavy coding.
-  If a maintenance worker encounters a critical problem, it logs an escalation event.
-- **Tasks v2 (N2) is a clean cutover.** Remove `claim`/`complete` endpoints.
-  Tasks move to `pending | running | done | failed`.
-- **Memory is a single hierarchical `/vaults` tree.** No scattered stores.
-  Strict path-level authorization enforced on backend before filesystem access.
-  `personal/` is strictly denied to all agent keys.
-- **No bloated UI Chatbot.** Replaced by a fast `Ctrl+K` Spotlight command bar
-  and an embedded Web TUI for direct Herdr monitoring.
-- **In-app notifications only.** Keep core tight without external push dependencies.
-- **Feature development tools:** Core features (N1, N2, N3) use mandatory TDD.
-  Frontend and visual design (N4, N5) rely on visual verification and design tokens.
-- **Target version:** v0.3.0 once N1+N2+N3 land in `dev`.
+Adopted means evidenced on `dev` or `main`. Proposed means the plan or an open issue still describes it.
+
+- **Adopted — N1 is lightweight maintenance only (Division of Labor).** On `dev`, workers run a minimal Bun loop with a JSON contract and an ephemeral key. They do not replace Herdr for heavy coding. A critical problem returns an escalation field. See the [N1 feature doc](../../features/2026-10-05-internal-maintenance-worker.md). The worker does not call MCP tools in this slice.
+- **Proposed — Tasks v2 (N2) is a clean cutover** ([#21](https://github.com/snattydev/cardinal-system/issues/21)). Remove `claim`/`complete` endpoints. Tasks move to `pending | running | done | failed`.
+- **Proposed — Memory is a single hierarchical `/vaults` tree** ([#22](https://github.com/snattydev/cardinal-system/issues/22)). Strict path-level authorization before filesystem access. `personal/` denied to all agent keys.
+- **Proposed — No bloated UI chatbot** ([#23](https://github.com/snattydev/cardinal-system/issues/23)). A `Ctrl+K` command bar and an embedded Web TUI for Herdr.
+- **Proposed — In-app notifications only** ([#24](https://github.com/snattydev/cardinal-system/issues/24)). No external push dependencies.
+- **Adopted for N1, still the rule for N2/N3 — tests first in core.** N5 used visual verification. N4 and N6 remain proposed.
+- **Proposed — target version v0.3.0** once N1+N2+N3 are on `dev`. N1 is on `dev` at v0.2.6. The PATCH bump and tag are [#47](https://github.com/snattydev/cardinal-system/issues/47). FASE moves only on a `dev` → `main` PR (`AGENTS/versioning.md`).
 ## Item Details (Minimum Scope)
 
 ### N1 — Internal Maintenance Worker
@@ -182,6 +180,9 @@ with a JSON stdin/stdout contract and bounded scope**.
 - Triggers: task completion/failure, worker timeout, ACL security denials.
 - UI: Top-bar bell badge, notification drawer, snooze options.
 - TDD: persistence + notification emitter.
+
+The freeze step below landed on `main` on 2026-09-18. N1 landed on `dev` on 2026-10-05.
+
 ## Proposed Execution Order
 
 ```
@@ -206,17 +207,18 @@ P2: N6 (notification center) ───┘─ feedback loop
 
 ## Next Step
 
-1. [done] PR [#12](https://github.com/snattydev/cardinal-system/pull/12) merged (`Closes #16 #17 #19`).
-2. PR `feature/#20-cardinal-worker` → `dev` (N1, issue [#20](https://github.com/snattydev/cardinal-system/issues/20)).
+1. [done] PR [#12](https://github.com/snattydev/cardinal-system/pull/12) merged to `main` (`Closes #16 #17 #19`).
+2. [done on `dev`] PR [#36](https://github.com/snattydev/cardinal-system/pull/36) (N1). [#20](https://github.com/snattydev/cardinal-system/issues/20) stays open until a manual close or a `dev` → `main` merge that still carries `Closes #20` ([#49](https://github.com/snattydev/cardinal-system/issues/49)).
 3. Parallel: N9 wrapper enforcement ([#26](https://github.com/snattydev/cardinal-system/issues/26)).
 4. Then N2 / N3 / item 13 following table order.
+5. QA follow-ups (2026-10-06), proposed and tracked from [`docs/roadmap.md`](../../roadmap.md): [#40](https://github.com/snattydev/cardinal-system/issues/40)–[#49](https://github.com/snattydev/cardinal-system/issues/49), plus [#31](https://github.com/snattydev/cardinal-system/issues/31) and [#18](https://github.com/snattydev/cardinal-system/issues/18).
 
 ## Lessons from v2 Backlog Applied to v3
 
 - **Tests first in core, not in frontend.** N1, N2, N3, N4, N6 -> mandatory TDD.
   N5 -> visual verification.
-- **The bottleneck was verification, not the model.** N1 introduces real
-  containers -> the bottleneck will be Podman setup in CI and locally. Run spike
-  prior to implementation.
+- **The bottleneck was verification, not the model.** N1 is on `dev`; `bun test`
+  uses a mock Podman driver. GitHub Actions are still absent
+  ([#42](https://github.com/snattydev/cardinal-system/issues/42)).
 - **Unified suite at the close of every sprint.** Do not rely on per-agent
   assertions: ground truth is `bun test` run from root.

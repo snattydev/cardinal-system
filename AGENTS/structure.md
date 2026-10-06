@@ -17,15 +17,17 @@ cardinal-system/
 │   ├── ws/                    protocol, hub, messages
 │   ├── db/                    schema, migrations, queries
 │   ├── router/                model routing (Phase 2)
+│   ├── worker/                N1 maintenance worker (on `dev` since PR #36; absent from `main`)
 │   └── mcp/                   MCP hub (Phase 2)
 ├── backend/
-│   └── src/                   composition: server, api handlers, static serve
+│   └── src/                   composition: server, api handlers, orchestrator, static serve
 ├── frontend/
 │   └── src/                   React + Vite + Tailwind v4
 ├── examples/
 │   └── ws-agent.ts            reference WS client (not an SDK)
 ├── deploy/
 │   ├── Containerfile
+│   ├── Containerfile.worker   N1 image (on `dev`)
 │   ├── Caddyfile.example
 │   └── quadlet/
 ├── docs/
