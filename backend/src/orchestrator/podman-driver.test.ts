@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildPodmanRunArgs } from "./podman-driver";
+import { buildPodmanRunArgs, workerContainerName } from "./podman-driver";
 
 describe("buildPodmanRunArgs", () => {
   test("binds the worker to the internal network and publishes no host ports", () => {
@@ -30,5 +30,12 @@ describe("buildPodmanRunArgs", () => {
     expect(args).toContain("CARDINAL_URL=http://backend:8787");
     expect(args).toContain("CARDINAL_KEY=test-key");
     expect(args.at(-1)).toBe("localhost/cardinal-worker:latest");
+  });
+
+  test("strips container-name metacharacters from the task id", () => {
+    expect(workerContainerName("task-1", 5)).toBe("cardinal-worker-task-1-5");
+    const hostile = workerContainerName("task/../$(rm)", 1000);
+    expect(hostile).toBe("cardinal-worker-task______rm_-1000");
+    expect(hostile).toMatch(/^cardinal-worker-[A-Za-z0-9_-]+-1000$/);
   });
 });

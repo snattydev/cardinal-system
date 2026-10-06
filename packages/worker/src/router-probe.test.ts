@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { executeWorkerTask } from "./runner";
 import {
   probeRouterModels,
+  routerProbeConfigFromEnv,
   RouterProbeError,
   type FetchLike,
 } from "./router-probe";
@@ -43,6 +44,66 @@ describe("probeRouterModels", () => {
     expect(headers.get("authorization")).toBe("Bearer ephemeral-test-key");
   });
 
+  test("reads the router target from CARDINAL_URL and CARDINAL_KEY", () => {
+    expect(
+      routerProbeConfigFromEnv({
+        CARDINAL_URL: "http://backend:8787",
+        CARDINAL_KEY: "ephemeral-test-key",
+      }),
+    ).toEqual({
+      baseUrl: "http://backend:8787",
+      apiKey: "ephemeral-test-key",
+    });
+    expect(routerProbeConfigFromEnv({})).toEqual({ baseUrl: "", apiKey: "" });
+  });
+
+  test("rejects a missing base URL before calling the router", async () => {
+    let called = false;
+    const fetchImpl: FetchLike = async () => {
+      called = true;
+      return jsonResponse(200, { data: [] });
+    };
+    await expect(
+      probeRouterModels({ baseUrl: "  ", apiKey: "ephemeral-test-key", fetchImpl }),
+    ).rejects.toBeInstanceOf(RouterProbeError);
+    expect(called).toBe(false);
+  });
+
+  test("wraps a transport failure without adding the key to the message", async () => {
+    const fetchImpl: FetchLike = async () => {
+      throw new Error("connection refused");
+    };
+    const error = await probeRouterModels({
+      baseUrl: "http://backend:8787",
+      apiKey: "ephemeral-test-key",
+      fetchImpl,
+    }).catch((err: unknown) => err);
+    expect(error).toBeInstanceOf(RouterProbeError);
+    expect((error as Error).message).toContain("connection refused");
+    expect((error as Error).message).not.toContain("ephemeral-test-key");
+  });
+
+  test("rejects invalid JSON and a body that is not a model list", async () => {
+    const invalidJson: FetchLike = async () =>
+      new Response("not-json", { status: 200, headers: { "content-type": "text/plain" } });
+    await expect(
+      probeRouterModels({
+        baseUrl: "http://backend:8787",
+        apiKey: "ephemeral-test-key",
+        fetchImpl: invalidJson,
+      }),
+    ).rejects.toThrow("invalid JSON");
+
+    const unexpected: FetchLike = async () => jsonResponse(200, { models: ["fusion"] });
+    await expect(
+      probeRouterModels({
+        baseUrl: "http://backend:8787",
+        apiKey: "ephemeral-test-key",
+        fetchImpl: unexpected,
+      }),
+    ).rejects.toThrow("unexpected body");
+  });
+
   test("rejects a missing key before calling the router", async () => {
     const fetchImpl: FetchLike = async () => {
       throw new Error("fetch should not run");
@@ -80,8 +141,32 @@ describe("probeRouterModels", () => {
       }),
     );
     expect(output.status).toBe("success");
+    expect(output.summary).toContain("Maintenance task task-9");
     expect(output.summary).toContain("router models=2");
     expect(output.summary).toContain("Check router");
     expect(output.summary).not.toContain("ephemeral-test-key");
+  });
+
+  test("labels hygiene and summary tasks in the success summary", async () => {
+    const fetchImpl: FetchLike = async () => jsonResponse(200, { data: [] });
+    const handler = createDefaultTaskHandler({
+      baseUrl: "http://backend:8787",
+      apiKey: "ephemeral-test-key",
+      fetchImpl,
+    });
+
+    const hygiene = await executeWorkerTask(
+      { ...input, taskType: "hygiene", prompt: "prune" },
+      handler,
+    );
+    const summary = await executeWorkerTask(
+      { ...input, taskType: "summary", prompt: "rollup" },
+      handler,
+    );
+
+    expect(hygiene.summary).toContain("Hygiene task task-9");
+    expect(hygiene.summary).toContain("router models=0");
+    expect(summary.summary).toContain("Summary task task-9");
+    expect(summary.summary).toContain("rollup");
   });
 });

@@ -11,6 +11,11 @@ export interface PodmanDriverOptions {
   cpuLimit?: string;
 }
 
+export function workerContainerName(taskId: string, nowMs: number): string {
+  const safeTaskId = taskId.replace(/[^a-zA-Z0-9_-]/g, "_");
+  return `cardinal-worker-${safeTaskId}-${nowMs}`;
+}
+
 export function buildPodmanRunArgs(
   options: SpawnWorkerOptions,
   limits: Required<Pick<PodmanDriverOptions, "imageName" | "network" | "memoryLimit" | "cpuLimit">>,
@@ -52,8 +57,7 @@ export class PodmanWorkerDriver implements WorkerDriver {
   }
 
   async spawn(options: SpawnWorkerOptions): Promise<WorkerExecutionResult> {
-    const safeTaskId = options.taskId.replace(/[^a-zA-Z0-9_-]/g, "_");
-    const containerName = `cardinal-worker-${safeTaskId}-${Date.now()}`;
+    const containerName = workerContainerName(options.taskId, Date.now());
     const timeoutSeconds = options.timeoutSeconds ?? 300;
 
     const inputJson = JSON.stringify({
