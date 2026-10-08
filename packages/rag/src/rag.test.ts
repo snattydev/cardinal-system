@@ -93,6 +93,14 @@ describe("rag cache (getCached/putCached)", () => {
     db.close();
   });
 
+  test("corrupt cached JSON is a miss", async () => {
+    const db = createDb(":memory:");
+    await putCached(db, "kirito", 5, "[]");
+    db.run("UPDATE rag_cache SET results = ?", ["{not-json"]);
+    expect(await getCached(db, "kirito", 5)).toBeNull();
+    db.close();
+  });
+
   test("entrada vieja (más de 1 hora) → null", async () => {
     const db = createDb(":memory:");
     await putCached(db, "kirito", 5, JSON.stringify([{ path: "a.md", score: 1, content: "x", source: "vault" }]));
@@ -180,6 +188,32 @@ describe("searchWithCache", () => {
       throw new Error("ECONNREFUSED");
     };
     await expect(searchWithCache(db, { query: "kirito", fetchImpl })).rejects.toThrow(RagUpstreamError);
+    db.close();
+  });
+
+  test("corrupt cache is ignored and the upstream is called", async () => {
+    const db = createDb(":memory:");
+    await putCached(db, "kirito", 5, "[]");
+    db.run("UPDATE rag_cache SET results = ?", ["{not-json"]);
+    let calls = 0;
+    const fetchImpl = async () => {
+      calls++;
+      return new Response(JSON.stringify({ results: [{ file_path: "a.md", content: "x" }] }), {
+        status: 200,
+      });
+    };
+    const result = await searchWithCache(db, { query: "kirito", fetchImpl, baseUrl: "http://vault:8788" });
+    expect(calls).toBe(1);
+    expect(result.cached).toBe(false);
+    expect(result.results).toEqual([{ path: "a.md", score: 0, content: "x", source: "vault" }]);
+    db.close();
+  });
+
+  test("a missing or non-array results field becomes an empty list", async () => {
+    const db = createDb(":memory:");
+    const fetchImpl = async () => new Response(JSON.stringify({ results: { file_path: "a.md" } }), { status: 200 });
+    const result = await searchWithCache(db, { query: "kirito", fetchImpl, baseUrl: "http://vault:8788" });
+    expect(result).toEqual({ results: [], cached: false });
     db.close();
   });
 

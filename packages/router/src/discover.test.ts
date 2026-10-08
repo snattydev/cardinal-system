@@ -23,6 +23,15 @@ describe("modelsUrl", () => {
       "https://generativelanguage.googleapis.com/v1beta/models",
     );
   });
+
+  test("strips trailing slashes and keeps an existing gemini version prefix", () => {
+    expect(modelsUrl("https://example.com/v1/", "openai")).toBe("https://example.com/v1/models");
+    expect(modelsUrl("https://example.com/v1beta/", "gemini")).toBe("https://example.com/v1beta/models");
+    expect(modelsUrl("https://example.com/v1/", "gemini")).toBe("https://example.com/v1/models");
+    expect(modelsUrl("https://api.anthropic.com/", "anthropic")).toBe(
+      "https://api.anthropic.com/v1/models",
+    );
+  });
 });
 
 describe("fetchProviderModels", () => {
@@ -69,5 +78,67 @@ describe("fetchProviderModels", () => {
     await expect(fetchProviderModels("https://example.com/v1", "bad", "openai")).rejects.toThrow(
       ModelFetchError,
     );
+  });
+
+  test("anthropic sends versioned key headers and returns a sorted unique id list", async () => {
+    globalThis.fetch = (async (input, init) => {
+      expect(String(input)).toBe("https://api.anthropic.com/v1/models");
+      expect(init?.headers).toEqual({
+        "x-api-key": "sk-ant",
+        "anthropic-version": "2023-06-01",
+      });
+      return new Response(
+        JSON.stringify({
+          data: [
+            { id: "claude-sonnet" },
+            { id: "" },
+            { id: 12 },
+            null,
+            { id: "claude-haiku" },
+            { id: "claude-sonnet" },
+          ],
+        }),
+        { status: 200 },
+      );
+    }) as typeof fetch;
+
+    const ids = await fetchProviderModels("https://api.anthropic.com", "sk-ant", "anthropic");
+    expect(ids).toEqual(["claude-haiku", "claude-sonnet"]);
+  });
+
+  test("omits credentials when the api key is missing", async () => {
+    globalThis.fetch = (async (input, init) => {
+      expect(String(input)).toBe("https://example.com/v1/models");
+      expect(init?.headers).toEqual({});
+      return new Response(JSON.stringify({ data: [{ id: "local" }] }), { status: 200 });
+    }) as typeof fetch;
+    expect(await fetchProviderModels("https://example.com/v1", null, "openai")).toEqual(["local"]);
+
+    globalThis.fetch = (async (input) => {
+      expect(String(input)).toBe("https://generativelanguage.googleapis.com/v1beta/models");
+      return new Response(JSON.stringify({ models: [{ name: "models/gemini-flash" }] }), { status: 200 });
+    }) as typeof fetch;
+    expect(
+      await fetchProviderModels("https://generativelanguage.googleapis.com", "", "gemini"),
+    ).toEqual(["gemini-flash"]);
+  });
+
+  test("rejects a non-JSON body and a catalog that is not a list", async () => {
+    globalThis.fetch = (async () => new Response("not-json", { status: 200 })) as typeof fetch;
+    await expect(fetchProviderModels("https://example.com/v1", null, "openai")).rejects.toThrow(
+      /invalid_response/,
+    );
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ data: { id: "gpt-4o" } }), { status: 200 })) as typeof fetch;
+    await expect(fetchProviderModels("https://example.com/v1", null, "openai")).rejects.toThrow(
+      /invalid_response/,
+    );
+
+    globalThis.fetch = (async () =>
+      new Response(JSON.stringify({ models: "gemini-pro" }), { status: 200 })) as typeof fetch;
+    await expect(
+      fetchProviderModels("https://generativelanguage.googleapis.com", null, "gemini"),
+    ).rejects.toThrow(/invalid_response/);
   });
 });

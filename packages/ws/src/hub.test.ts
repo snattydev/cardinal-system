@@ -221,6 +221,73 @@ describe("Hub", () => {
     hub.websocket.close(second.ws);
     expect(getAgent(db, "shinon")?.connected).toBe(0);
   });
+
+  test("hello and subscribe after identification return already_identified and keep the session", () => {
+    const { db, hub } = makeHub();
+    const agent = mockWs();
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc", status: "idle" }));
+
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "other", status: "busy" }));
+    expect(agent.sent[agent.sent.length - 1]).toEqual({ type: "error", reason: "already_identified" });
+    expect(agent.closed).toEqual([]);
+    expect(getAgent(db, "shinon")).toMatchObject({ connected: 1, device: "pc", status: "idle" });
+
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "subscribe" }));
+    expect(agent.sent[agent.sent.length - 1]).toEqual({ type: "error", reason: "already_identified" });
+    expect(agent.closed).toEqual([]);
+    expect(getAgent(db, "shinon")?.connected).toBe(1);
+  });
+
+  test("pong and bye before hello are ignored", () => {
+    const { db, hub } = makeHub();
+    const agent = mockWs();
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "pong", status: "busy" }));
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "bye" }));
+
+    expect(agent.sent).toEqual([]);
+    expect(agent.closed).toEqual([]);
+    expect(getAgent(db, "shinon")?.connected).toBe(0);
+    expect(listEvents(db, "shinon")).toEqual([]);
+  });
+
+  test("pong without status keeps the current status", () => {
+    const { db, hub } = makeHub();
+    const agent = mockWs();
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc", status: "idle" }));
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "pong", status: "busy" }));
+    const statusEvents = () => listEvents(db, "shinon").filter((event) => event.type === "status");
+    expect(statusEvents()).toHaveLength(1);
+
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "pong" }));
+    expect(getAgent(db, "shinon")?.status).toBe("busy");
+    expect(statusEvents()).toHaveLength(1);
+  });
+
+  test("a Buffer frame is parsed the same way as a string", () => {
+    const { hub } = makeHub();
+    const agent = mockWs();
+    hub.websocket.message(
+      agent.ws,
+      Buffer.from(JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc" })),
+    );
+    expect(agent.sent[0]).toEqual({ type: "welcome", agent: "shinon", kind: "agent" });
+  });
+
+  test("closing a dashboard stops broadcasts and does not disconnect the agent", () => {
+    const { db, hub } = makeHub();
+    const dash = mockWs({ dashboardAuthed: true });
+    hub.websocket.message(dash.ws, JSON.stringify({ type: "subscribe" }));
+    const agent = mockWs();
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc" }));
+    const before = dash.sent.length;
+
+    hub.websocket.close(dash.ws);
+    expect(getAgent(db, "shinon")?.connected).toBe(1);
+
+    hub.websocket.message(agent.ws, JSON.stringify({ type: "pong", status: "busy" }));
+    expect(dash.sent).toHaveLength(before);
+    expect(getAgent(db, "shinon")?.status).toBe("busy");
+  });
 });
 
 describe("task broadcast", () => {

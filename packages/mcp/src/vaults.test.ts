@@ -56,4 +56,22 @@ describe("readVaultFile", () => {
   test("archivo inexistente → error", async () => {
     await expect(readVaultFile("the portal", "missing.md")).rejects.toThrow(/not found/i);
   });
+
+  test("rejects vault names that could escape the vault root", async () => {
+    for (const name of ["../for-my-agents", "the portal/sub", "the\\portal", ".."]) {
+      await expect(listVaultFiles(name)).rejects.toThrow(/invalid vault name/i);
+      await expect(readVaultFile(name, "index.md")).rejects.toThrow(/invalid vault name/i);
+    }
+  });
+
+  test("rejects null bytes, broken encodings, and paths that resolve to the vault root", async () => {
+    await expect(readVaultFile("the portal", "index.md\0")).rejects.toThrow(/invalid path/i);
+    await expect(readVaultFile("the portal", "%")).rejects.toThrow(/invalid path/i);
+    await expect(readVaultFile("the portal", "")).rejects.toThrow(/traversal/i);
+    await expect(readVaultFile("the portal", ".")).rejects.toThrow(/traversal/i);
+  });
+
+  test("decodes a percent-encoded path that stays inside the vault", async () => {
+    expect(await readVaultFile("the portal", "sub%2Fnote.md")).toBe("nota\n");
+  });
 });
