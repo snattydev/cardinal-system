@@ -35,4 +35,10 @@ describe("canAccessVault", () => {
     expect(canAccessVault(["vault:the portal"], "the portal", VAULTS)).toBe(true);
     expect(canAccessVault(["vault:the portal"], "for-my-agents", VAULTS)).toBe(false);
   });
+
+  test("star does not authorize a vault outside the known set", () => {
+    expect(canAccessVault(["*"], "other", VAULTS)).toBe(false);
+    expect(canAccessVault(["*", "vault:other"], "other", VAULTS)).toBe(false);
+    expect(allowedVaults(["*", "vault:other"], VAULTS)).toEqual(new Set(VAULTS));
+  });
 });

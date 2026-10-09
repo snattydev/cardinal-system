@@ -84,4 +84,66 @@ describe("createValidator", () => {
     expect(await validate("bad")).toBeNull();
     expect(count).toBe(1);
   });
+
+  test("a 200 that is not a string-scoped identity is a cached denial", async () => {
+    const malformed = [
+      { agent: "a", scopes: ["*"] },
+      { kind: "agent", scopes: ["*"] },
+      { agent: "a", kind: "agent", scopes: "not-array" },
+      { agent: "a", kind: "agent", scopes: ["*", 1] },
+      { agent: "a", kind: "agent" },
+      ["a"],
+    ];
+    for (const body of malformed) {
+      let count = 0;
+      const fetchImpl = async (): Promise<Response> => {
+        count++;
+        if (count === 1) return jsonResponse(200, body);
+        return jsonResponse(200, { agent: "a", kind: "agent", scopes: ["*"] });
+      };
+      let now = 1_000;
+      const validate = createValidator(BACKEND, { fetchImpl, ttlMs: 500, now: () => now });
+      expect(await validate("k")).toBeNull();
+      expect(await validate("k")).toBeNull();
+      expect(count).toBe(1);
+      now += 501;
+      expect(await validate("k")).toEqual({ agent: "a", kind: "agent", scopes: ["*"] });
+      expect(count).toBe(2);
+    }
+  });
+
+  test("a JSON null identity does not authenticate", async () => {
+    const fetchImpl = async (): Promise<Response> => jsonResponse(200, null);
+    const validate = createValidator(BACKEND, { fetchImpl, ttlMs: 60_000 });
+    expect(await validate("k")).toBeNull();
+    expect(await validate("k")).toBeNull();
+  });
+
+  test("a non-401 backend failure is not cached", async () => {
+    for (const status of [403, 500, 503]) {
+      let count = 0;
+      const fetchImpl = async (): Promise<Response> => {
+        count++;
+        if (count === 1) return jsonResponse(status, { error: "down" });
+        return jsonResponse(200, { agent: "a", kind: "agent", scopes: ["fast"] });
+      };
+      const validate = createValidator(BACKEND, { fetchImpl, ttlMs: 60_000 });
+      expect(await validate("k")).toBeNull();
+      expect(await validate("k")).toEqual({ agent: "a", kind: "agent", scopes: ["fast"] });
+      expect(count).toBe(2);
+    }
+  });
+
+  test("a 200 with invalid JSON is a miss and is not cached", async () => {
+    let count = 0;
+    const fetchImpl = async (): Promise<Response> => {
+      count++;
+      if (count === 1) return new Response("not-json", { status: 200 });
+      return jsonResponse(200, { agent: "a", kind: "agent", scopes: [] });
+    };
+    const validate = createValidator(BACKEND, { fetchImpl, ttlMs: 60_000 });
+    expect(await validate("k")).toBeNull();
+    expect(await validate("k")).toEqual({ agent: "a", kind: "agent", scopes: [] });
+    expect(count).toBe(2);
+  });
 });

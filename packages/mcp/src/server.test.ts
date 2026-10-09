@@ -23,14 +23,21 @@ interface FakeMessage {
   read: number;
 }
 
+interface RagCall {
+  authorization: string;
+  body: string;
+}
+
 interface FakeBackendState {
   validKeys: Map<string, { agent: string; kind: string; scopes: string[] }>;
   searchResults?: unknown;
+  ragCalls: RagCall[];
+  ragStatus?: number;
   tasks: FakeTask[];
   messages: FakeMessage[];
 }
 
-function makeDeps(state: FakeBackendState) {
+function makeDeps(state: FakeBackendState, options?: { serviceKey?: string }) {
   const fetchImpl = (async (url: any, init?: any): Promise<Response> => {
     const urlStr = String(url);
     const method = String(init?.method ?? "GET").toUpperCase();
@@ -43,6 +50,10 @@ function makeDeps(state: FakeBackendState) {
       return Response.json(id);
     }
     if (urlStr.includes("/api/rag/search")) {
+      state.ragCalls.push({ authorization: auth, body: String(init?.body ?? "") });
+      if (state.ragStatus !== undefined && state.ragStatus !== 200) {
+        return Response.json({ error: "upstream" }, { status: state.ragStatus });
+      }
       return Response.json({ results: state.searchResults ?? [] });
     }
 
@@ -116,6 +127,7 @@ function makeDeps(state: FakeBackendState) {
   }) as typeof fetch;
   const server = createMcpServer({
     backendUrl: "http://backend:8787",
+    serviceKey: options?.serviceKey,
     vaultsRoot: "/nonexistent",
     knownVaults: VAULTS,
     fetchImpl,
@@ -153,6 +165,7 @@ function makeState(): FakeBackendState {
       [KEY_OK, { agent: "shinon", kind: "agent", scopes: ["*"] }],
       [KEY_SCOPED, { agent: "writer", kind: "agent", scopes: ["vault:the portal"] }],
     ]),
+    ragCalls: [],
     tasks: [],
     messages: [],
   };
@@ -432,5 +445,184 @@ describe("MCP server /mcp", () => {
     });
     expect(json.result.isError).toBe(true);
     expect(json.result.content[0].text).toMatch(/forbidden|scope/i);
+  });
+
+  test("RAG search uses the service key and still filters by the caller scope", async () => {
+    const state = makeState();
+    const serviceKey = "sk-cardinal-service";
+    state.searchResults = [
+      {
+        path: "/data/vaults/the portal/index.md",
+        score: 0.9,
+        content: "portal-body",
+        source: "vault",
+      },
+      {
+        path: "/data/vaults/for-my-agents/tasks.md",
+        score: 0.8,
+        content: "AGENT-VAULT-LEAK",
+        source: "vault",
+      },
+    ];
+    const { rpcJson } = makeDeps(state, { serviceKey });
+    const { json } = await rpcJson(KEY_SCOPED, {
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools/call",
+      params: {
+        name: "cardinal_search_memory",
+        arguments: { query: "hola", top_k: 2, vault: "the portal" },
+      },
+    });
+
+    expect(state.ragCalls).toHaveLength(1);
+    expect(state.ragCalls[0]!.authorization).toBe(`Bearer ${serviceKey}`);
+    expect(state.ragCalls[0]!.authorization).not.toContain(KEY_SCOPED);
+    expect(JSON.parse(state.ragCalls[0]!.body)).toEqual({ query: "hola", top_k: 2 });
+    const text = json.result.content[0].text as string;
+    const content = JSON.parse(text);
+    expect(content.results).toHaveLength(1);
+    expect(content.results[0].vault).toBe("the portal");
+    expect(content.results[0].path).toBe("index.md");
+    expect(text).not.toContain(serviceKey);
+    expect(text).not.toContain("AGENT-VAULT-LEAK");
+  });
+
+  test("RAG search without a service key does not forward the caller key", async () => {
+    const state = makeState();
+    state.searchResults = [];
+    const { rpcJson } = makeDeps(state);
+    await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 9,
+      method: "tools/call",
+      params: { name: "cardinal_search_memory", arguments: { query: "hola" } },
+    });
+    expect(state.ragCalls).toHaveLength(1);
+    expect(state.ragCalls[0]!.authorization).toBe("");
+    expect(state.ragCalls[0]!.authorization).not.toContain(KEY_OK);
+  });
+
+  test("a vault argument keeps only that vault for a wildcard key", async () => {
+    const state = makeState();
+    state.searchResults = [
+      {
+        path: "/data/vaults/the portal/index.md",
+        score: 0.9,
+        content: "portal-body",
+        source: "vault",
+      },
+      {
+        path: "/data/vaults/for-my-agents/tasks.md",
+        score: 0.8,
+        content: "AGENT-VAULT-LEAK",
+        source: "vault",
+      },
+    ];
+    const { rpcJson } = makeDeps(state);
+    const { json } = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: {
+        name: "cardinal_search_memory",
+        arguments: { query: "hola", vault: "for-my-agents" },
+      },
+    });
+    const content = JSON.parse(json.result.content[0].text);
+    expect(content.results).toHaveLength(1);
+    expect(content.results[0].vault).toBe("for-my-agents");
+    expect(content.results[0].path).toBe("tasks.md");
+    expect(json.result.content[0].text).not.toContain("portal-body");
+  });
+
+  test("a path that only shares a vault prefix is not treated as that vault", async () => {
+    const state = makeState();
+    state.searchResults = [
+      {
+        path: "/data/vaults/the portal-evil/index.md",
+        score: 1,
+        content: "PREFIX-LEAK",
+        source: "vault",
+      },
+    ];
+    const { rpcJson } = makeDeps(state);
+    for (const key of [KEY_SCOPED, KEY_OK]) {
+      const { json } = await rpcJson(key, {
+        jsonrpc: "2.0",
+        id: 11,
+        method: "tools/call",
+        params: { name: "cardinal_search_memory", arguments: { query: "hola" } },
+      });
+      const content = JSON.parse(json.result.content[0].text);
+      expect(content.results).toEqual([]);
+      expect(json.result.content[0].text).not.toContain("PREFIX-LEAK");
+    }
+  });
+
+  test("a blank search query fails before calling the backend", async () => {
+    const state = makeState();
+    const { rpcJson } = makeDeps(state, { serviceKey: "sk-cardinal-service" });
+    const { json } = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 12,
+      method: "tools/call",
+      params: { name: "cardinal_search_memory", arguments: { query: "   " } },
+    });
+    expect(json.result.isError).toBe(true);
+    expect(json.result.content[0].text).toBe("missing query");
+    expect(state.ragCalls).toHaveLength(0);
+  });
+
+  test("a non-numeric top_k is not forwarded to RAG", async () => {
+    const state = makeState();
+    const { rpcJson } = makeDeps(state);
+    await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 13,
+      method: "tools/call",
+      params: { name: "cardinal_search_memory", arguments: { query: "hola", top_k: "9" } },
+    });
+    expect(JSON.parse(state.ragCalls[0]!.body)).toEqual({ query: "hola" });
+  });
+
+  test("a failed RAG upstream is an error result and does not echo keys", async () => {
+    const state = makeState();
+    state.ragStatus = 502;
+    const serviceKey = "sk-cardinal-service";
+    const { rpcJson } = makeDeps(state, { serviceKey });
+    const { json } = await rpcJson(KEY_SCOPED, {
+      jsonrpc: "2.0",
+      id: 14,
+      method: "tools/call",
+      params: { name: "cardinal_search_memory", arguments: { query: "hola" } },
+    });
+    expect(json.result.isError).toBe(true);
+    const text = json.result.content[0].text as string;
+    expect(text).toContain("502");
+    expect(text).not.toContain(serviceKey);
+    expect(text).not.toContain(KEY_SCOPED);
+  });
+
+  test("tools/call rejects a non-string name and a non-object arguments value", async () => {
+    const { rpcJson } = makeDeps(makeState());
+    const badArgs = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 15,
+      method: "tools/call",
+      params: { name: "cardinal_search_memory", arguments: "nope" },
+    });
+    expect(badArgs.json.id).toBe(15);
+    expect(badArgs.json.error.code).toBe(-32602);
+    expect(badArgs.json.result).toBeUndefined();
+
+    const badName = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 16,
+      method: "tools/call",
+      params: { name: 1, arguments: { query: "hola" } },
+    });
+    expect(badName.json.id).toBe(16);
+    expect(badName.json.error.code).toBe(-32602);
   });
 });
