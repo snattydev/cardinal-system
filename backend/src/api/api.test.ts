@@ -698,6 +698,90 @@ describe("handleRagSearch", () => {
     expect(calls).toHaveLength(1);
     db.close();
   });
+
+  test("multiple vault scopes keep every matching vault", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal", "vault:for-my-agents"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("a vault scope does not match a longer directory or a filename", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(
+      [
+        { file_path: "/data/vaults/the portal/index.md", content: "portal", heading: "", rrf_score: 0.9 },
+        { file_path: "/data/vaults/the portal-archive/secret.md", content: "archive", heading: "", rrf_score: 0.8 },
+        { file_path: "/data/vaults/other/the portal.md", content: "name only", heading: "", rrf_score: 0.7 },
+      ],
+      calls,
+    );
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+    db.close();
+  });
+
+  test("a wildcard scope is not narrowed by a sibling vault scope", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch(twoVaultHits, calls);
+    const res = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal", "*"],
+    });
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { results: Array<{ path: string }> };
+    expect(body.results.map((r) => r.path)).toEqual([
+      "/data/vaults/the portal/index.md",
+      "/data/vaults/for-my-agents/tasks.md",
+    ]);
+    db.close();
+  });
+
+  test("non-numeric top_k stays at the default and numeric strings are floored into [1,10]", async () => {
+    const db = createDb(":memory:");
+    const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+    const fetchImpl = mockRagFetch([], calls);
+
+    await handleRagSearch(db, ragReq({ query: "top-k-default", top_k: "nope" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    await handleRagSearch(db, ragReq({ query: "top-k-fraction", top_k: "2.9" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    await handleRagSearch(db, ragReq({ query: "top-k-zero", top_k: 0 }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+    await handleRagSearch(db, ragReq({ query: "top-k-negative", top_k: -3 }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+    });
+
+    expect(calls.map((call) => call.body.top_k)).toEqual([5, 2, 1, 1]);
+    db.close();
+  });
 });
 
 describe("handleGetConfig", () => {
