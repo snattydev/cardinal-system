@@ -263,6 +263,21 @@ describe("handleClaimTask", () => {
     db.close();
   });
 
+  test("by that is not a string → 400 and the task stays open", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "numeric claimer");
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: 12 }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    const body = (await handleGetTask(db, created.id).json()) as { task: { status: string; assigned_to: string | null } };
+    expect(body.task).toMatchObject({ status: "open", assigned_to: null });
+    db.close();
+  });
+
   test("by solo espacios → 400 {error: 'bad_request'}", async () => {
     const db = createDb(":memory:");
     const created = await createOpenTask(db, "needs by");
@@ -341,6 +356,53 @@ describe("handleCompleteTask", () => {
     );
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("actorAgent on a missing task is 404, not 403", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCompleteTask(
+      db,
+      "missing",
+      jsonReq("http://localhost/api/tasks/missing/complete", "PUT", { summary: "x" }),
+      undefined,
+      "shinon",
+    );
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+    db.close();
+  });
+
+  test("non-string summary and artifact_ref are stored as null", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "typed fields");
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", {
+        summary: { text: "not a string" },
+        artifact_ref: 12,
+      }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { summary: string | null; artifact_ref: string | null; status: string } };
+    expect(body.task).toMatchObject({ status: "done", summary: null, artifact_ref: null });
+    db.close();
+  });
+
+  test("invalid JSON does not complete the task", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "stay open");
+    const res = await handleCompleteTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/complete", "PUT", "not-json"),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "bad_request" });
+    expect(handleGetTask(db, created.id).status).toBe(200);
+    const body = (await handleGetTask(db, created.id).json()) as { task: { status: string } };
+    expect(body.task.status).toBe("open");
     db.close();
   });
 
