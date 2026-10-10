@@ -70,4 +70,46 @@ describe("fetchProviderModels", () => {
       ModelFetchError,
     );
   });
+
+  test("encodes a Gemini key into the query and omits it from headers", async () => {
+    const apiKey = "gem key&next=1";
+    let seenUrl = "";
+    let seenHeaders: HeadersInit | undefined;
+    globalThis.fetch = (async (input, init) => {
+      seenUrl = String(input);
+      seenHeaders = init?.headers;
+      return new Response(JSON.stringify({ models: [{ name: "models/gemini-2.0-flash" }] }), {
+        status: 200,
+      });
+    }) as typeof fetch;
+
+    const ids = await fetchProviderModels(
+      "https://generativelanguage.googleapis.com?existing=1",
+      apiKey,
+      "gemini",
+    );
+    expect(ids).toEqual(["gemini-2.0-flash"]);
+    const url = new URL(seenUrl);
+    expect(url.searchParams.get("key")).toBe(apiKey);
+    expect(url.searchParams.get("next")).toBeNull();
+    expect(seenUrl.includes(`key=${encodeURIComponent(apiKey)}`)).toBe(true);
+    const headers = new Headers(seenHeaders);
+    expect(headers.get("authorization")).toBeNull();
+    expect(headers.get("x-api-key")).toBeNull();
+  });
+
+  test("an upstream error does not include the api key", async () => {
+    const apiKey = "sk-super-secret";
+    globalThis.fetch = (async () => new Response(`body includes ${apiKey}`, { status: 403 })) as typeof fetch;
+    try {
+      await fetchProviderModels("https://example.com/v1", apiKey, "openai");
+      throw new Error("expected ModelFetchError");
+    } catch (err) {
+      expect(err).toBeInstanceOf(ModelFetchError);
+      const message = (err as Error).message;
+      expect(message).toContain("403");
+      expect(message).not.toContain(apiKey);
+      expect(message).not.toContain("body includes");
+    }
+  });
 });

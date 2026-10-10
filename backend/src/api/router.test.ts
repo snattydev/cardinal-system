@@ -10,7 +10,7 @@ import {
   upsertModelRoute,
   upsertProvider,
 } from "@cardinal/db";
-import { generateKey, hashKey } from "@cardinal/keys";
+import { encryptSecret, generateKey, hashKey } from "@cardinal/keys";
 import { extractBearerKey, handleChatCompletions, handleListModels } from "./router";
 
 const COMPLETION_OK = {
@@ -31,14 +31,19 @@ const config: Config = {
 
 let mock: ReturnType<typeof Bun.serve>;
 let mockOrigin = "";
+let lastUpstream: { authorization: string | null; body: string } | null = null;
 
 beforeAll(() => {
   mock = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
       if (url.pathname === "/v1/chat/completions") {
+        lastUpstream = {
+          authorization: req.headers.get("authorization"),
+          body: await req.text(),
+        };
         return Response.json(COMPLETION_OK);
       }
       return new Response("error", { status: 500 });
@@ -105,6 +110,18 @@ describe("extractBearerKey", () => {
 
   test("returns null when the key is not sk-cardinal-* format", () => {
     const req = new Request("http://localhost/", { headers: { authorization: "Bearer sk-cardinal-short" } });
+    expect(extractBearerKey(req)).toBeNull();
+  });
+
+  test("accepts any bearer scheme casing", () => {
+    const key = generateKey();
+    const req = new Request("http://localhost/", { headers: { authorization: `bearer ${key}` } });
+    expect(extractBearerKey(req)).toBe(key);
+  });
+
+  test("rejects a bearer header with trailing tokens", () => {
+    const key = generateKey();
+    const req = new Request("http://localhost/", { headers: { authorization: `Bearer ${key} extra` } });
     expect(extractBearerKey(req)).toBeNull();
   });
 });
@@ -221,6 +238,67 @@ describe("handleChatCompletions", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as { choices: Array<{ message: { content: string } }> };
     expect(body.choices[0]?.message.content).toBe("ok");
+    db.close();
+  });
+
+  test("sends the provider key upstream and never the caller key", async () => {
+    const db = createDb(":memory:");
+    const providerSecret = "provider-live-secret";
+    upsertProvider(db, {
+      name: "http-keyed",
+      baseUrl: mockOrigin,
+      apiKeyEnc: encryptSecret(providerSecret, config.poolSecret),
+    });
+    const provider = getProviderByName(db, "http-keyed");
+    if (provider === null) throw new Error("keyed provider missing");
+    addProviderModel(db, { providerId: provider.id, modelId: "test-model" });
+    const key = makeRawKey(db);
+    lastUpstream = null;
+
+    const res = await handleChatCompletions(
+      completionReq(key, JSON.stringify({ model: "test-model", messages: [{ role: "user", content: "hi" }] })),
+      db,
+      config,
+    );
+    expect(res.status).toBe(200);
+    expect(lastUpstream?.authorization).toBe(`Bearer ${providerSecret}`);
+    expect(lastUpstream?.authorization).not.toContain(key);
+    expect(lastUpstream?.body ?? "").not.toContain(key);
+    db.close();
+  });
+
+  test("drops non-boolean stream and non-array messages, and keeps zero sampling limits", async () => {
+    const db = createDb(":memory:");
+    seedProvider(db, "http-shape", mockOrigin);
+    const key = makeRawKey(db);
+    lastUpstream = null;
+
+    const res = await handleChatCompletions(
+      completionReq(
+        key,
+        JSON.stringify({
+          model: "test-model",
+          messages: "not-an-array",
+          stream: "true",
+          temperature: 0,
+          max_tokens: 0,
+          tools: "not-tools",
+        }),
+      ),
+      db,
+      config,
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("application/json");
+    const sent = JSON.parse(lastUpstream?.body ?? "{}") as Record<string, unknown>;
+    expect(sent).toEqual({
+      model: "test-model",
+      messages: [],
+      temperature: 0,
+      max_tokens: 0,
+    });
+    const body = (await res.json()) as { choices: unknown[] };
+    expect(Array.isArray(body.choices)).toBe(true);
     db.close();
   });
 });
