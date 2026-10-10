@@ -349,4 +349,82 @@ describe("handleValidateKey", () => {
     expect((await handleValidateKey(db, postValidate(12345))).status).toBe(400);
     db.close();
   });
+
+  test("expired key → 401 and last_used_at stays unset", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const key = generateKey();
+    createAgentKey(db, {
+      keyHash: hashKey(key),
+      agentName: "shinon",
+      expiresAt: new Date(Date.now() - 60_000).toISOString(),
+    });
+
+    const res = await handleValidateKey(db, postValidate(key));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+    const row = db.query("SELECT last_used_at FROM agent_keys WHERE key_hash = ?").get(hashKey(key)) as {
+      last_used_at: string | null;
+    };
+    expect(row.last_used_at).toBeNull();
+    db.close();
+  });
+
+  test("kind_override wins over the agent profile kind", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const key = generateKey();
+    createAgentKey(db, {
+      keyHash: hashKey(key),
+      agentName: "shinon",
+      kindOverride: "subagent",
+    });
+
+    const res = await handleValidateKey(db, postValidate(key));
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ agent: "shinon", kind: "subagent", scopes: ["*"] });
+    db.close();
+  });
+
+  test("scopes that are not a string array fail closed to []", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const key = generateKey();
+    createAgentKey(db, { keyHash: hashKey(key), agentName: "shinon", scopes: ["*"] });
+    db.run("UPDATE agent_keys SET scopes = ? WHERE key_hash = ?", ['["*", 1]', hashKey(key)]);
+
+    const mixed = await handleValidateKey(db, postValidate(key));
+    expect(mixed.status).toBe(200);
+    expect(await mixed.json()).toEqual({ agent: "shinon", kind: "agent", scopes: [] });
+
+    db.run("UPDATE agent_keys SET scopes = ? WHERE key_hash = ?", ["not-json", hashKey(key)]);
+    const broken = await handleValidateKey(db, postValidate(key));
+    expect(broken.status).toBe(200);
+    expect(await broken.json()).toEqual({ agent: "shinon", kind: "agent", scopes: [] });
+    db.close();
+  });
+
+  test("an invalid Bearer header does not fall back to a valid body key", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const key = generateKey();
+    createAgentKey(db, { keyHash: hashKey(key), agentName: "shinon" });
+
+    const req = new Request("http://localhost/api/internal/keys/validate", {
+      method: "POST",
+      headers: {
+        authorization: "Bearer not-a-key",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ key }),
+    });
+    const res = await handleValidateKey(db, req);
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+    const row = db.query("SELECT last_used_at FROM agent_keys WHERE key_hash = ?").get(hashKey(key)) as {
+      last_used_at: string | null;
+    };
+    expect(row.last_used_at).toBeNull();
+    db.close();
+  });
 });
