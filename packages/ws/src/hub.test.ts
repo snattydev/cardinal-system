@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import type { Database } from "bun:sqlite";
 import type { ServerWebSocket } from "bun";
-import { createDb, createAgentKey, createTask, getAgent, listEvents, registerAgent } from "@cardinal/db";
+import {
+  createDb,
+  createAgentKey,
+  createTask,
+  getAgent,
+  listEvents,
+  registerAgent,
+  revokeKeyById,
+} from "@cardinal/db";
 import { hashKey } from "@cardinal/keys";
 import { Hub, messageToPayload, taskToPayload } from "./hub";
 import type { ConnData } from "./hub";
@@ -55,6 +63,38 @@ describe("Hub", () => {
     expect(row?.device).toBe("pc");
     expect(row?.kind).toBe("agent");
     expect(listEvents(db, "shinon").some((e) => e.type === "connect")).toBe(true);
+  });
+
+  test("revoked and expired keys cannot hello and do not connect the agent", () => {
+    const { db, hub } = makeHub();
+    const active = db.query("SELECT id FROM agent_keys").get() as { id: number };
+    revokeKeyById(db, active.id);
+
+    const revoked = mockWs();
+    hub.websocket.message(
+      revoked.ws,
+      JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc" }),
+    );
+    expect(revoked.sent[0]).toEqual({ type: "error", reason: "auth_failed" });
+    expect(revoked.closed[0]).toEqual({ code: 4401, reason: "auth_failed" });
+    expect(getAgent(db, "shinon")?.connected).toBe(0);
+    expect(listEvents(db, "shinon").some((event) => event.type === "connect")).toBe(false);
+
+    const expiredKey = "sk-cardinal-" + "ef".repeat(32);
+    createAgentKey(db, {
+      keyHash: hashKey(expiredKey),
+      agentName: "shinon",
+      expiresAt: "2000-01-01T00:00:00.000Z",
+    });
+    const expired = mockWs();
+    hub.websocket.message(
+      expired.ws,
+      JSON.stringify({ type: "hello", key: expiredKey, device: "pc" }),
+    );
+    expect(expired.sent[0]).toEqual({ type: "error", reason: "auth_failed" });
+    expect(expired.closed[0]).toEqual({ code: 4401, reason: "auth_failed" });
+    expect(getAgent(db, "shinon")?.connected).toBe(0);
+    expect(listEvents(db, "shinon")).toHaveLength(0);
   });
 
   test("hello con key inválida (formato malo o desconocida) → auth_failed + close 4401", () => {

@@ -29,6 +29,7 @@ import {
   getProviderByName,
   listUsage,
   registerAgent,
+  setProviderStatus,
   upsertProvider,
 } from "@cardinal/db";
 import { generateKey, hashKey } from "@cardinal/keys";
@@ -398,6 +399,42 @@ describe("routeCompletion fusion", () => {
     expect(judgeCalls).toBe(0);
     expect(p1Calls).toBe(1);
     expect(p2Calls).toBe(1);
+    db.close();
+  });
+
+  test("skips disabled and blank-url panel hops without calling upstream", async () => {
+    const db = createDb(":memory:");
+    seedFusionStack(db, { p1: "du-p1", p2: "du-p2", judge: "du-judge" });
+    setProviderStatus(db, "du-p1", "disabled");
+    db.run("UPDATE providers SET base_url = '' WHERE name = ?", ["du-p2"]);
+    const keyHash = makeKey(db);
+
+    await expectRouterError(
+      () => routeCompletion(db, keyHash, fusionRequest, { decryptKey }),
+      "all_providers_failed",
+    );
+    expect(p1Calls).toBe(0);
+    expect(p2Calls).toBe(0);
+    expect(judgeCalls).toBe(0);
+    expect(failCalls).toBe(0);
+    expect(listUsage(db)).toHaveLength(0);
+    db.close();
+  });
+
+  test("a disabled judge is fusion_not_configured before any panel call", async () => {
+    const db = createDb(":memory:");
+    seedFusionStack(db, { p1: "dj-p1", p2: "dj-p2", judge: "dj-judge" });
+    setProviderStatus(db, "dj-judge", "disabled");
+    const keyHash = makeKey(db);
+
+    await expectRouterError(
+      () => routeCompletion(db, keyHash, fusionRequest, { decryptKey }),
+      "fusion_not_configured",
+    );
+    expect(p1Calls).toBe(0);
+    expect(p2Calls).toBe(0);
+    expect(judgeCalls).toBe(0);
+    expect(listUsage(db)).toHaveLength(0);
     db.close();
   });
 

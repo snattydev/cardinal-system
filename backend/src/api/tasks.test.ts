@@ -232,6 +232,24 @@ describe("handleClaimTask", () => {
     db.close();
   });
 
+  test("blocked stays blocked and cannot be claimed", async () => {
+    const db = createDb(":memory:");
+    const created = await createOpenTask(db, "blocked goal");
+    db.run("UPDATE tasks SET status = 'blocked' WHERE id = ?", [created.id]);
+    const res = await handleClaimTask(
+      db,
+      created.id,
+      jsonReq("http://localhost/api/tasks/x/claim", "PUT", { by: "shinon" }),
+    );
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "not_open" });
+    const stored = handleGetTask(db, created.id);
+    const body = (await stored.json()) as { task: { status: string; assigned_to: string | null } };
+    expect(body.task.status).toBe("blocked");
+    expect(body.task.assigned_to).toBeNull();
+    db.close();
+  });
+
   test("ya done → 409 {error: 'not_open'}", async () => {
     const db = createDb(":memory:");
     const created = await createOpenTask(db, "done already");

@@ -328,6 +328,32 @@ describe("handlePatchRouterProvider", () => {
     db.close();
   });
 
+  test("blank api key and non-finite cost do not rotate the stored secret", async () => {
+    const db = createDb(":memory:");
+    const { mockId } = seedRouter(db);
+    const before = getProviderByName(db, "mock-local")!;
+    const bodies = [
+      JSON.stringify({ api_key: "   " }),
+      JSON.stringify({ cost_per_mtok: -1 }),
+      '{"cost_per_mtok":1e309}',
+    ];
+    for (const body of bodies) {
+      const res = await handlePatchRouterProvider(
+        db,
+        String(mockId),
+        jsonReq(`http://localhost/api/router/providers/${mockId}`, "PATCH", body),
+        POOL,
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_payload" });
+    }
+    const after = getProviderByName(db, "mock-local")!;
+    expect(after.api_key_enc).toBe(before.api_key_enc);
+    expect(after.cost_per_mtok).toBe(before.cost_per_mtok);
+    expect(decryptSecret(after.api_key_enc!, POOL)).toBe("secret-should-not-leak");
+    db.close();
+  });
+
   test("rotates api_key when provided", async () => {
     const db = createDb(":memory:");
     const { mockId } = seedRouter(db);
@@ -648,6 +674,34 @@ describe("handleCreateRouterProvider", () => {
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: "invalid_payload" });
     }
+    db.close();
+  });
+
+  test("rejects non-finite cost and a blank api key before calling upstream", async () => {
+    const db = createDb(":memory:");
+    let fetched = false;
+    globalThis.fetch = (() => {
+      fetched = true;
+      throw new Error("upstream should not be called");
+    }) as unknown as typeof fetch;
+    const bodies = [
+      createProviderBody({ cost_per_mtok: -1 }),
+      createProviderBody({ api_key: "   " }),
+      createProviderBody({ cost_per_mtok: "12" }),
+      createProviderBody().replace(/}$/, ',"cost_per_mtok":1e309}'),
+    ];
+    for (const body of bodies) {
+      const res = await handleCreateRouterProvider(
+        db,
+        jsonReq("http://localhost/api/router/providers", "POST", body),
+        POOL,
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_payload" });
+    }
+    expect(fetched).toBe(false);
+    const listed = (await handleListRouterProviders(db).json()) as { providers: ProviderPublic[] };
+    expect(listed.providers).toHaveLength(0);
     db.close();
   });
 

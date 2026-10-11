@@ -743,3 +743,92 @@ test("agent key cannot spoof task created_by, claim as another agent, or complet
   expect(dashComplete.status).toBe(200);
   expect(((await dashComplete.json()) as { task: { status: string } }).task.status).toBe("done");
 });
+
+test("expired and revoked agent keys cannot open tasks, read mail, or search memory", async () => {
+  const expiredKey = generateKey();
+  createAgentKey(db, {
+    keyHash: hashKey(expiredKey),
+    agentName: "shinon",
+    expiresAt: "2000-01-01T00:00:00.000Z",
+  });
+  const revokedKey = generateKey();
+  createAgentKey(db, { keyHash: hashKey(revokedKey), agentName: "shinon" });
+  db.run("UPDATE agent_keys SET revoked_at = datetime('now') WHERE key_hash = ?", [hashKey(revokedKey)]);
+
+  const before = (db.query("SELECT COUNT(*) AS n FROM tasks").get() as { n: number }).n;
+  for (const key of [expiredKey, revokedKey]) {
+    const created = await fetch(`http://localhost:${port}/api/tasks`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ goal: "must not be stored" }),
+    });
+    expect(created.status).toBe(401);
+    expect(await created.json()).toEqual({ error: "unauthorized" });
+
+    const inbox = await fetch(`http://localhost:${port}/api/messages`, {
+      headers: { authorization: `Bearer ${key}` },
+    });
+    expect(inbox.status).toBe(401);
+
+    const search = await fetch(`http://localhost:${port}/api/rag/search`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${key}`,
+      },
+      body: JSON.stringify({ query: "vault contents", top_k: 3 }),
+    });
+    expect(search.status).toBe(401);
+    expect(await search.json()).toEqual({ error: "unauthorized" });
+  }
+  const after = (db.query("SELECT COUNT(*) AS n FROM tasks").get() as { n: number }).n;
+  expect(after).toBe(before);
+});
+
+test("an agent key cannot mutate dashboard-only routes", async () => {
+  const headers = {
+    "content-type": "application/json",
+    authorization: `Bearer ${TEST_KEY}`,
+  };
+  const attempts: Array<{ url: string; method: string; body?: string }> = [
+    { url: "/api/keys", method: "POST", body: JSON.stringify({ agentName: "shinon" }) },
+    {
+      url: "/api/memories/shinon/memory",
+      method: "PUT",
+      body: JSON.stringify({ content: "should not land" }),
+    },
+    {
+      url: "/api/config/shinon",
+      method: "PUT",
+      body: JSON.stringify({ config_yaml: "name: nope" }),
+    },
+    {
+      url: "/api/router/providers",
+      method: "POST",
+      body: JSON.stringify({ name: "evil", base_url: "http://127.0.0.1:9", api_key: "k" }),
+    },
+    { url: "/api/system", method: "GET" },
+  ];
+
+  const counts = () => ({
+    providers: (db.query("SELECT COUNT(*) AS n FROM providers").get() as { n: number }).n,
+    memories: (db.query("SELECT COUNT(*) AS n FROM memory_mirror").get() as { n: number }).n,
+    configs: (db.query("SELECT COUNT(*) AS n FROM config_templates").get() as { n: number }).n,
+  });
+  const before = counts();
+
+  for (const attempt of attempts) {
+    const res = await fetch(`http://localhost:${port}${attempt.url}`, {
+      method: attempt.method,
+      headers,
+      body: attempt.body,
+    });
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
+  }
+
+  expect(counts()).toEqual(before);
+});
