@@ -137,6 +137,46 @@ describe("handleCreateTask", () => {
     db.close();
   });
 
+  test("stores parent_id when the parent task exists", async () => {
+    const db = createDb(":memory:");
+    const parent = await createOpenTask(db, "parent");
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "child", parent_id: parent.id }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { goal: string; status: string; parent_id: string } };
+    expect(body.task).toMatchObject({ goal: "child", status: "open", parent_id: parent.id });
+    db.close();
+  });
+
+  test("ignores a non-string parent_id", async () => {
+    const db = createDb(":memory:");
+    const res = await handleCreateTask(
+      db,
+      jsonReq("http://localhost/api/tasks", "POST", { goal: "child", parent_id: 12 }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { task: { parent_id: string | null } };
+    expect(body.task.parent_id).toBeNull();
+    db.close();
+  });
+
+  test("does not insert a task when parent_id is missing or blank", async () => {
+    const db = createDb(":memory:");
+    for (const parent_id of ["missing", ""]) {
+      const res = await handleCreateTask(
+        db,
+        jsonReq("http://localhost/api/tasks", "POST", { goal: "orphan", parent_id }),
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "parent_not_found" });
+    }
+    const count = db.query("SELECT COUNT(*) AS n FROM tasks").get() as { n: number };
+    expect(count.n).toBe(0);
+    db.close();
+  });
+
   test("body no JSON → 400 {error: 'bad_request'}", async () => {
     const db = createDb(":memory:");
     const res = await handleCreateTask(
