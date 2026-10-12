@@ -939,4 +939,40 @@ describe("handleDeviceHeartbeat", () => {
     expect(await res.json()).toEqual({ error: "bad_request" });
     db.close();
   });
+
+  test("rejects null and array info without writing device_info", async () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    for (const info of [null, []]) {
+      const res = await handleDeviceHeartbeat(db, "kirito", heartbeatReq({ info }));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "bad_request" });
+    }
+    const agent = getAgent(db, "kirito")!;
+    expect(agent.device).toBe("pc");
+    expect(agent.device_info).toBeNull();
+    db.close();
+  });
+
+  test("empty hostname does not rename the device and non-numeric fields are null", async () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    const res = await handleDeviceHeartbeat(
+      db,
+      "kirito",
+      heartbeatReq({ info: { hostname: "", platform: 1, ram_gb: "64", gpu: false, ip: null } }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { device: Record<string, unknown> };
+    expect(body.device).toMatchObject({
+      id: "pc",
+      hostname: null,
+      platform: null,
+      ram_gb: null,
+      gpu: null,
+      ip: null,
+    });
+    expect(getAgent(db, "kirito")!.device).toBe("pc");
+    db.close();
+  });
 });
