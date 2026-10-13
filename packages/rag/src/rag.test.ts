@@ -85,6 +85,33 @@ describe("rag cache (getCached/putCached)", () => {
     db.close();
   });
 
+  test("the same query with a different top_k does not share a cache row", async () => {
+    const db = createDb(":memory:");
+    await putCached(db, "kirito", 1, JSON.stringify([{ path: "one.md", score: 1, content: "x", source: "vault" }]));
+    expect(await getCached(db, "kirito", 10)).toBeNull();
+    const hit = await getCached(db, "kirito", 1);
+    expect(hit).not.toBeNull();
+    expect(hit!.results).toEqual([{ path: "one.md", score: 1, content: "x", source: "vault" }]);
+    db.close();
+  });
+
+  test("putCached refreshes an expired row so the query hits again", async () => {
+    const db = createDb(":memory:");
+    await putCached(db, "kirito", 5, JSON.stringify([{ path: "old.md", score: 1, content: "old", source: "vault" }]));
+    db.run("UPDATE rag_cache SET created_at = datetime('now', '-2 hours')");
+    expect(await getCached(db, "kirito", 5)).toBeNull();
+    await putCached(
+      db,
+      "kirito",
+      5,
+      JSON.stringify([{ path: "new.md", score: 2, content: "new", source: "vault" }]),
+    );
+    const hit = await getCached(db, "kirito", 5);
+    expect(hit).not.toBeNull();
+    expect(hit!.results).toEqual([{ path: "new.md", score: 2, content: "new", source: "vault" }]);
+    db.close();
+  });
+
   test("mismo query con mode distinto no colisiona en el cache", async () => {
     const db = createDb(":memory:");
     await putCached(db, "kirito", 5, JSON.stringify([{ path: "h.md", score: 1, content: "x", source: "vault" }]), "hybrid");
@@ -155,6 +182,34 @@ describe("searchWithCache", () => {
     expect(second.results).toEqual(first.results);
     expect(calls).toBe(1);
     db.close();
+  });
+
+  test("an explicit blank token is not sent and does not fall back to the environment", async () => {
+    const previous = process.env.VAULT_PROXY_TOKEN;
+    process.env.VAULT_PROXY_TOKEN = "env-vault-token";
+    const db = createDb(":memory:");
+    try {
+      let headers: Headers | undefined;
+      let urlSeen = "";
+      const fetchImpl = async (url: string, init?: RequestInit) => {
+        urlSeen = url;
+        headers = new Headers(init?.headers as HeadersInit);
+        return new Response(JSON.stringify({ results: [] }), { status: 200 });
+      };
+      await searchWithCache(db, {
+        query: "x",
+        token: "",
+        fetchImpl,
+        baseUrl: "http://vault:8788",
+      });
+      expect(headers!.get("x-vault-token")).toBeNull();
+      expect(urlSeen).not.toContain("env-vault-token");
+      expect(JSON.stringify([...headers!.entries()])).not.toContain("env-vault-token");
+    } finally {
+      if (previous === undefined) delete process.env.VAULT_PROXY_TOKEN;
+      else process.env.VAULT_PROXY_TOKEN = previous;
+      db.close();
+    }
   });
 
   test("envía el token en X-Vault-Token", async () => {

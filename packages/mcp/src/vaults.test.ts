@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { makeListVaultFiles, makeReadVaultFile } from "./vaults";
 
@@ -30,6 +30,20 @@ describe("listVaultFiles", () => {
       expect(f.size).toBeGreaterThan(0);
       expect(f.path.endsWith(".md")).toBe(true);
     }
+  });
+
+  test("does not list files reached only through a symlink outside the vault", async () => {
+    const outside = join(ROOT, "outside-secret");
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "secret.md"), "secret\n");
+    symlinkSync(outside, join(ROOT, "the portal", "escape"));
+    symlinkSync(join(outside, "secret.md"), join(ROOT, "the portal", "linked.md"));
+
+    const paths = (await listVaultFiles("the portal")).map((file) => file.path);
+    expect(paths).toEqual(["index.md", "sub/note.md"]);
+    expect(paths.some((path) => path.includes("secret") || path.includes("escape") || path === "linked.md")).toBe(
+      false,
+    );
   });
 
   test("vault inexistente → error", async () => {

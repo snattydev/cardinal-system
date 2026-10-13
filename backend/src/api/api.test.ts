@@ -3,6 +3,8 @@ import {
   addSkillToProfile,
   createDb,
   getAgent,
+  getMemoryMirror,
+  getProfile,
   insertEvent,
   registerAgent,
   updateAgentDeviceInfo,
@@ -105,6 +107,42 @@ describe("handlePutProfile", () => {
       display_name: "Hermes",
       device: "laptop",
     });
+    db.close();
+  });
+
+  test("an invalid kind or status does not create or rewrite the profile", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", { display_name: "Hermes", kind: "permanent", status: "active" });
+    const badKind = await handlePutProfile(
+      db,
+      "hermes",
+      new Request("http://localhost/api/profiles/hermes", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ kind: "ghost", display_name: "wiped" }),
+      }),
+    );
+    expect(badKind.status).toBe(400);
+    expect(await badKind.json()).toEqual({ error: "invalid_kind" });
+
+    const missing = await handlePutProfile(
+      db,
+      "ghost",
+      new Request("http://localhost/api/profiles/ghost", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ status: "zombie", display_name: "Ghost" }),
+      }),
+    );
+    expect(missing.status).toBe(400);
+    expect(await missing.json()).toEqual({ error: "invalid_status" });
+
+    expect(getProfile(db, "hermes")).toMatchObject({
+      display_name: "Hermes",
+      kind: "permanent",
+      status: "active",
+    });
+    expect(getProfile(db, "ghost")).toBeNull();
     db.close();
   });
 
@@ -391,6 +429,41 @@ describe("handlePutMemory", () => {
       sync_direction: "bidirectional",
     });
     expect(body.memory.last_synced).not.toBeNull();
+    db.close();
+  });
+
+  test("an invalid sync_direction does not create or rewrite the mirror", async () => {
+    const db = createDb(":memory:");
+    upsertProfile(db, "hermes", {});
+    upsertMemoryMirror(db, "hermes", "memory", { content: "hola", sync_direction: "local_primary" });
+    const res = await handlePutMemory(
+      db,
+      "hermes",
+      "memory",
+      new Request("http://localhost/api/memories/hermes/memory", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sync_direction: "nope", content: "wiped" }),
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_sync_direction" });
+    const stored = getMemoryMirror(db, "hermes", "memory");
+    expect(stored).toMatchObject({ content: "hola", sync_direction: "local_primary" });
+
+    upsertProfile(db, "asuna", {});
+    const missing = await handlePutMemory(
+      db,
+      "asuna",
+      "memory",
+      new Request("http://localhost/api/memories/asuna/memory", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sync_direction: "sideways", content: "x" }),
+      }),
+    );
+    expect(missing.status).toBe(400);
+    expect(getMemoryMirror(db, "asuna", "memory")).toBeNull();
     db.close();
   });
 

@@ -15,6 +15,8 @@ import {
   getMemoryMirror,
   getModelRoute,
   getProfile,
+  deleteProvider,
+  getProviderById,
   getProviderByName,
   getSession,
   getSkill,
@@ -1165,6 +1167,23 @@ describe("provider_models repo", () => {
     expect(models).toHaveLength(1);
     expect(models[0].capabilities).toBe('["vision"]');
     expect(models[0].context_window).toBe(2000);
+    db.close();
+  });
+
+  test("deleteProvider removes that provider's models and leaves siblings", () => {
+    const db = createDb(":memory:");
+    upsertProvider(db, { name: "pro", baseUrl: "http://a" });
+    upsertProvider(db, { name: "other", baseUrl: "http://b" });
+    const pro = getProviderByName(db, "pro")!;
+    const other = getProviderByName(db, "other")!;
+    addProviderModel(db, { providerId: pro.id, modelId: "m1" });
+    addProviderModel(db, { providerId: other.id, modelId: "keep" });
+
+    expect(deleteProvider(db, pro.id)).toBe(true);
+    expect(getProviderById(db, pro.id)).toBeNull();
+    expect(listProviderModels(db, pro.id)).toEqual([]);
+    expect(listProviderModels(db, other.id).map((m) => m.model_id)).toEqual(["keep"]);
+    expect(deleteProvider(db, pro.id)).toBe(false);
     db.close();
   });
 });

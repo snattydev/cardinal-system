@@ -31,6 +31,12 @@ let mock: ReturnType<typeof Bun.serve>;
 let baseA = "";
 let baseB = "";
 let baseC = "";
+const upstreamHits = new Map<string, number>();
+const upstreamAuth = new Map<string, string | null>();
+
+function upstreamPrefix(pathname: string): string {
+  return pathname.split("/").filter(Boolean)[0] ?? "";
+}
 
 beforeAll(() => {
   mock = Bun.serve({
@@ -38,6 +44,9 @@ beforeAll(() => {
     port: 18999,
     fetch(req) {
       const url = new URL(req.url);
+      const prefix = upstreamPrefix(url.pathname);
+      upstreamHits.set(prefix, (upstreamHits.get(prefix) ?? 0) + 1);
+      upstreamAuth.set(prefix, req.headers.get("authorization"));
       if (url.pathname.startsWith("/a/")) {
         return Response.json(COMPLETION_OK);
       }
@@ -46,6 +55,14 @@ beforeAll(() => {
       }
       if (url.pathname.startsWith("/c/")) {
         return new Response("error", { status: 500 });
+      }
+      if (
+        url.pathname.startsWith("/budget-block/") ||
+        url.pathname.startsWith("/scope-deny/") ||
+        url.pathname.startsWith("/no-key/") ||
+        url.pathname.startsWith("/blank-key/")
+      ) {
+        return Response.json(COMPLETION_OK);
       }
       return new Response("not found", { status: 404 });
     },
@@ -289,6 +306,85 @@ describe("routeCompletion", () => {
     const key = findActiveKeyByHash(db, keyHash);
     expect(key).not.toBeNull();
     expect(key!.budget_usd_used).toBe(0);
+    db.close();
+  });
+
+  test("a spent token budget is rejected before any upstream call", async () => {
+    const db = createDb(":memory:");
+    const base = `http://127.0.0.1:${mock.port}/budget-block`;
+    seedProvider(db, "budget-block", base);
+    upstreamHits.set("budget-block", 0);
+
+    const atLimit = makeKey(db, { budgetLimit: 10, budgetUsed: 10 });
+    await expectRouterError(
+      () => routeCompletion(db, atLimit, baseRequest, { decryptKey }),
+      "budget_exceeded",
+    );
+
+    const zeroLimit = makeKey(db, { budgetLimit: 0, budgetUsed: 0 });
+    await expectRouterError(
+      () => routeCompletion(db, zeroLimit, baseRequest, { decryptKey }),
+      "budget_exceeded",
+    );
+
+    expect(upstreamHits.get("budget-block")).toBe(0);
+    expect(listUsage(db)).toHaveLength(0);
+    const atLimitRow = listKeys(db).find((row) => row.key_hash === atLimit);
+    expect(atLimitRow).toBeDefined();
+    expect(atLimitRow!.revoked_at).toBeNull();
+    expect(atLimitRow!.budget_used).toBe(10);
+    const zeroRow = listKeys(db).find((row) => row.key_hash === zeroLimit);
+    expect(zeroRow).toBeDefined();
+    expect(zeroRow!.revoked_at).toBeNull();
+    expect(zeroRow!.budget_used).toBe(0);
+    db.close();
+  });
+
+  test("model scope must match exactly; a prefix or glob-like scope does not authorize", async () => {
+    const db = createDb(":memory:");
+    const base = `http://127.0.0.1:${mock.port}/scope-deny`;
+    seedProvider(db, "scope-deny", base);
+    upstreamHits.set("scope-deny", 0);
+
+    for (const scopes of [["test"], ["test-model*"], ["test-model-extra"]]) {
+      const keyHash = makeKey(db, { scopes });
+      await expectRouterError(
+        () => routeCompletion(db, keyHash, baseRequest, { decryptKey }),
+        "scope_denied",
+      );
+    }
+
+    expect(upstreamHits.get("scope-deny")).toBe(0);
+    expect(listUsage(db)).toHaveLength(0);
+
+    const exact = makeKey(db, { scopes: ["test-model"] });
+    const response = await routeCompletion(db, exact, baseRequest, { decryptKey });
+    expect(response.status).toBe(200);
+    expect(upstreamHits.get("scope-deny")).toBe(1);
+    expect(listUsage(db)).toHaveLength(1);
+    db.close();
+  });
+
+  test("a provider with a null or blank api key is called without Authorization", async () => {
+    const db = createDb(":memory:");
+    const origin = `http://127.0.0.1:${mock.port}`;
+    seedProvider(db, "no-key", `${origin}/no-key`);
+    upsertProvider(db, { name: "blank-key", baseUrl: `${origin}/blank-key`, apiKeyEnc: "" });
+    const blank = getProviderByName(db, "blank-key");
+    if (blank === null) throw new Error("blank-key missing");
+    addProviderModel(db, { providerId: blank.id, modelId: "test-model" });
+    upstreamAuth.set("no-key", "unset");
+    upstreamAuth.set("blank-key", "unset");
+
+    const keyHash = makeKey(db);
+    const missing = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(missing.status).toBe(200);
+    expect(upstreamAuth.get("no-key")).toBeNull();
+
+    upsertProvider(db, { name: "no-key", baseUrl: "http://127.0.0.1:9/unused", status: "disabled" });
+    const blankResponse = await routeCompletion(db, keyHash, baseRequest, { decryptKey });
+    expect(blankResponse.status).toBe(200);
+    expect(upstreamAuth.get("blank-key")).toBeNull();
     db.close();
   });
 

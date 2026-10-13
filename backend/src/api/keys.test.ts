@@ -117,6 +117,45 @@ describe("handleCreateKey", () => {
     db.close();
   });
 
+  test("an empty scopes array stays empty through create and validate", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const res = await handleCreateKey(db, postCreate({ agentName: "shinon", scopes: [] }));
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { key: string; item: { scopes: string[] } };
+    expect(body.item.scopes).toEqual([]);
+
+    const validated = await handleValidateKey(
+      db,
+      new Request("http://localhost/api/internal/keys/validate", {
+        method: "POST",
+        headers: { authorization: `Bearer ${body.key}` },
+      }),
+    );
+    expect(validated.status).toBe(200);
+    expect(await validated.json()).toMatchObject({ agent: "shinon", scopes: [] });
+    db.close();
+  });
+
+  test("null or mixed scopes and non-numeric budgets are rejected before insert", async () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    const cases = [
+      { agentName: "shinon", scopes: null },
+      { agentName: "shinon", scopes: ["fast", 1] },
+      { agentName: "shinon", budgetLimit: "1000" },
+      { agentName: "shinon", budgetLimit: true },
+      { agentName: "shinon", budgetUsdLimit: "5" },
+    ];
+    for (const payload of cases) {
+      const res = await handleCreateKey(db, postCreate(payload));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "invalid_payload" });
+    }
+    expect(listKeys(db)).toHaveLength(0);
+    db.close();
+  });
+
   test("omitted scopes → item.scopes is [\"*\"]", async () => {
     const db = createDb(":memory:");
     registerAgent(db, "shinon", "agent");

@@ -31,6 +31,11 @@ describe("encryptSecret / decryptSecret", () => {
     expect(() => decryptSecret(buf.toString("base64"), POOL)).toThrow();
   });
 
+  test("rejects a payload shorter than the iv and auth tag", () => {
+    expect(() => decryptSecret("", POOL)).toThrow("invalid payload");
+    expect(() => decryptSecret(Buffer.alloc(27).toString("base64"), POOL)).toThrow("invalid payload");
+  });
+
   test("same plaintext produces different ciphertext because IV is random", () => {
     const a = encryptSecret(PLAIN, POOL);
     const b = encryptSecret(PLAIN, POOL);
