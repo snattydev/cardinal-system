@@ -634,6 +634,48 @@ describe("device registry repo", () => {
     db.close();
   });
 
+  test("listDevices treats corrupt device_info as empty and keeps the agent device", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "workstation", kind: "agent", status: "idle" });
+    db.run("UPDATE agents SET device_info = ? WHERE name = ?", ["{not-json", "kirito"]);
+    const devices = listDevices(db);
+    expect(devices).toHaveLength(1);
+    expect(devices[0]).toMatchObject({
+      id: "workstation",
+      hostname: null,
+      platform: null,
+      arch: null,
+      gpu: null,
+      ram_gb: null,
+      ip: null,
+      agents: 1,
+      profiles: ["kirito"],
+    });
+    db.close();
+  });
+
+  test("empty hostname does not rename the device and non-numeric fields stay null", () => {
+    const db = createDb(":memory:");
+    upsertAgentOnConnect(db, { name: "kirito", device: "pc", kind: "agent", status: "idle" });
+    updateAgentDeviceInfo(db, "kirito", {
+      hostname: "",
+      platform: "linux",
+      ram_gb: "64",
+      gpu: false,
+    });
+    expect(getAgent(db, "kirito")!.device).toBe("pc");
+    const devices = listDevices(db);
+    expect(devices).toHaveLength(1);
+    expect(devices[0]).toMatchObject({
+      id: "pc",
+      hostname: "",
+      platform: "linux",
+      ram_gb: null,
+      gpu: null,
+    });
+    db.close();
+  });
+
   test("listDevices falls back to agents.device when device_info has no hostname", () => {
     const db = createDb(":memory:");
     upsertAgentOnConnect(db, { name: "kirito", device: "workstation", kind: "agent", status: "idle" });
@@ -1269,6 +1311,19 @@ describe("consumeBudgetUsd", () => {
     createAgentKey(db, { keyHash: "hash-usd-revoked", agentName: "shinon", budgetUsdLimit: 10 });
     revokeKeysForAgent(db, "shinon");
     expect(consumeBudgetUsd(db, "hash-usd-revoked", 1)).toBe(false);
+    db.close();
+  });
+
+  test("consumeBudgetUsd on expired key returns false", () => {
+    const db = createDb(":memory:");
+    registerAgent(db, "shinon", "agent");
+    createAgentKey(db, {
+      keyHash: "hash-usd-expired",
+      agentName: "shinon",
+      budgetUsdLimit: 10,
+      expiresAt: "1999-01-01T00:00:00Z",
+    });
+    expect(consumeBudgetUsd(db, "hash-usd-expired", 1)).toBe(false);
     db.close();
   });
 

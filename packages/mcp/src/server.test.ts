@@ -23,11 +23,20 @@ interface FakeMessage {
   read: number;
 }
 
+interface RecordedCall {
+  url: string;
+  method: string;
+  body?: string;
+  authorization: string;
+}
+
 interface FakeBackendState {
   validKeys: Map<string, { agent: string; kind: string; scopes: string[] }>;
   searchResults?: unknown;
   tasks: FakeTask[];
   messages: FakeMessage[];
+  calls?: RecordedCall[];
+  boardFailure?: { status: number; body: string };
 }
 
 function makeDeps(state: FakeBackendState) {
@@ -35,6 +44,12 @@ function makeDeps(state: FakeBackendState) {
     const urlStr = String(url);
     const method = String(init?.method ?? "GET").toUpperCase();
     const auth = (init?.headers as Record<string, string>)?.authorization ?? "";
+    state.calls?.push({
+      url: urlStr,
+      method,
+      body: typeof init?.body === "string" ? init.body : undefined,
+      authorization: auth,
+    });
 
     if (urlStr.endsWith("/api/internal/keys/validate")) {
       const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
@@ -44,6 +59,10 @@ function makeDeps(state: FakeBackendState) {
     }
     if (urlStr.includes("/api/rag/search")) {
       return Response.json({ results: state.searchResults ?? [] });
+    }
+
+    if (state.boardFailure) {
+      return new Response(state.boardFailure.body, { status: state.boardFailure.status });
     }
 
     // Board API stubs (agent Bearer auth is assumed already accepted by backend).
@@ -187,6 +206,7 @@ describe("MCP server /mcp", () => {
     expect(status).toBe(200);
     expect(json.result.protocolVersion).toBe("2024-11-05");
     expect(json.result.capabilities.tools).toBeDefined();
+    expect(json.result.serverInfo).toEqual({ name: "cardinal-mcp", version: "0.2.6" });
     expect(json.id).toBe(1);
   });
 
@@ -432,5 +452,193 @@ describe("MCP server /mcp", () => {
     });
     expect(json.result.isError).toBe(true);
     expect(json.result.content[0].text).toMatch(/forbidden|scope/i);
+  });
+
+  test("board tools bind the authenticated agent and drop spoofed actor fields", async () => {
+    const state = makeState();
+    state.calls = [];
+    const { rpcJson } = makeDeps(state);
+
+    const created = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 40,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_create",
+        arguments: { goal: "owned", created_by: "kirito", parent_id: "   " },
+      },
+    });
+    expect(created.json.result.isError).toBeUndefined();
+    const createdTask = JSON.parse(created.json.result.content[0].text).task;
+    expect(createdTask.created_by).toBe("shinon");
+    expect(createdTask.parent_id).toBeNull();
+
+    const child = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 41,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_create",
+        arguments: { goal: "child", created_by: "kirito", parent_id: createdTask.id },
+      },
+    });
+    const childTask = JSON.parse(child.json.result.content[0].text).task;
+    expect(childTask.created_by).toBe("shinon");
+    expect(childTask.parent_id).toBe(createdTask.id);
+
+    const claimed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 42,
+      method: "tools/call",
+      params: {
+        name: "cardinal_task_claim",
+        arguments: { id: createdTask.id, by: "kirito" },
+      },
+    });
+    expect(JSON.parse(claimed.json.result.content[0].text).task.assigned_to).toBe("shinon");
+
+    const sent = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 43,
+      method: "tools/call",
+      params: {
+        name: "cardinal_agent_send",
+        arguments: { to_agent: "kirito", type: "ping", from_agent: "asuna" },
+      },
+    });
+    const message = JSON.parse(sent.json.result.content[0].text).message;
+    expect(message.from_agent).toBe("shinon");
+    expect(message.to_agent).toBe("kirito");
+
+    const toSelf = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 44,
+      method: "tools/call",
+      params: {
+        name: "cardinal_agent_send",
+        arguments: { to_agent: "shinon", type: "note" },
+      },
+    });
+    const selfMessage = JSON.parse(toSelf.json.result.content[0].text).message;
+
+    const inbox = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 45,
+      method: "tools/call",
+      params: { name: "cardinal_agent_inbox", arguments: { to_agent: "kirito" } },
+    });
+    const listed = JSON.parse(inbox.json.result.content[0].text).messages;
+    expect(listed.some((m: { id: string }) => m.id === selfMessage.id)).toBe(true);
+    expect(listed.some((m: { id: string }) => m.id === message.id)).toBe(false);
+
+    const createBody = JSON.parse(state.calls!.find((c) => c.method === "POST" && c.url.endsWith("/api/tasks"))!.body!);
+    expect(createBody).toEqual({ goal: "owned", created_by: "shinon" });
+    expect(state.calls!.every((c) => c.authorization === `Bearer ${KEY_OK}`)).toBe(true);
+    const inboxCall = state.calls!.find((c) => c.method === "GET" && c.url.includes("/api/messages"));
+    expect(inboxCall!.url).toContain("to_agent=shinon");
+    expect(inboxCall!.url).not.toContain("to_agent=kirito");
+  });
+
+  test("blank board arguments fail before calling the backend", async () => {
+    const state = makeState();
+    state.calls = [];
+    const { rpcJson } = makeDeps(state);
+    const calls = [
+      { name: "cardinal_task_create", arguments: { goal: "   " } },
+      { name: "cardinal_task_create", arguments: {} },
+      { name: "cardinal_task_claim", arguments: { id: "  " } },
+      { name: "cardinal_task_complete", arguments: { id: "" } },
+      { name: "cardinal_agent_send", arguments: { to_agent: " ", type: "ping" } },
+      { name: "cardinal_agent_send", arguments: { to_agent: "kirito", type: "" } },
+    ];
+    for (const [index, params] of calls.entries()) {
+      const { json } = await rpcJson(KEY_OK, {
+        jsonrpc: "2.0",
+        id: 50 + index,
+        method: "tools/call",
+        params,
+      });
+      expect(json.result.isError).toBe(true);
+      expect(json.result.content[0].text).toMatch(/missing /);
+    }
+    expect(state.calls!.filter((c) => !c.url.endsWith("/api/internal/keys/validate"))).toEqual([]);
+  });
+
+  test("encodes task ids and status filters as a single path or query value", async () => {
+    const state = makeState();
+    state.calls = [];
+    const taskId = "a/b?x=1";
+    state.tasks.push(
+      {
+        id: taskId,
+        goal: "encoded",
+        status: "open",
+        created_by: "shinon",
+        assigned_to: null,
+        summary: null,
+        artifact_ref: null,
+        parent_id: null,
+      },
+      {
+        id: "weird-status",
+        goal: "filter",
+        status: "open&done=1",
+        created_by: "shinon",
+        assigned_to: null,
+        summary: null,
+        artifact_ref: null,
+        parent_id: null,
+      },
+      {
+        id: "plain-open",
+        goal: "plain",
+        status: "open",
+        created_by: "shinon",
+        assigned_to: null,
+        summary: null,
+        artifact_ref: null,
+        parent_id: null,
+      },
+    );
+    const { rpcJson } = makeDeps(state);
+
+    const claimed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 60,
+      method: "tools/call",
+      params: { name: "cardinal_task_claim", arguments: { id: taskId } },
+    });
+    expect(claimed.json.result.isError).toBeUndefined();
+    expect(JSON.parse(claimed.json.result.content[0].text).task.assigned_to).toBe("shinon");
+    const claimCall = state.calls!.find((c) => c.method === "PUT" && c.url.includes("/claim"));
+    expect(claimCall!.url).toContain(`/api/tasks/${encodeURIComponent(taskId)}/claim`);
+
+    const listed = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 61,
+      method: "tools/call",
+      params: { name: "cardinal_task_list", arguments: { status: "open&done=1" } },
+    });
+    const tasks = JSON.parse(listed.json.result.content[0].text).tasks;
+    expect(tasks.map((t: { id: string }) => t.id)).toEqual(["weird-status"]);
+    const listCall = state.calls!.find((c) => c.method === "GET" && c.url.includes("/api/tasks?"));
+    expect(listCall!.url).toContain(`status=${encodeURIComponent("open&done=1")}`);
+  });
+
+  test("a failed board call does not include the caller key", async () => {
+    const state = makeState();
+    state.boardFailure = { status: 500, body: "upstream exploded" };
+    const { rpcJson } = makeDeps(state);
+    const { json } = await rpcJson(KEY_OK, {
+      jsonrpc: "2.0",
+      id: 62,
+      method: "tools/call",
+      params: { name: "cardinal_task_create", arguments: { goal: "ship" } },
+    });
+    expect(json.result.isError).toBe(true);
+    const text = json.result.content[0].text as string;
+    expect(text).toContain("500");
+    expect(text).toContain("upstream exploded");
+    expect(text).not.toContain(KEY_OK);
   });
 });
