@@ -45,6 +45,23 @@ describe("loadConfig", () => {
     expect(config.poolSecret).toBe("test-pool-secret");
   });
 
+  test("strips backslash escapes before dollar signs in ADMIN_PASSWORD_HASH", () => {
+    const config = loadConfig({
+      ...requiredEnv,
+      ADMIN_PASSWORD_HASH: "\\$argon2id\\$v=19\\$m=65536,t=2,p=1\\$salt\\$hash",
+    });
+    expect(config.adminPasswordHash).toBe("$argon2id$v=19$m=65536,t=2,p=1$salt$hash");
+  });
+
+  test("strips surrounding quotes from ADMIN_PASSWORD_HASH", () => {
+    expect(
+      loadConfig({ ...requiredEnv, ADMIN_PASSWORD_HASH: '"argon2:fakehash"' }).adminPasswordHash,
+    ).toBe("argon2:fakehash");
+    expect(
+      loadConfig({ ...requiredEnv, ADMIN_PASSWORD_HASH: "'argon2:fakehash'" }).adminPasswordHash,
+    ).toBe("argon2:fakehash");
+  });
+
   test("respects explicit overrides", () => {
     const config = loadConfig({
       ...requiredEnv,

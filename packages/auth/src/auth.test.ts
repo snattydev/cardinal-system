@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { SignJWT } from "jose";
-import type { Config } from "@cardinal/core";
+import { loadConfig, type Config } from "@cardinal/core";
 import { signSession, verifySession } from "./jwt";
-import { clearSessionCookie, readCookie, sessionCookie } from "./session";
+import { clearSessionCookie, cookieSecure, getSessionUser, readCookie, sessionCookie } from "./session";
 import { handleLogin, handleLogout, handleMe } from "./routes";
 
 describe("jwt", () => {
@@ -58,6 +58,21 @@ describe("session", () => {
 
   test("readCookie returns null for null header", () => {
     expect(readCookie(null, "cardinal_session")).toBeNull();
+  });
+
+  test("cookieSecure uses first X-Forwarded-Proto when comma-separated", () => {
+    const req = new Request("http://t/", { headers: { "X-Forwarded-Proto": "https, http" } });
+    expect(cookieSecure(req)).toBe(true);
+    const httpFirst = new Request("http://t/", { headers: { "X-Forwarded-Proto": "http, https" } });
+    expect(cookieSecure(httpFirst)).toBe(false);
+  });
+
+  test("getSessionUser returns null for missing or invalid session cookie", async () => {
+    expect(await getSessionUser(new Request("http://t/"), "secret")).toBeNull();
+    const req = new Request("http://t/", {
+      headers: { cookie: "cardinal_session=not-a-valid-jwt" },
+    });
+    expect(await getSessionUser(req, "secret")).toBeNull();
   });
 });
 
@@ -146,6 +161,27 @@ describe("routes", () => {
     const res = await handleLogin(loginReq("not-json"), config);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "bad_request" });
+  });
+
+  test("handleLogin: verifies password when hash env had shell escapes and quotes", async () => {
+    const password = "sao123-escaped-hash";
+    const hash = await Bun.password.hash(password);
+    const quoted = `"${hash.replace(/\$/g, "\\$")}"`;
+    const sanitizedConfig: Config = {
+      ...config,
+      adminPasswordHash: loadConfig({
+        ADMIN_USER: "admin",
+        ADMIN_PASSWORD_HASH: quoted,
+        JWT_SECRET: "test-secret",
+        POOL_SECRET: "test-pool-secret",
+      }).adminPasswordHash,
+    };
+    const res = await handleLogin(
+      loginReq(JSON.stringify({ user: "admin", password })),
+      sanitizedConfig,
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ user: "admin" });
   });
 
   test("handleMe: with session cookie returns 200", async () => {
