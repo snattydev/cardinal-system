@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { executeWorkerTask } from "./runner";
 import {
   probeRouterModels,
+  routerProbeConfigFromEnv,
   RouterProbeError,
   type FetchLike,
 } from "./router-probe";
@@ -20,6 +21,21 @@ function jsonResponse(status: number, body: unknown): Response {
     headers: { "content-type": "application/json" },
   });
 }
+
+describe("routerProbeConfigFromEnv", () => {
+  test("reads CARDINAL_URL and CARDINAL_KEY from the environment", () => {
+    expect(
+      routerProbeConfigFromEnv({
+        CARDINAL_URL: "http://backend:8787",
+        CARDINAL_KEY: "ephemeral-key",
+      }),
+    ).toEqual({ baseUrl: "http://backend:8787", apiKey: "ephemeral-key" });
+  });
+
+  test("defaults missing variables to empty strings", () => {
+    expect(routerProbeConfigFromEnv({})).toEqual({ baseUrl: "", apiKey: "" });
+  });
+});
 
 describe("probeRouterModels", () => {
   test("sends the ephemeral key to GET /v1/models", async () => {

@@ -743,3 +743,9 @@ test("agent key cannot spoof task created_by, claim as another agent, or complet
   expect(dashComplete.status).toBe(200);
   expect(((await dashComplete.json()) as { task: { status: string } }).task.status).toBe("done");
 });
+
+test("GET /api/system without dashboard session returns 401", async () => {
+  const res = await fetch(`http://localhost:${port}/api/system`);
+  expect(res.status).toBe(401);
+  expect(await res.json()).toEqual({ error: "unauthorized" });
+});

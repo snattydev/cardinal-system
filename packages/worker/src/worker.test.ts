@@ -42,6 +42,59 @@ describe("@cardinal/worker protocol & runner", () => {
     expect(() => parseWorkerInput(raw)).toThrow(WorkerProtocolError);
   });
 
+  test("parseWorkerInput rejects blank taskId", () => {
+    expect(() =>
+      parseWorkerInput({ taskId: "   ", taskType: "hygiene", prompt: "go" }),
+    ).toThrow(WorkerProtocolError);
+  });
+
+  test("parseWorkerInput drops non-string memoryScopes entries", () => {
+    const input = parseWorkerInput({
+      taskId: "task-123",
+      taskType: "maintenance",
+      prompt: "probe",
+      memoryScopes: ["ok", 1, null, "also-ok"],
+    });
+    expect(input.memoryScopes).toEqual(["ok", "also-ok"]);
+  });
+
+  test("parseWorkerInput ignores non-positive timeoutSeconds", () => {
+    const input = parseWorkerInput({
+      taskId: "task-123",
+      taskType: "maintenance",
+      prompt: "probe",
+      timeoutSeconds: 0,
+    });
+    expect(input.timeoutSeconds).toBeUndefined();
+  });
+
+  test("parseWorkerOutput rejects missing summary", () => {
+    expect(() =>
+      parseWorkerOutput({ taskId: "task-123", status: "success" }),
+    ).toThrow(WorkerProtocolError);
+  });
+
+  test("parseWorkerOutput rejects invalid memoryWrite entries", () => {
+    expect(() =>
+      parseWorkerOutput({
+        taskId: "task-123",
+        status: "success",
+        summary: "ok",
+        memoryWrites: [{ path: "a", content: 1 }],
+      }),
+    ).toThrow(WorkerProtocolError);
+  });
+
+  test("parseWorkerOutput defaults memoryWrite action to write", () => {
+    const output = parseWorkerOutput({
+      taskId: "task-123",
+      status: "success",
+      summary: "ok",
+      memoryWrites: [{ path: "notes/x.md", content: "hi", action: "overwrite" }],
+    });
+    expect(output.memoryWrites![0].action).toBe("write");
+  });
+
   test("parseWorkerOutput validates success payload", () => {
     const raw = {
       taskId: "task-123",
