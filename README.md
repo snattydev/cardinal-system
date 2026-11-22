@@ -1,5 +1,7 @@
 # Cardinal System
 
+> **Status: paused (2026-11-22).** This project is on hold and the repository is archived (read-only). No new work is planned for now.
+
 Central backend of the SAO agent ecosystem: identity (`sk-cardinal-*`), context (memories, RAG, profiles), task blackboard, agent-to-agent mailbox, LLM router, and web dashboard. A [Bun](https://bun.sh) + SQLite monolith that serves API, WebSocket, and static assets from a single process. In production, a rootless Podman pod (Caddy → nginx SPA → Bun backend).
 
 Cardinal v2 thesis: **orchestration is commodity**. Cardinal is the brain (identity + context + blackboard); herdr, Hermes, and CLIs are the hands.
