@@ -14,6 +14,7 @@ Do not paste stack, branching, or TDD here. Those live in `AGENTS.md`.
 | Stack decisions | `docs/stack.md` |
 | Security model | `docs/security.md` |
 | REST + WS + JWT recipe | `docs/api.md` |
+| Context Hub v2 (MCP) | `docs/features/2026-11-25-mcp-context-hub-v2.md` |
 | Operational gotchas | `docs/guides/pitfalls.md` |
 | Router usage | `docs/guides/router-usage.md` |
 | SAO ecosystem / protocol | `context/ecosystem.md` |
@@ -25,9 +26,10 @@ Use `127.0.0.1`, never `localhost` (cookie origin).
 | Resource | URL / command |
 |----------|----------------|
 | Frontend | `http://127.0.0.1:5173` |
-| Backend | `http://127.0.0.1:8787` (`GET /api/health`) |
-| MCP | `http://127.0.0.1:8789` |
-| Compose | `podman-compose up -d` / `down` |
-| Keygen (container DB) | `podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <name>'` |
+| Backend | `http://127.0.0.1:8787` (`GET /api/health`, `GET /api/system`) |
+| MCP Hub | `http://127.0.0.1:8789/mcp` (`GET /health`, Streamable HTTP, Bearer `sk-cardinal-*`) |
+| Compose | `podman-compose up -d` / `down` (optional `--profile qmd`) |
+| Config sync | `bash scripts/sync-configs.sh` (populates sanitized `./configs/{agents,user}` for `/data/configs:ro`) |
+| Keygen (container DB) | `podman exec cardinal-backend sh -c 'cd /app && bun run keygen -- --agent <name> --scope "vault:read:..."'` |
 
 Reference WS client: `CARDINAL_AGENT_KEY=sk-cardinal-... bun examples/ws-agent.ts`.
