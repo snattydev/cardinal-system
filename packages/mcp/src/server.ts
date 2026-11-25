@@ -250,6 +250,7 @@ export function createMcpServer(options: McpServerOptions) {
           project: z.string().optional(),
           stack: z.string().optional(),
           skills: z.string().optional(),
+          scope: z.enum(["lite", "standard", "full"]).optional(),
         },
       },
       async (args) => {
@@ -266,6 +267,7 @@ export function createMcpServer(options: McpServerOptions) {
             project: args.project,
             stack: args.stack,
             skills: skillsList,
+            repoScope: args.scope,
             scopes: identity.scopes,
             vaultStore,
             aclConfig,
@@ -308,18 +310,31 @@ export function createMcpServer(options: McpServerOptions) {
         {
           title: "Bootstrap Repository (Configuration 101)",
           description:
-            "Return conduct rules, starter AGENTS.md and PR templates, and portable workflow skills (e.g. caveman, commit hygiene, PR flow, Matt Pocock PRD/architecture skills) without client-side setup.",
+            "Return the personal repo standards for a scope tier (README, AGENTS.md, GitHub templates, verify/hook scripts, repo skills) plus conduct rules and workflow skills (planning, commits, PR flow, TDD) from the vault. Use for new repos, auditing existing ones, or brainstorming features (preset 'brainstorm').",
           inputSchema: {
             preset: z
               .string()
               .optional()
-              .describe("Preset name ('default', 'prd', 'minimal', custom vault preset, or 'list')."),
-            project: z.string().optional().describe("Optional project slug for AGENTS.md boilerplate."),
-            stack: z.string().optional().describe("Optional stack summary (e.g. 'TypeScript, Bun, React')."),
-            skills: z.array(z.string()).optional().describe("Optional explicit skill slugs or vault paths overriding preset defaults."),
+              .describe("Preset: 'default', 'brainstorm', 'standards', 'prd', 'minimal', a vault preset, or 'list'."),
+            scope: z
+              .enum(["lite", "standard", "full"])
+              .optional()
+              .describe("Repo tier: 'lite' (scripts/spikes, no hooks), 'standard' (default apps/libs, light hook), 'full' (security-sensitive, CI + full hooks)."),
+            hooks: z
+              .enum(["auto", "none", "light", "full"])
+              .optional()
+              .describe("Override git hook level; 'auto' (default) follows the scope tier."),
+            default_branch: z.string().optional().describe("Integration branch (default 'dev'; 'main' for lite)."),
+            project: z.string().optional().describe("Project slug used in README/AGENTS.md templates."),
+            stack: z.string().optional().describe("Stack summary (e.g. 'TypeScript, Bun'); also selects CI toolchain setup."),
+            skills: z.array(z.string()).optional().describe("Explicit skill slugs or vault paths replacing preset skills ('a|b' = first found)."),
             extra_skills: z.array(z.string()).optional().describe("Additional skill slugs or paths appended to the preset."),
-            include_starter_files: z.boolean().optional().describe("Include AGENTS.md and PR template boilerplate (default true)."),
-            max_bytes: z.number().int().min(512).max(96_000).optional().describe("Optional max markdown bytes (default 48000)."),
+            include_starter_files: z.boolean().optional().describe("Include the repo standards files (default true; false for 'brainstorm')."),
+            format: z
+              .enum(["markdown", "json"])
+              .optional()
+              .describe("'markdown' (default) or 'json' with files[] and complianceChecklist for scaffolding or audits."),
+            max_bytes: z.number().int().min(512).max(196_608).optional().describe("Max markdown bytes (default 96000)."),
           },
           annotations: { readOnlyHint: true },
         },
@@ -332,11 +347,32 @@ export function createMcpServer(options: McpServerOptions) {
               skills: args.skills,
               extraSkills: args.extra_skills,
               includeStarterFiles: args.include_starter_files,
+              repoScope: args.scope,
+              hooks: args.hooks,
+              defaultBranch: args.default_branch,
               maxBytes: args.max_bytes,
               scopes: identity.scopes,
               vaultStore,
               aclConfig,
             });
+            if (args.format === "json") {
+              return JSON.stringify(
+                {
+                  preset: packet.preset,
+                  standardsVersion: packet.standardsVersion,
+                  scope: packet.scope,
+                  hooks: packet.hooks,
+                  complianceChecklist: packet.complianceChecklist,
+                  files: packet.files,
+                  conductFiles: packet.conductFiles,
+                  includedSkills: packet.includedSkills,
+                  missingSkills: packet.missingSkills,
+                  availablePresets: packet.availablePresets,
+                },
+                null,
+                2,
+              );
+            }
             return packet.markdown;
           }),
       );

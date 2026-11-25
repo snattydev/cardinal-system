@@ -542,11 +542,29 @@ describe("MCP Streamable HTTP server v2", () => {
     });
     expect(bootTool.json.result.isError).toBeUndefined();
     const bootText = bootTool.json.result.content[0].text;
-    expect(bootText).toContain("# fresh-service — Agent Conduct & Repo Rules");
+    expect(bootText).toContain("# AGENTS.md — fresh-service");
+    expect(bootText).toContain("### Anti-Drift Rules");
+    expect(bootText).toContain("#### `.githooks/pre-commit` (executable)");
     expect(bootText).toContain("Verify every command.");
     expect(bootText).toContain("Keep diffs and notes concise.");
     expect(bootText).toContain("Missing or outside key scopes");
     expect(bootText).not.toContain("Private Diary");
+
+    const bootJson = await rpcJson(KEY_CODING, {
+      jsonrpc: "2.0",
+      id: 32,
+      method: "tools/call",
+      params: {
+        name: "cardinal_bootstrap_repo",
+        arguments: { preset: "standards", scope: "full", project: "audited-repo", format: "json" },
+      },
+    });
+    expect(bootJson.json.result.isError).toBeUndefined();
+    const structured = JSON.parse(bootJson.json.result.content[0].text);
+    expect(structured.scope).toBe("full");
+    expect(structured.hooks).toBe("full");
+    expect(structured.files.map((f: any) => f.path)).toContain(".githooks/commit-msg");
+    expect(structured.complianceChecklist.length).toBeGreaterThan(0);
 
     const bootPrompt = await rpcJson(KEY_CODING, {
       jsonrpc: "2.0",

@@ -41,6 +41,20 @@ export {
 } from "./configs";
 export { buildOnboardPacket, type OnboardMode, type OnboardOptions, type OnboardPacket } from "./onboard";
 export {
+  DEFAULT_HOOKS_BY_SCOPE,
+  REPO_SCOPES,
+  REPO_STANDARDS_VERSION,
+  SCOPE_GUIDE,
+  buildRepoStandardsBlueprint,
+  renderRepoStandardsMarkdown,
+  resolveHookLevel,
+  type HookLevel,
+  type RepoScope,
+  type RepoStandardFile,
+  type RepoStandardsBlueprint,
+  type RepoStandardsOptions,
+} from "./repo-standards";
+export {
   isSensitiveConfigFilename,
   redactSecrets,
   type RedactResult,
