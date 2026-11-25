@@ -6,7 +6,9 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "dependencies": {
-    "@cardinal/keys": "workspace:*"
+    "@cardinal/keys": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "bun-types": "1.3.14"

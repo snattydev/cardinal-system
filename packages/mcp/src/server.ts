@@ -1,178 +1,118 @@
-import { allowedVaults, type KeyIdentity } from "./auth";
-import { createValidator, type ValidatorOptions } from "./validator";
-import {
-  makeListVaultFiles,
-  makeReadVaultFile,
-  VaultError,
-  type VaultFile,
-} from "./vaults";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { z } from "zod";
 import rootPkg from "../../../package.json";
+import {
+  canReadAnyVault,
+  canReadConfigCategory,
+  canWritePrefix,
+  DEFAULT_DENY_PREFIXES,
+  hasServiceScope,
+  type AclConfig,
+  type ConfigCategory,
+  type KeyIdentity,
+} from "./acl";
+import { buildBootstrapPacket } from "./bootstrap";
+import { makeConfigStore } from "./configs";
+import { buildOnboardPacket } from "./onboard";
+import { makeSearchEngine } from "./search";
+import { createValidator, type ValidatorOptions } from "./validator";
+import { makeVaultStore } from "./vaults";
+import { makeSandboxedWriter, type SandboxedWriter } from "./writer";
 
 export interface McpServerOptions extends ValidatorOptions {
   backendUrl: string;
-  /** Service key del MCP contra el backend (para /api/rag/search). */
-  serviceKey?: string;
   vaultsRoot: string;
-  knownVaults: readonly string[];
-  fetchImpl?: typeof fetch;
+  writableRoot?: string;
+  configsRoot?: string;
+  indexDbPath?: string;
+  qmdUrl?: string;
+  denyPrefixes?: readonly string[];
+  gitAutoCommit?: boolean;
 }
-
-interface ToolDef {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-}
-
-const SEARCH_TOOL: ToolDef = {
-  name: "cardinal_search_memory",
-  description: "Búsqueda semántica/híbrida en las memorias (vaults) de Cardinal.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      query: { type: "string", description: "Texto a buscar" },
-      top_k: { type: "number", description: "Cantidad máxima de resultados (1-10)" },
-      vault: { type: "string", description: "Filtrar por vault específica" },
-    },
-    required: ["query"],
-  },
-};
-
-const READ_TOOL: ToolDef = {
-  name: "cardinal_read_memory",
-  description: "Lee un archivo .md de una vault de memoria.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      vault: { type: "string", description: "Nombre de la vault" },
-      path: { type: "string", description: "Path relativo dentro de la vault" },
-    },
-    required: ["vault", "path"],
-  },
-};
-
-const LIST_TOOL: ToolDef = {
-  name: "cardinal_list_memory",
-  description: "Lista recursiva de archivos .md de una vault (o de todas las accesibles).",
-  inputSchema: {
-    type: "object",
-    properties: {
-      vault: { type: "string", description: "Nombre de la vault (opcional; default todas)" },
-    },
-  },
-};
-
-const TASK_CREATE_TOOL: ToolDef = {
-  name: "cardinal_task_create",
-  description: "Crea una task en el blackboard de Cardinal.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      goal: { type: "string", description: "Objetivo de la task" },
-      parent_id: { type: "string", description: "ID de task padre (opcional)" },
-    },
-    required: ["goal"],
-  },
-};
-
-const TASK_LIST_TOOL: ToolDef = {
-  name: "cardinal_task_list",
-  description: "Lista tasks del blackboard (opcionalmente filtradas por status).",
-  inputSchema: {
-    type: "object",
-    properties: {
-      status: {
-        type: "string",
-        description: "Filtro de status: open | claimed | done | blocked",
-      },
-    },
-  },
-};
-
-const TASK_CLAIM_TOOL: ToolDef = {
-  name: "cardinal_task_claim",
-  description: "Claima una task open. assigned_to = agent de la key.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      id: { type: "string", description: "ID de la task" },
-    },
-    required: ["id"],
-  },
-};
-
-const TASK_COMPLETE_TOOL: ToolDef = {
-  name: "cardinal_task_complete",
-  description: "Marca una task como done con summary y artifact_ref opcionales.",
-  inputSchema: {
-    type: "object",
-    properties: {
-      id: { type: "string", description: "ID de la task" },
-      summary: { type: "string", description: "Resumen acotado del resultado" },
-      artifact_ref: { type: "string", description: "Referencia al artefacto (path/URL)" },
-    },
-    required: ["id"],
-  },
-};
-
-const AGENT_SEND_TOOL: ToolDef = {
-  name: "cardinal_agent_send",
-  description: "envía un mensaje al mailbox de otro agente",
-  inputSchema: {
-    type: "object",
-    properties: {
-      to_agent: { type: "string", description: "Agente destinatario" },
-      type: { type: "string", description: "Tipo de mensaje" },
-      payload_ref: { type: "string", description: "Referencia al payload (opcional)" },
-    },
-    required: ["to_agent", "type"],
-  },
-};
-
-const AGENT_INBOX_TOOL: ToolDef = {
-  name: "cardinal_agent_inbox",
-  description: "lista mensajes del inbox del agente de la key",
-  inputSchema: {
-    type: "object",
-    properties: {},
-  },
-};
-
-const BOARD_TOOLS: ToolDef[] = [
-  TASK_CREATE_TOOL,
-  TASK_LIST_TOOL,
-  TASK_CLAIM_TOOL,
-  TASK_COMPLETE_TOOL,
-  AGENT_SEND_TOOL,
-  AGENT_INBOX_TOOL,
-];
-
-const MEMORY_TOOLS: ToolDef[] = [SEARCH_TOOL, READ_TOOL, LIST_TOOL];
 
 function textResult(text: string, isError = false) {
-  return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
+  return {
+    content: [{ type: "text" as const, text }],
+    ...(isError ? { isError: true } : {}),
+  };
+}
+
+async function normalizeStreamableRequest(req: Request): Promise<Request> {
+  const accept = req.headers.get("accept") ?? "";
+  if (accept.includes("application/json") && accept.includes("text/event-stream")) {
+    return req;
+  }
+  const headers = new Headers(req.headers);
+  headers.set("accept", "application/json, text/event-stream");
+  const body = await req.arrayBuffer();
+  return new Request(req.url, {
+    method: req.method,
+    headers,
+    body,
+  });
 }
 
 export function createMcpServer(options: McpServerOptions) {
-  const validate = createValidator(options.backendUrl, options);
-  const listVaultFiles = makeListVaultFiles(options.vaultsRoot);
-  const readVaultFile = makeReadVaultFile(options.vaultsRoot);
-  const knownVaults = options.knownVaults;
   const doFetch = options.fetchImpl ?? fetch;
+  const backendUrl = options.backendUrl.replace(/\/+$/, "");
+  const aclConfig: AclConfig = {
+    denyPrefixes: options.denyPrefixes ?? DEFAULT_DENY_PREFIXES,
+  };
 
-  function toolsFor(identity: KeyIdentity): ToolDef[] {
-    const tools: ToolDef[] = [...BOARD_TOOLS];
-    // Memory tools only when the key can reach at least one vault.
-    if (allowedVaults(identity.scopes, knownVaults).size > 0) {
-      tools.push(...MEMORY_TOOLS);
-    }
-    return tools;
-  }
+  const validate = createValidator(backendUrl, {
+    ...options,
+    fetchImpl: doFetch,
+  });
 
-  function bearerHeaders(identityKey: string): Record<string, string> {
-    return {
-      "content-type": "application/json",
-      authorization: `Bearer ${identityKey}`,
-    };
+  const vaultStore = makeVaultStore({
+    vaultsRoot: options.vaultsRoot,
+    writableRoot: options.writableRoot,
+    aclConfig,
+  });
+
+  const configStore = makeConfigStore({
+    configsRoot: options.configsRoot,
+  });
+
+  const writer: SandboxedWriter | null = options.writableRoot
+    ? makeSandboxedWriter({
+        writableRoot: options.writableRoot,
+        gitAutoCommit: options.gitAutoCommit ?? true,
+      })
+    : null;
+
+  const searchEngine = makeSearchEngine({
+    vaultsRoot: options.vaultsRoot,
+    writableRoot: options.writableRoot,
+    indexDbPath: options.indexDbPath,
+    qmdUrl: options.qmdUrl,
+    aclConfig,
+    fetchImpl: doFetch,
+  });
+
+  function recordUsage(
+    identityKey: string,
+    toolName: string,
+    ok: boolean,
+    bytesOut: number,
+    durationMs: number,
+  ): void {
+    void Promise.resolve(
+      doFetch(`${backendUrl}/api/internal/mcp/usage`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${identityKey}`,
+        },
+        body: JSON.stringify({
+          tool_name: toolName,
+          ok,
+          bytes_out: Math.max(0, Math.floor(bytesOut)),
+          duration_ms: Math.max(0, Math.floor(durationMs)),
+        }),
+      }),
+    ).catch(() => {});
   }
 
   async function backendJson(
@@ -180,9 +120,12 @@ export function createMcpServer(options: McpServerOptions) {
     path: string,
     init?: { method?: string; body?: unknown },
   ): Promise<unknown> {
-    const res = await doFetch(`${options.backendUrl}${path}`, {
+    const res = await doFetch(`${backendUrl}${path}`, {
       method: init?.method ?? "GET",
-      headers: bearerHeaders(identityKey),
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${identityKey}`,
+      },
       body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     });
     if (!res.ok) {
@@ -197,234 +140,571 @@ export function createMcpServer(options: McpServerOptions) {
     return res.json();
   }
 
-  function assertScope(identity: KeyIdentity, vault: string): void {
-    if (!allowedVaults(identity.scopes, knownVaults).has(vault)) {
-      throw new ScopeError(`forbidden: vault "${vault}" fuera del scope de la key`);
+  async function withToolTelemetry(
+    identityKey: string,
+    toolName: string,
+    fn: () => Promise<string>,
+  ) {
+    const start = Date.now();
+    try {
+      const text = await fn();
+      recordUsage(
+        identityKey,
+        toolName,
+        true,
+        Buffer.byteLength(text, "utf8"),
+        Date.now() - start,
+      );
+      return textResult(text);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      recordUsage(
+        identityKey,
+        toolName,
+        false,
+        Buffer.byteLength(message, "utf8"),
+        Date.now() - start,
+      );
+      return textResult(message, true);
     }
   }
 
-  async function callSearch(identity: KeyIdentity, args: Record<string, unknown>): Promise<string> {
-    const query = typeof args.query === "string" ? args.query.trim() : "";
-    if (query === "") throw new Error("missing query");
-    const body: Record<string, unknown> = { query };
-    if (typeof args.top_k === "number") body.top_k = args.top_k;
-
-    const res = await doFetch(`${options.backendUrl}/api/rag/search`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(options.serviceKey ? { authorization: `Bearer ${options.serviceKey}` } : {}),
+  function buildCallerMcpServer(identity: KeyIdentity, identityKey: string): McpServer {
+    const mcp = new McpServer(
+      {
+        name: "cardinal-context-hub",
+        version: rootPkg.version,
       },
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`backend rag/search failed (${res.status})`);
-    const data = (await res.json()) as { results?: Array<Record<string, unknown>> };
-    const results = data.results ?? [];
-
-    // Clasificar por vault. El backend normaliza cada resultado a
-    // {path: <abs path en el host>, score, content, source: "vault"}: la vault
-    // real hay que deducirla del path absoluto matcheando los knownVaults.
-    const allowed = allowedVaults(identity.scopes, knownVaults);
-    const wanted = typeof args.vault === "string" ? args.vault : null;
-    const classified = results.map((r) => {
-      const absPath = String(r.path ?? "");
-      let vault = "(root)";
-      let relPath = absPath;
-      for (const candidate of knownVaults) {
-        const marker = `/${candidate}/`;
-        const idx = absPath.indexOf(marker);
-        if (idx !== -1) {
-          vault = candidate;
-          relPath = absPath.slice(idx + marker.length);
-          break;
-        }
-      }
-      return { ...r, vault, path: relPath };
-    });
-    const filtered = classified.filter(
-      (r) =>
-        allowed.has(r.vault as string) && (wanted === null || r.vault === wanted),
+      {
+        capabilities: {
+          tools: {},
+          prompts: {},
+        },
+      },
     );
-    return JSON.stringify({ results: filtered }, null, 2);
-  }
 
-  async function callRead(identity: KeyIdentity, args: Record<string, unknown>): Promise<string> {
-    const vault = typeof args.vault === "string" ? args.vault : "";
-    const path = typeof args.path === "string" ? args.path : "";
-    if (vault === "" || path === "") throw new Error("missing vault or path");
-    assertScope(identity, vault);
-    const content = await readVaultFile(vault, path);
-    return content;
-  }
+    const canRead = canReadAnyVault(identity.scopes, aclConfig);
 
-  async function callList(identity: KeyIdentity, args: Record<string, unknown>): Promise<string> {
-    const allowed = allowedVaults(identity.scopes, knownVaults);
-    let listing: Record<string, VaultFile[]> = {};
-    const targets =
-      typeof args.vault === "string" ? [args.vault] : [...allowed].filter((v) => knownVaults.includes(v));
-    for (const vault of targets) {
-      assertScope(identity, vault);
-      try {
-        listing[vault] = await listVaultFiles(vault);
-      } catch (err) {
-        if (err instanceof VaultError) throw err;
-        throw err;
-      }
-    }
-    return JSON.stringify(listing, null, 2);
-  }
-
-  async function callTaskCreate(
-    identity: KeyIdentity,
-    identityKey: string,
-    args: Record<string, unknown>,
-  ): Promise<string> {
-    const goal = typeof args.goal === "string" ? args.goal.trim() : "";
-    if (goal === "") throw new Error("missing goal");
-    const body: Record<string, unknown> = { goal, created_by: identity.agent };
-    if (typeof args.parent_id === "string" && args.parent_id.trim() !== "") {
-      body.parent_id = args.parent_id;
-    }
-    const data = await backendJson(identityKey, "/api/tasks", { method: "POST", body });
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function callTaskList(identityKey: string, args: Record<string, unknown>): Promise<string> {
-    const qs =
-      typeof args.status === "string" && args.status.trim() !== ""
-        ? `?status=${encodeURIComponent(args.status.trim())}`
-        : "";
-    const data = await backendJson(identityKey, `/api/tasks${qs}`);
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function callTaskClaim(
-    identity: KeyIdentity,
-    identityKey: string,
-    args: Record<string, unknown>,
-  ): Promise<string> {
-    const id = typeof args.id === "string" ? args.id.trim() : "";
-    if (id === "") throw new Error("missing id");
-    const data = await backendJson(identityKey, `/api/tasks/${encodeURIComponent(id)}/claim`, {
-      method: "PUT",
-      body: { by: identity.agent },
-    });
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function callTaskComplete(identityKey: string, args: Record<string, unknown>): Promise<string> {
-    const id = typeof args.id === "string" ? args.id.trim() : "";
-    if (id === "") throw new Error("missing id");
-    const body: Record<string, unknown> = {};
-    if (typeof args.summary === "string") body.summary = args.summary;
-    if (typeof args.artifact_ref === "string") body.artifact_ref = args.artifact_ref;
-    const data = await backendJson(identityKey, `/api/tasks/${encodeURIComponent(id)}/complete`, {
-      method: "PUT",
-      body,
-    });
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function callAgentSend(
-    identity: KeyIdentity,
-    identityKey: string,
-    args: Record<string, unknown>,
-  ): Promise<string> {
-    const to_agent = typeof args.to_agent === "string" ? args.to_agent.trim() : "";
-    const type = typeof args.type === "string" ? args.type.trim() : "";
-    if (to_agent === "") throw new Error("missing to_agent");
-    if (type === "") throw new Error("missing type");
-    const body: Record<string, unknown> = { from_agent: identity.agent, to_agent, type };
-    if (typeof args.payload_ref === "string") body.payload_ref = args.payload_ref;
-    const data = await backendJson(identityKey, "/api/messages", { method: "POST", body });
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function callAgentInbox(identity: KeyIdentity, identityKey: string): Promise<string> {
-    const data = await backendJson(
-      identityKey,
-      `/api/messages?to_agent=${encodeURIComponent(identity.agent)}`,
-    );
-    return JSON.stringify(data, null, 2);
-  }
-
-  async function dispatch(
-    identity: KeyIdentity,
-    identityKey: string,
-    name: string,
-    args: Record<string, unknown>,
-  ): Promise<string> {
-    switch (name) {
-      case "cardinal_search_memory":
-        return callSearch(identity, args);
-      case "cardinal_read_memory":
-        return callRead(identity, args);
-      case "cardinal_list_memory":
-        return callList(identity, args);
-      case "cardinal_task_create":
-        return callTaskCreate(identity, identityKey, args);
-      case "cardinal_task_list":
-        return callTaskList(identityKey, args);
-      case "cardinal_task_claim":
-        return callTaskClaim(identity, identityKey, args);
-      case "cardinal_task_complete":
-        return callTaskComplete(identityKey, args);
-      case "cardinal_agent_send":
-        return callAgentSend(identity, identityKey, args);
-      case "cardinal_agent_inbox":
-        return callAgentInbox(identity, identityKey);
-      default:
-        throw new Error(`unknown tool: ${name}`);
-    }
-  }
-
-  class ScopeError extends Error {}
-
-  async function handleRpc(msg: any, identity: KeyIdentity, identityKey: string): Promise<Response> {
-    const method: string | undefined = msg.method;
-    const hasId = msg.id !== undefined && msg.id !== null;
-
-    if (!hasId) {
-      // Notification: no response body (known protocol pitfall).
-      return new Response(null, { status: 202 });
-    }
-    const id = msg.id;
-
-    const reply = (result: unknown) => Response.json({ jsonrpc: "2.0", id, result });
-    const errorReply = (code: number, message: string) =>
-      Response.json({ jsonrpc: "2.0", id, error: { code, message } });
-
-    switch (method) {
-      case "initialize":
-        return reply({
-          protocolVersion: String(msg.params?.protocolVersion ?? "2024-11-05"),
-          capabilities: { tools: {} },
-          serverInfo: { name: "cardinal-mcp", version: rootPkg.version },
-        });
-      case "ping":
-        return reply({});
-      case "tools/list":
-        return reply({ tools: toolsFor(identity) });
-      case "tools/call": {
-        const name = msg.params?.name;
-        const args = msg.params?.arguments ?? {};
-        if (typeof name !== "string" || typeof args !== "object" || args === null) {
-          return errorReply(-32602, "invalid params");
-        }
+    mcp.registerPrompt(
+      "cardinal_onboard",
+      {
+        title: "Cardinal Onboarding",
+        description:
+          "Assemble a deterministic onboarding context packet (conduct rules, setup, active projects, and readable topic map).",
+        argsSchema: {
+          mode: z.enum(["coding", "hermes"]).optional(),
+          project: z.string().optional(),
+        },
+      },
+      async (args) => {
+        const start = Date.now();
+        const mode = args.mode ?? "coding";
         try {
-          const text = await dispatch(identity, identityKey, name, args as Record<string, unknown>);
-          return reply(textResult(text));
+          const packet = await buildOnboardPacket({
+            mode,
+            project: args.project,
+            scopes: identity.scopes,
+            vaultStore,
+            aclConfig,
+          });
+          recordUsage(identityKey, "prompt:cardinal_onboard", true, packet.bytes, Date.now() - start);
+          return {
+            description: `Cardinal onboarding packet (${mode})`,
+            messages: [
+              {
+                role: "user" as const,
+                content: { type: "text" as const, text: packet.markdown },
+              },
+            ],
+          };
         } catch (err) {
-          if (err instanceof ScopeError) {
-            return reply(textResult(err.message, true));
-          }
           const message = err instanceof Error ? err.message : String(err);
-          return reply(textResult(message, true));
+          recordUsage(
+            identityKey,
+            "prompt:cardinal_onboard",
+            false,
+            Buffer.byteLength(message, "utf8"),
+            Date.now() - start,
+          );
+          return {
+            description: "Cardinal onboarding error",
+            messages: [
+              {
+                role: "user" as const,
+                content: { type: "text" as const, text: `Onboarding failed: ${message}` },
+              },
+            ],
+          };
         }
-      }
-      default:
-        return errorReply(-32601, `method not found: ${method}`);
+      },
+    );
+
+    mcp.registerPrompt(
+      "cardinal_bootstrap_repo",
+      {
+        title: "Cardinal New-Repo Bootstrap (Configuration 101)",
+        description:
+          "Bundle baseline conduct rules, starter AGENTS.md/PR templates, and portable workflow skills from vaults without client-side installs.",
+        argsSchema: {
+          preset: z.string().optional(),
+          project: z.string().optional(),
+          stack: z.string().optional(),
+          skills: z.string().optional(),
+        },
+      },
+      async (args) => {
+        const start = Date.now();
+        const skillsList = args.skills
+          ? args.skills
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : undefined;
+        try {
+          const packet = await buildBootstrapPacket({
+            preset: args.preset,
+            project: args.project,
+            stack: args.stack,
+            skills: skillsList,
+            scopes: identity.scopes,
+            vaultStore,
+            aclConfig,
+          });
+          recordUsage(identityKey, "prompt:cardinal_bootstrap_repo", true, packet.bytes, Date.now() - start);
+          return {
+            description: `Cardinal repo bootstrap (${packet.preset})`,
+            messages: [
+              {
+                role: "user" as const,
+                content: { type: "text" as const, text: packet.markdown },
+              },
+            ],
+          };
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          recordUsage(
+            identityKey,
+            "prompt:cardinal_bootstrap_repo",
+            false,
+            Buffer.byteLength(message, "utf8"),
+            Date.now() - start,
+          );
+          return {
+            description: "Cardinal repo bootstrap error",
+            messages: [
+              {
+                role: "user" as const,
+                content: { type: "text" as const, text: `Bootstrap failed: ${message}` },
+              },
+            ],
+          };
+        }
+      },
+    );
+
+    if (canRead) {
+      mcp.registerTool(
+        "cardinal_bootstrap_repo",
+        {
+          title: "Bootstrap Repository (Configuration 101)",
+          description:
+            "Return conduct rules, starter AGENTS.md and PR templates, and portable workflow skills (e.g. caveman, commit hygiene, PR flow, Matt Pocock PRD/architecture skills) without client-side setup.",
+          inputSchema: {
+            preset: z
+              .string()
+              .optional()
+              .describe("Preset name ('default', 'prd', 'minimal', custom vault preset, or 'list')."),
+            project: z.string().optional().describe("Optional project slug for AGENTS.md boilerplate."),
+            stack: z.string().optional().describe("Optional stack summary (e.g. 'TypeScript, Bun, React')."),
+            skills: z.array(z.string()).optional().describe("Optional explicit skill slugs or vault paths overriding preset defaults."),
+            extra_skills: z.array(z.string()).optional().describe("Additional skill slugs or paths appended to the preset."),
+            include_starter_files: z.boolean().optional().describe("Include AGENTS.md and PR template boilerplate (default true)."),
+            max_bytes: z.number().int().min(512).max(96_000).optional().describe("Optional max markdown bytes (default 48000)."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_bootstrap_repo", async () => {
+            const packet = await buildBootstrapPacket({
+              preset: args.preset,
+              project: args.project,
+              stack: args.stack,
+              skills: args.skills,
+              extraSkills: args.extra_skills,
+              includeStarterFiles: args.include_starter_files,
+              maxBytes: args.max_bytes,
+              scopes: identity.scopes,
+              vaultStore,
+              aclConfig,
+            });
+            return packet.markdown;
+          }),
+      );
+      mcp.registerTool(
+        "cardinal_onboard",
+        {
+          title: "Assemble Onboarding Context",
+          description:
+            "Build a deterministic, scope-filtered onboarding packet (conduct rules, setup, active projects, optional project handoff, and topic map).",
+          inputSchema: {
+            mode: z
+              .enum(["coding", "hermes"])
+              .optional()
+              .describe("Harness mode: 'coding' for stateless coding agents or 'hermes' for Hermes profiles."),
+            project: z
+              .string()
+              .optional()
+              .describe("Optional project slug to include agents/handoffs/<project>.md in coding mode."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_onboard", async () => {
+            const packet = await buildOnboardPacket({
+              mode: args.mode ?? "coding",
+              project: args.project,
+              scopes: identity.scopes,
+              vaultStore,
+              aclConfig,
+            });
+            return packet.markdown;
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_list",
+        {
+          title: "List Readable Vault Topics",
+          description:
+            "Progressive-disclosure listing of readable markdown directories and files under an optional relative prefix.",
+          inputSchema: {
+            prefix: z.string().optional().describe("Optional relative directory prefix (e.g. 'skills/coding')."),
+            depth: z.number().int().min(1).max(5).optional().describe("Max directory depth (1-5, default 2)."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_list", async () => {
+            const listing = await vaultStore.listEntries(identity.scopes, {
+              prefix: args.prefix,
+              depth: args.depth,
+            });
+            return JSON.stringify(listing, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_search",
+        {
+          title: "Search Vault Context",
+          description:
+            "Search readable markdown vaults and skills using hybrid/BM25 search, strictly filtered by the caller key's path scopes.",
+          inputSchema: {
+            query: z.string().min(1).describe("Search query text."),
+            prefix: z.string().optional().describe("Optional relative path prefix filter."),
+            top_k: z.number().int().min(1).max(20).optional().describe("Maximum hits to return (1-20, default 5)."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_search", async () => {
+            const out = await searchEngine.search(identity.scopes, {
+              query: args.query,
+              prefix: args.prefix,
+              topK: args.top_k,
+            });
+            return JSON.stringify(out, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_read",
+        {
+          title: "Read Markdown Note",
+          description:
+            "Read a single markdown (.md) note by relative vault path, enforcing path-glob ACLs and byte limits.",
+          inputSchema: {
+            path: z.string().min(1).describe("Relative path inside vaults (e.g. 'skills/coding/git/SKILL.md')."),
+            max_bytes: z.number().int().min(128).max(131_072).optional().describe("Optional byte limit (default 32768)."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_read", async () => {
+            const note = await vaultStore.readMarkdown(identity.scopes, args.path, args.max_bytes);
+            return JSON.stringify(note, null, 2);
+          }),
+      );
     }
+
+    const configTools: Array<{
+      name: "cardinal_agent_config" | "cardinal_user_config";
+      category: ConfigCategory;
+      title: string;
+      description: string;
+      examplePath: string;
+    }> = [
+      {
+        name: "cardinal_agent_config",
+        category: "agents",
+        title: "Read Agent Harness Configs",
+        description:
+          "List or read sanitized, secret-redacted agent harness configurations (OpenCode, OMP, AGY, Cursor, Claude, Codex, Hermes) under /data/configs/agents.",
+        examplePath: "opencode/opencode.json",
+      },
+      {
+        name: "cardinal_user_config",
+        category: "user",
+        title: "Read Personal Terminal & User Configs",
+        description:
+          "List or read sanitized, secret-redacted terminal/shell/personal configurations (Kitty, Fish, Zsh, Starship, Git) under /data/configs/user. Requires explicit config:read:user/** opt-in.",
+        examplePath: "kitty/kitty.conf",
+      },
+    ];
+
+    for (const cfg of configTools) {
+      if (!canReadConfigCategory(identity.scopes, cfg.category)) continue;
+      mcp.registerTool(
+        cfg.name,
+        {
+          title: cfg.title,
+          description: cfg.description,
+          inputSchema: {
+            action: z
+              .enum(["list", "read"])
+              .optional()
+              .describe("Action: 'list' (default unless path is set) or 'read' one file."),
+            path: z
+              .string()
+              .optional()
+              .describe(`Relative path inside ${cfg.category}/ when reading (e.g. '${cfg.examplePath}').`),
+            prefix: z.string().optional().describe("Optional relative directory prefix when listing."),
+            depth: z.number().int().min(1).max(5).optional().describe("Max directory depth (1-5, default 2) when listing."),
+            max_bytes: z.number().int().min(128).max(131_072).optional().describe("Optional byte limit when reading (default 32768)."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, cfg.name, async () => {
+            const action = args.action ?? (args.path ? "read" : "list");
+            if (action === "read") {
+              if (!args.path || args.path.trim() === "") {
+                throw new Error("path is required when action='read'");
+              }
+              const res = await configStore.readConfig(
+                identity.scopes,
+                cfg.category,
+                args.path,
+                args.max_bytes,
+              );
+              return JSON.stringify(res, null, 2);
+            }
+            const listing = await configStore.listConfigs(identity.scopes, cfg.category, {
+              prefix: args.prefix,
+              depth: args.depth,
+            });
+            return JSON.stringify(listing, null, 2);
+          }),
+      );
+    }
+
+    if (writer !== null && canWritePrefix(identity.scopes, "agents/handoffs", aclConfig)) {
+      mcp.registerTool(
+        "cardinal_handoff",
+        {
+          title: "Write Project Handoff",
+          description:
+            "Write a bounded cross-session handoff note under agents/handoffs/<project>.md in the isolated writable state directory.",
+          inputSchema: {
+            project: z.string().min(1).describe("Project slug matching /^[a-z0-9][a-z0-9._-]{0,63}$/."),
+            summary: z.string().min(1).describe("Concise state summary."),
+            next_steps: z.array(z.string()).optional().describe("Actionable next steps."),
+            refs: z.array(z.string()).optional().describe("Relevant file paths or URLs."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_handoff", async () => {
+            const res = await writer.writeHandoff({
+              agent: identity.agent,
+              project: args.project,
+              summary: args.summary,
+              nextSteps: args.next_steps,
+              refs: args.refs,
+            });
+            return JSON.stringify(res, null, 2);
+          }),
+      );
+    }
+
+    if (writer !== null && canWritePrefix(identity.scopes, "agents/proposals", aclConfig)) {
+      mcp.registerTool(
+        "cardinal_propose_skill",
+        {
+          title: "Propose Skill Update",
+          description:
+            "Write a reviewable skill improvement proposal under agents/proposals/ without modifying read-only source vaults.",
+          inputSchema: {
+            skill_path: z.string().min(1).describe("Relative target skill path (e.g. 'skills/coding/git/SKILL.md')."),
+            reason: z.string().min(1).describe("Why this skill change is proposed."),
+            content: z.string().min(1).describe("Proposed markdown content or diff."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_propose_skill", async () => {
+            const res = await writer.writeSkillProposal({
+              agent: identity.agent,
+              skillPath: args.skill_path,
+              reason: args.reason,
+              content: args.content,
+            });
+            return JSON.stringify(res, null, 2);
+          }),
+      );
+    }
+
+    if (hasServiceScope(identity.scopes, "board")) {
+      mcp.registerTool(
+        "cardinal_task_create",
+        {
+          title: "Create Blackboard Task",
+          description: "Create a task on the Cardinal blackboard.",
+          inputSchema: {
+            goal: z.string().min(1).describe("Task goal description."),
+            parent_id: z.string().optional().describe("Optional parent task ID."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_task_create", async () => {
+            const body: Record<string, unknown> = {
+              goal: args.goal,
+              created_by: identity.agent,
+            };
+            if (args.parent_id && args.parent_id.trim() !== "") {
+              body.parent_id = args.parent_id.trim();
+            }
+            const data = await backendJson(identityKey, "/api/tasks", { method: "POST", body });
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_task_list",
+        {
+          title: "List Blackboard Tasks",
+          description: "List tasks on the Cardinal blackboard, optionally filtered by status.",
+          inputSchema: {
+            status: z
+              .enum(["open", "claimed", "done", "blocked"])
+              .optional()
+              .describe("Optional task status filter."),
+          },
+          annotations: { readOnlyHint: true },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_task_list", async () => {
+            const qs = args.status ? `?status=${encodeURIComponent(args.status)}` : "";
+            const data = await backendJson(identityKey, `/api/tasks${qs}`);
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_task_claim",
+        {
+          title: "Claim Blackboard Task",
+          description: "Claim an open blackboard task under the caller key's agent identity.",
+          inputSchema: {
+            id: z.string().min(1).describe("Task ID."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_task_claim", async () => {
+            const data = await backendJson(
+              identityKey,
+              `/api/tasks/${encodeURIComponent(args.id)}/claim`,
+              {
+                method: "PUT",
+                body: { by: identity.agent },
+              },
+            );
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_task_complete",
+        {
+          title: "Complete Blackboard Task",
+          description: "Mark a claimed blackboard task as done with an optional summary and artifact reference.",
+          inputSchema: {
+            id: z.string().min(1).describe("Task ID."),
+            summary: z.string().optional().describe("Bounded result summary."),
+            artifact_ref: z.string().optional().describe("Artifact path or URL."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_task_complete", async () => {
+            const body: Record<string, unknown> = {};
+            if (args.summary !== undefined) body.summary = args.summary;
+            if (args.artifact_ref !== undefined) body.artifact_ref = args.artifact_ref;
+            const data = await backendJson(
+              identityKey,
+              `/api/tasks/${encodeURIComponent(args.id)}/complete`,
+              {
+                method: "PUT",
+                body,
+              },
+            );
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+    }
+
+    if (hasServiceScope(identity.scopes, "mailbox")) {
+      mcp.registerTool(
+        "cardinal_agent_send",
+        {
+          title: "Send Agent Mailbox Message",
+          description: "Send a lightweight handoff message to another agent's mailbox.",
+          inputSchema: {
+            to_agent: z.string().min(1).describe("Recipient agent name."),
+            type: z.string().min(1).describe("Message type."),
+            payload_ref: z.string().optional().describe("Optional reference to an artifact or handoff."),
+          },
+        },
+        async (args) =>
+          withToolTelemetry(identityKey, "cardinal_agent_send", async () => {
+            const body: Record<string, unknown> = {
+              from_agent: identity.agent,
+              to_agent: args.to_agent,
+              type: args.type,
+            };
+            if (args.payload_ref !== undefined) body.payload_ref = args.payload_ref;
+            const data = await backendJson(identityKey, "/api/messages", { method: "POST", body });
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+
+      mcp.registerTool(
+        "cardinal_agent_inbox",
+        {
+          title: "Read Agent Inbox",
+          description: "List messages addressed to the caller key's agent identity.",
+          inputSchema: {},
+          annotations: { readOnlyHint: true },
+        },
+        async () =>
+          withToolTelemetry(identityKey, "cardinal_agent_inbox", async () => {
+            const data = await backendJson(
+              identityKey,
+              `/api/messages?to_agent=${encodeURIComponent(identity.agent)}`,
+            );
+            return JSON.stringify(data, null, 2);
+          }),
+      );
+    }
+
+    return mcp;
   }
 
   return {
@@ -433,37 +713,64 @@ export function createMcpServer(options: McpServerOptions) {
     async fetch(req: Request): Promise<Response> {
       const { pathname } = new URL(req.url);
 
+      if (pathname === "/health" && req.method === "GET") {
+        const stats = searchEngine.stats();
+        return Response.json({
+          status: "ok",
+          version: rootPkg.version,
+          searchEngine: stats.engine,
+          indexedFiles: stats.indexedFiles,
+        });
+      }
+
       if (pathname !== "/mcp") {
         return Response.json({ error: "not_found" }, { status: 404 });
       }
+
       if (req.method !== "POST") {
         return Response.json({ error: "method_not_allowed" }, { status: 405 });
       }
 
-      // Auth: Bearer key → validate against backend (TTL cache).
       const auth = req.headers.get("authorization");
       if (auth === null || !auth.startsWith("Bearer ")) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
+
       const identityKey = auth.slice(7).trim();
+      if (identityKey === "") {
+        return Response.json({ error: "unauthorized" }, { status: 401 });
+      }
+
       const identity = await validate(identityKey);
       if (identity === null) {
         return Response.json({ error: "unauthorized" }, { status: 401 });
       }
 
-      let msg: unknown;
+      const mcp = buildCallerMcpServer(identity, identityKey);
+      const transport = new WebStandardStreamableHTTPServerTransport({
+        sessionIdGenerator: undefined,
+        enableJsonResponse: true,
+      });
+
       try {
-        msg = await req.json();
-      } catch {
-        return Response.json(
-          { jsonrpc: "2.0", id: null, error: { code: -32700, message: "parse error" } },
-          { status: 200 },
-        );
+        await mcp.connect(transport);
+        const normalizedReq = await normalizeStreamableRequest(req);
+        return await transport.handleRequest(normalizedReq);
+      } finally {
+        await mcp.close().catch(() => {});
       }
-      return handleRpc(msg, identity, identityKey);
+    },
+
+    async syncIndex(force = false) {
+      await searchEngine.syncIndex(force);
+    },
+
+    close() {
+      searchEngine.close();
     },
 
     start(port = Number(process.env.PORT ?? 8789)) {
+      void searchEngine.syncIndex(true).catch(() => {});
       const server = Bun.serve({ port, fetch: this.fetch.bind(this) });
       this.port = server.port;
       console.log(`cardinal-mcp listening on :${server.port}`);

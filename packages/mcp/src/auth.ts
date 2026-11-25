@@ -1,29 +1,46 @@
-export { generateKey, hashKey, isKeyFormat, KEY_PREFIX } from "@cardinal/keys";
-
-/** Resultado de validar una agent key contra el backend. */
-export interface KeyIdentity {
-  agent: string;
-  kind: string;
-  scopes: string[];
-}
+export {
+  AclPathError,
+  DEFAULT_DENY_PREFIXES,
+  PERSONAL_OPT_IN_SCOPE,
+  canReadAnyVault,
+  canReadConfig,
+  canReadConfigCategory,
+  canReadPath,
+  canWritePath,
+  canWritePrefix,
+  hasServiceScope,
+  isDeniedPath,
+  matchGlob,
+  normalizePrefix,
+  normalizeRelativePath,
+  type AclConfig,
+  type ConfigCategory,
+  type KeyIdentity,
+} from "./acl";
+import { canReadPath, type AclConfig } from "./acl";
 
 /**
- * Interpreta los scopes de una key como allowlist de vaults.
- * - Scope "*" → todas las vaults permitidas.
- * - Scope "vault:<name>" → permite esa vault.
- * - Vault pedida que no está en CARDINAL_VAULTS → nunca permitida salvo "*".
- *   (el caller decide: para vaults desconocidas, "*" no autoriza leerlas porque
- *   no existen en el filesystem; el check de existencia lo hace la tool.)
+ * Legacy helper retained for vault-level allowlist inspection.
  */
-export function allowedVaults(scopes: string[], knownVaults: readonly string[]): Set<string> {
-  if (scopes.includes("*")) return new Set(knownVaults);
-  const vaults = new Set<string>();
-  for (const scope of scopes) {
-    if (scope.startsWith("vault:")) vaults.add(scope.slice("vault:".length));
+export function allowedVaults(
+  scopes: string[],
+  knownVaults: readonly string[],
+  config?: AclConfig,
+): Set<string> {
+  const out = new Set<string>();
+  for (const vault of knownVaults) {
+    if (canReadPath(scopes, `${vault}/__probe__.md`, config)) {
+      out.add(vault);
+    }
   }
-  return vaults;
+  return out;
 }
 
-export function canAccessVault(scopes: string[], vault: string, knownVaults: readonly string[]): boolean {
-  return allowedVaults(scopes, knownVaults).has(vault);
+export function canAccessVault(
+  scopes: string[],
+  vault: string,
+  knownVaults: readonly string[],
+  config?: AclConfig,
+): boolean {
+  return allowedVaults(scopes, knownVaults, config).has(vault);
 }

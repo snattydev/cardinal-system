@@ -1,7 +1,12 @@
-import { describe, expect, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { createMcpServer } from "./server";
 
-const VAULTS = ["the portal", "for-my-agents"] as const;
+const ROOT = join(import.meta.dir, ".tmp-server-v2-test");
+const VAULTS = join(ROOT, "vaults");
+const WRITABLE = join(ROOT, "agent-state");
+const CONFIGS = join(ROOT, "configs");
 
 interface FakeTask {
   id: string;
@@ -23,18 +28,114 @@ interface FakeMessage {
   read: number;
 }
 
+interface UsageEvent {
+  auth: string;
+  tool_name: string;
+  ok: boolean;
+  bytes_out: number;
+  duration_ms: number;
+}
+
 interface FakeBackendState {
   validKeys: Map<string, { agent: string; kind: string; scopes: string[] }>;
-  searchResults?: unknown;
   tasks: FakeTask[];
   messages: FakeMessage[];
+  usageEvents: UsageEvent[];
+}
+
+beforeAll(() => {
+  mkdirSync(join(VAULTS, "cardinal-system"), { recursive: true });
+  mkdirSync(join(VAULTS, "skills", "coding", "caveman"), { recursive: true });
+  mkdirSync(join(VAULTS, "projects"), { recursive: true });
+  mkdirSync(join(VAULTS, "personal"), { recursive: true });
+  mkdirSync(join(WRITABLE, "handoffs"), { recursive: true });
+  mkdirSync(join(CONFIGS, "agents", "opencode"), { recursive: true });
+  mkdirSync(join(CONFIGS, "user", "kitty"), { recursive: true });
+
+  writeFileSync(join(VAULTS, "cardinal-system", "AGENTS.md"), "# Rules\nVerify every command.");
+  writeFileSync(join(VAULTS, "cardinal-system", "CODING.md"), "# Coding\nStateless harness.");
+  writeFileSync(join(VAULTS, "projects", "ACTIVE.md"), "- cardinal-context-hub");
+  writeFileSync(
+    join(VAULTS, "skills", "coding", "git.md"),
+    "# Git Skill\nNever force push main branches.",
+  );
+  writeFileSync(
+    join(VAULTS, "skills", "coding", "caveman", "SKILL.md"),
+    "# Caveman Skill\nKeep diffs and notes concise.",
+  );
+  writeFileSync(
+    join(VAULTS, "personal", "diary.md"),
+    "# Private Diary\nNever expose this secret force push note.",
+  );
+  writeFileSync(join(WRITABLE, "handoffs", "demo.md"), "# Handoff: demo\nReady to continue.");
+
+  const syntheticSk = ["sk", "proj", "AbCdEfGh1234567890XyZ"].join("-");
+  writeFileSync(
+    join(CONFIGS, "agents", "opencode", "opencode.json"),
+    JSON.stringify({ model: "anthropic/claude-sonnet-4", provider: { openai: { apiKey: syntheticSk } } }),
+  );
+  writeFileSync(join(CONFIGS, "agents", "opencode", "auth.json"), `{"secret":"blocked"}`);
+  writeFileSync(join(CONFIGS, "user", "kitty", "kitty.conf"), "font_size 11\n");
+});
+
+afterAll(() => {
+  rmSync(ROOT, { recursive: true, force: true });
+});
+
+const KEY_CODING = "sk-cardinal-coding-key";
+const KEY_BOARD = "sk-cardinal-board-key";
+const KEY_FULL = "sk-cardinal-full-key";
+const KEY_USER_CFG = "sk-cardinal-usercfg-key";
+const KEY_EMPTY = "sk-cardinal-empty-key";
+
+function makeState(): FakeBackendState {
+  return {
+    validKeys: new Map([
+      [
+        KEY_CODING,
+        {
+          agent: "coder-1",
+          kind: "agent",
+          scopes: [
+            "vault:read:cardinal-system/**",
+            "vault:read:skills/coding/**",
+            "vault:read:projects/**",
+            "vault:read:agents/**",
+            "vault:write:agents/handoffs/**",
+            "vault:write:agents/proposals/**",
+          ],
+        },
+      ],
+      [KEY_BOARD, { agent: "coord-1", kind: "agent", scopes: ["board:write", "mailbox:write"] }],
+      [
+        KEY_FULL,
+        {
+          agent: "admin-agent",
+          kind: "agent",
+          scopes: ["*", "vault:write:agents/handoffs/**", "vault:write:agents/proposals/**"],
+        },
+      ],
+      [
+        KEY_USER_CFG,
+        {
+          agent: "host-user",
+          kind: "agent",
+          scopes: ["config:read:agents/**", "config:read:user/**"],
+        },
+      ],
+      [KEY_EMPTY, { agent: "idle-agent", kind: "agent", scopes: [] }],
+    ]),
+    tasks: [],
+    messages: [],
+    usageEvents: [],
+  };
 }
 
 function makeDeps(state: FakeBackendState) {
-  const fetchImpl = (async (url: any, init?: any): Promise<Response> => {
+  const fetchImpl = (async (url: string | URL, init?: RequestInit): Promise<Response> => {
     const urlStr = String(url);
     const method = String(init?.method ?? "GET").toUpperCase();
-    const auth = (init?.headers as Record<string, string>)?.authorization ?? "";
+    const auth = (init?.headers as Record<string, string> | undefined)?.authorization ?? "";
 
     if (urlStr.endsWith("/api/internal/keys/validate")) {
       const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
@@ -42,24 +143,32 @@ function makeDeps(state: FakeBackendState) {
       if (!id) return Response.json({ error: "unauthorized" }, { status: 401 });
       return Response.json(id);
     }
-    if (urlStr.includes("/api/rag/search")) {
-      return Response.json({ results: state.searchResults ?? [] });
+
+    if (urlStr.endsWith("/api/internal/mcp/usage") && method === "POST") {
+      const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      state.usageEvents.push({
+        auth,
+        tool_name: String(body.tool_name ?? ""),
+        ok: Boolean(body.ok),
+        bytes_out: Number(body.bytes_out ?? 0),
+        duration_ms: Number(body.duration_ms ?? 0),
+      });
+      return Response.json({ ok: true });
     }
 
-    // Board API stubs (agent Bearer auth is assumed already accepted by backend).
-    const tasksUrl = new URL(urlStr, "http://backend:8787");
-    if (tasksUrl.pathname === "/api/tasks" && method === "GET") {
-      const status = tasksUrl.searchParams.get("status");
+    const parsedUrl = new URL(urlStr, "http://backend:8787");
+    if (parsedUrl.pathname === "/api/tasks" && method === "GET") {
+      const status = parsedUrl.searchParams.get("status");
       const tasks = status ? state.tasks.filter((t) => t.status === status) : state.tasks;
       return Response.json({ tasks });
     }
-    if (tasksUrl.pathname === "/api/tasks" && method === "POST") {
+    if (parsedUrl.pathname === "/api/tasks" && method === "POST") {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       const task: FakeTask = {
         id: crypto.randomUUID(),
         goal: String(body.goal ?? ""),
         status: "open",
-        created_by: typeof body.created_by === "string" ? body.created_by : "system",
+        created_by: String(body.created_by ?? "system"),
         assigned_to: null,
         summary: null,
         artifact_ref: null,
@@ -68,17 +177,16 @@ function makeDeps(state: FakeBackendState) {
       state.tasks.push(task);
       return Response.json({ task });
     }
-    const claimMatch = tasksUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
+    const claimMatch = parsedUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/claim$/);
     if (claimMatch && method === "PUT") {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       const task = state.tasks.find((t) => t.id === decodeURIComponent(claimMatch[1]!));
       if (!task) return Response.json({ error: "not_found" }, { status: 404 });
-      if (task.status !== "open") return Response.json({ error: "not_open" }, { status: 409 });
       task.status = "claimed";
       task.assigned_to = String(body.by ?? "");
       return Response.json({ task });
     }
-    const completeMatch = tasksUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
+    const completeMatch = parsedUrl.pathname.match(/^\/api\/tasks\/([^/]+)\/complete$/);
     if (completeMatch && method === "PUT") {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       const task = state.tasks.find((t) => t.id === decodeURIComponent(completeMatch[1]!));
@@ -88,9 +196,7 @@ function makeDeps(state: FakeBackendState) {
       task.artifact_ref = typeof body.artifact_ref === "string" ? body.artifact_ref : null;
       return Response.json({ task });
     }
-
-    const messagesUrl = new URL(urlStr, "http://backend:8787");
-    if (messagesUrl.pathname === "/api/messages" && method === "POST") {
+    if (parsedUrl.pathname === "/api/messages" && method === "POST") {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       const message: FakeMessage = {
         id: crypto.randomUUID(),
@@ -103,29 +209,33 @@ function makeDeps(state: FakeBackendState) {
       state.messages.push(message);
       return Response.json({ message });
     }
-    if (messagesUrl.pathname === "/api/messages" && method === "GET") {
-      const toAgent = messagesUrl.searchParams.get("to_agent");
-      if (!toAgent) {
-        return Response.json({ error: "missing_to_agent" }, { status: 400 });
-      }
+    if (parsedUrl.pathname === "/api/messages" && method === "GET") {
+      const toAgent = parsedUrl.searchParams.get("to_agent");
       const messages = state.messages.filter((m) => m.to_agent === toAgent);
       return Response.json({ messages });
     }
 
     return new Response("not found", { status: 404 });
-  }) as typeof fetch;
+  }) as unknown as typeof fetch;
+
   const server = createMcpServer({
     backendUrl: "http://backend:8787",
-    vaultsRoot: "/nonexistent",
-    knownVaults: VAULTS,
+    vaultsRoot: VAULTS,
+    writableRoot: WRITABLE,
+    configsRoot: CONFIGS,
+    gitAutoCommit: false,
     fetchImpl,
   });
 
-  function rpc(
+  async function rpc(
     key: string | null,
     body: Record<string, unknown>,
+    accept = "application/json, text/event-stream",
   ): Promise<Response> {
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      accept,
+    };
     if (key !== null) headers.authorization = `Bearer ${key}`;
     return server.fetch(
       new Request("http://localhost:8789/mcp", {
@@ -136,301 +246,379 @@ function makeDeps(state: FakeBackendState) {
     );
   }
 
-  async function rpcJson(key: string | null, body: Record<string, unknown>) {
-    const res = await rpc(key, body);
-    return { status: res.status, json: (await res.json()) as any };
+  async function rpcJson(
+    key: string | null,
+    body: Record<string, unknown>,
+    accept?: string,
+  ) {
+    const res = await rpc(key, body, accept);
+    const text = await res.text();
+    return {
+      status: res.status,
+      json: text ? (JSON.parse(text) as any) : null,
+    };
   }
 
   return { server, rpc, rpcJson };
 }
 
-const KEY_OK = "sk-cardinal-ok";
-const KEY_SCOPED = "sk-cardinal-scoped";
-
-function makeState(): FakeBackendState {
-  return {
-    validKeys: new Map([
-      [KEY_OK, { agent: "shinon", kind: "agent", scopes: ["*"] }],
-      [KEY_SCOPED, { agent: "writer", kind: "agent", scopes: ["vault:the portal"] }],
-    ]),
-    tasks: [],
-    messages: [],
-  };
-}
-
-describe("MCP server /mcp", () => {
-  test("sin Authorization → 401", async () => {
-    const { rpc } = makeDeps(makeState());
-    const res = await rpc(null, { jsonrpc: "2.0", id: 1, method: "initialize", params: {} });
-    expect(res.status).toBe(401);
-  });
-
-  test("key desconocida → 401 (backend la rechaza)", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { status } = await rpcJson("sk-cardinal-nope", {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: {},
-    });
-    expect(status).toBe(401);
-  });
-
-  test("initialize responde protocolVersion y capabilities", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { status, json } = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 1,
-      method: "initialize",
-      params: { protocolVersion: "2024-11-05" },
-    });
-    expect(status).toBe(200);
-    expect(json.result.protocolVersion).toBe("2024-11-05");
-    expect(json.result.capabilities.tools).toBeDefined();
-    expect(json.id).toBe(1);
-  });
-
-  test("notification (sin id) → 202 sin body", async () => {
-    const { rpc } = makeDeps(makeState());
-    const res = await rpc(KEY_OK, {
-      jsonrpc: "2.0",
-      method: "notifications/initialized",
-    });
-    expect(res.status).toBe(202);
-    expect(await res.text()).toBe("");
-  });
-
-  test("key con * ve memory + board tools en tools/list", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { json } = await rpcJson(KEY_OK, { jsonrpc: "2.0", id: 2, method: "tools/list" });
-    const names = json.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual([
-      "cardinal_agent_inbox",
-      "cardinal_agent_send",
-      "cardinal_list_memory",
-      "cardinal_read_memory",
-      "cardinal_search_memory",
-      "cardinal_task_claim",
-      "cardinal_task_complete",
-      "cardinal_task_create",
-      "cardinal_task_list",
-    ]);
-  });
-
-  test("key sin vaults sigue viendo board tools", async () => {
-    const state = makeState();
-    state.validKeys.set("sk-cardinal-novault", {
-      agent: "worker",
-      kind: "agent",
-      scopes: ["fast"],
-    });
-    const { rpcJson } = makeDeps(state);
-    const { json } = await rpcJson("sk-cardinal-novault", {
-      jsonrpc: "2.0",
-      id: 20,
-      method: "tools/list",
-    });
-    const names = json.result.tools.map((t: any) => t.name).sort();
-    expect(names).toEqual([
-      "cardinal_agent_inbox",
-      "cardinal_agent_send",
-      "cardinal_task_claim",
-      "cardinal_task_complete",
-      "cardinal_task_create",
-      "cardinal_task_list",
-    ]);
-  });
-
-  test("cardinal_task_create/list/claim/complete proxyea al backend", async () => {
-    const state = makeState();
-    const { rpcJson } = makeDeps(state);
-
-    const created = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 21,
-      method: "tools/call",
-      params: {
-        name: "cardinal_task_create",
-        arguments: { goal: "ship board mcp", parent_id: null },
-      },
-    });
-    expect(created.json.result.isError).toBeUndefined();
-    const createdTask = JSON.parse(created.json.result.content[0].text).task;
-    expect(createdTask.goal).toBe("ship board mcp");
-    expect(createdTask.status).toBe("open");
-    expect(createdTask.created_by).toBe("shinon");
-
-    const listed = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 22,
-      method: "tools/call",
-      params: { name: "cardinal_task_list", arguments: { status: "open" } },
-    });
-    const openTasks = JSON.parse(listed.json.result.content[0].text).tasks;
-    expect(openTasks.some((t: any) => t.id === createdTask.id)).toBe(true);
-
-    const claimed = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 23,
-      method: "tools/call",
-      params: {
-        name: "cardinal_task_claim",
-        arguments: { id: createdTask.id },
-      },
-    });
-    const claimedTask = JSON.parse(claimed.json.result.content[0].text).task;
-    expect(claimedTask.status).toBe("claimed");
-    expect(claimedTask.assigned_to).toBe("shinon");
-
-    const completed = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 24,
-      method: "tools/call",
-      params: {
-        name: "cardinal_task_complete",
-        arguments: { id: createdTask.id, summary: "board tools live", artifact_ref: "docs/x.md" },
-      },
-    });
-    const doneTask = JSON.parse(completed.json.result.content[0].text).task;
-    expect(doneTask.status).toBe("done");
-    expect(doneTask.summary).toBe("board tools live");
-    expect(doneTask.artifact_ref).toBe("docs/x.md");
-  });
-
-  test("cardinal_agent_send/inbox proxyea al backend", async () => {
-    const state = makeState();
-    const { rpcJson } = makeDeps(state);
-
-    const sent = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 25,
-      method: "tools/call",
-      params: {
-        name: "cardinal_agent_send",
-        arguments: { to_agent: "shinon", type: "handoff", payload_ref: "notes/x.md" },
-      },
-    });
-    expect(sent.json.result.isError).toBeUndefined();
-    const message = JSON.parse(sent.json.result.content[0].text).message;
-    expect(message.from_agent).toBe("shinon");
-    expect(message.to_agent).toBe("shinon");
-    expect(message.type).toBe("handoff");
-    expect(message.payload_ref).toBe("notes/x.md");
-    expect(message.read).toBe(0);
-
-    const other = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 26,
-      method: "tools/call",
-      params: {
-        name: "cardinal_agent_send",
-        arguments: { to_agent: "kirito", type: "other" },
-      },
-    });
-    expect(other.json.result.isError).toBeUndefined();
-    const otherMessage = JSON.parse(other.json.result.content[0].text).message;
-    expect(otherMessage.to_agent).toBe("kirito");
-
-    const inbox = await rpcJson(KEY_OK, {
-      jsonrpc: "2.0",
-      id: 27,
-      method: "tools/call",
-      params: { name: "cardinal_agent_inbox", arguments: {} },
-    });
-    expect(inbox.json.result.isError).toBeUndefined();
-    const listed = JSON.parse(inbox.json.result.content[0].text).messages;
-    expect(listed.some((m: { id: string }) => m.id === message.id)).toBe(true);
-    expect(listed.some((m: { id: string }) => m.id === otherMessage.id)).toBe(false);
-  });
-
-  test("ping → result vacío", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { json } = await rpcJson(KEY_OK, { jsonrpc: "2.0", id: 3, method: "ping" });
-    expect(json.result).toEqual({});
-  });
-
-  test("método desconocido → error -32601", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { json } = await rpcJson(KEY_OK, { jsonrpc: "2.0", id: 4, method: "resources/list" });
-    expect(json.error.code).toBe(-32601);
-  });
-
-  test("JSON inválido → error -32700", async () => {
+describe("MCP Streamable HTTP server v2", () => {
+  test("GET /health returns engine status and indexed file count without leaking paths", async () => {
     const { server } = makeDeps(makeState());
-    const res = await server.fetch(
-      new Request("http://localhost:8789/mcp", {
-        method: "POST",
-        headers: { authorization: `Bearer ${KEY_OK}`, "content-type": "application/json" },
-        body: "{not json",
-      }),
-    );
+    await server.syncIndex(true);
+    const res = await server.fetch(new Request("http://localhost:8789/health"));
     expect(res.status).toBe(200);
-    const json = (await res.json()) as any;
-    expect(json.error.code).toBe(-32700);
+    const body = (await res.json()) as Record<string, unknown>;
+    expect(body.status).toBe("ok");
+    expect(body.searchEngine).toBe("fts5");
+    expect(body.indexedFiles).toBe(7);
+    expect(JSON.stringify(body)).not.toContain(VAULTS);
+    server.close();
   });
 
-  test("GET /mcp → 405", async () => {
-    const { server } = makeDeps(makeState());
-    const res = await server.fetch(
+  test("rejects missing/invalid Bearer keys with 401 and GET /mcp with 405", async () => {
+    const { server, rpc, rpcJson } = makeDeps(makeState());
+
+    const noAuth = await rpc(null, {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+    });
+    expect(noAuth.status).toBe(401);
+
+    const badAuth = await rpcJson("sk-cardinal-unknown", {
+      jsonrpc: "2.0",
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-03-26", capabilities: {}, clientInfo: { name: "test", version: "1" } },
+    });
+    expect(badAuth.status).toBe(401);
+
+    const getRes = await server.fetch(
       new Request("http://localhost:8789/mcp", {
-        headers: { authorization: `Bearer ${KEY_OK}` },
+        method: "GET",
+        headers: { authorization: `Bearer ${KEY_CODING}` },
       }),
     );
-    expect(res.status).toBe(405);
+    expect(getRes.status).toBe(405);
+    server.close();
   });
 
-  test("cardinal_search_memory proxyea al backend y filtra por scope de vault", async () => {
-    const state = makeState();
-    state.searchResults = [
+  test("supports initialize and accepts curl-like Accept: application/json header", async () => {
+    const { server, rpcJson } = makeDeps(makeState());
+    const init = await rpcJson(
+      KEY_CODING,
       {
-        path: "/data/vaults/the portal/index.md",
-        score: 0.9,
-        content: "portal",
-        source: "vault",
+        jsonrpc: "2.0",
+        id: 1,
+        method: "initialize",
+        params: {
+          protocolVersion: "2025-03-26",
+          capabilities: {},
+          clientInfo: { name: "curl", version: "1.0" },
+        },
       },
-      {
-        path: "/data/vaults/for-my-agents/tasks.md",
-        score: 0.8,
-        content: "tasks",
-        source: "vault",
-      },
-    ];
-    const scoped = makeDeps(state);
-    // key scoped a "the portal": solo ve resultados de esa vault
-    const { json } = await scoped.rpcJson(KEY_SCOPED, {
-      jsonrpc: "2.0",
-      id: 5,
-      method: "tools/call",
-      params: { name: "cardinal_search_memory", arguments: { query: "hola", top_k: 2 } },
-    });
-    const content = JSON.parse(json.result.content[0].text);
-    expect(content.results).toHaveLength(1);
-    expect(content.results[0].vault).toBe("the portal");
-    expect(content.results[0].path).toBe("index.md");
+      "application/json",
+    );
+    expect(init.status).toBe(200);
+    expect(init.json.result.serverInfo.name).toBe("cardinal-context-hub");
+    expect(init.json.result.capabilities.tools).toBeDefined();
+    expect(init.json.result.capabilities.prompts).toBeDefined();
+    server.close();
+  });
 
-    // key con * ve ambos
-    const all = makeDeps(state);
-    const { json: jsonAll } = await all.rpcJson(KEY_OK, {
+  test("tools/list filters tool surface strictly by caller scopes", async () => {
+    const { server, rpcJson } = makeDeps(makeState());
+
+    const codingTools = await rpcJson(KEY_CODING, { jsonrpc: "2.0", id: 2, method: "tools/list" });
+    expect(codingTools.json.result.tools.map((t: any) => t.name).sort()).toEqual([
+      "cardinal_bootstrap_repo",
+      "cardinal_handoff",
+      "cardinal_list",
+      "cardinal_onboard",
+      "cardinal_propose_skill",
+      "cardinal_read",
+      "cardinal_search",
+    ]);
+
+    const fullTools = await rpcJson(KEY_FULL, { jsonrpc: "2.0", id: 21, method: "tools/list" });
+    const fullNames = fullTools.json.result.tools.map((t: any) => t.name);
+    expect(fullNames).toContain("cardinal_agent_config");
+    expect(fullNames).not.toContain("cardinal_user_config");
+
+    const userCfgTools = await rpcJson(KEY_USER_CFG, { jsonrpc: "2.0", id: 22, method: "tools/list" });
+    expect(userCfgTools.json.result.tools.map((t: any) => t.name).sort()).toEqual([
+      "cardinal_agent_config",
+      "cardinal_user_config",
+    ]);
+
+    const boardTools = await rpcJson(KEY_BOARD, { jsonrpc: "2.0", id: 3, method: "tools/list" });
+    expect(boardTools.json.result.tools.map((t: any) => t.name).sort()).toEqual([
+      "cardinal_agent_inbox",
+      "cardinal_agent_send",
+      "cardinal_task_claim",
+      "cardinal_task_complete",
+      "cardinal_task_create",
+      "cardinal_task_list",
+    ]);
+
+    const emptyTools = await rpcJson(KEY_EMPTY, { jsonrpc: "2.0", id: 4, method: "tools/list" });
+    expect(emptyTools.json.result.tools).toEqual([]);
+    server.close();
+  });
+
+  test("prompts/list and prompts/get assemble onboarding packet and emit usage telemetry", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    const list = await rpcJson(KEY_CODING, { jsonrpc: "2.0", id: 5, method: "prompts/list" });
+    expect(list.json.result.prompts.map((p: any) => p.name).sort()).toEqual([
+      "cardinal_bootstrap_repo",
+      "cardinal_onboard",
+    ]);
+
+    const getPrompt = await rpcJson(KEY_CODING, {
       jsonrpc: "2.0",
       id: 6,
-      method: "tools/call",
-      params: { name: "cardinal_search_memory", arguments: { query: "hola" } },
+      method: "prompts/get",
+      params: { name: "cardinal_onboard", arguments: { mode: "coding", project: "demo" } },
     });
-    expect(JSON.parse(jsonAll.result.content[0].text).results).toHaveLength(2);
+    expect(getPrompt.status).toBe(200);
+    const promptText = getPrompt.json.result.messages[0].content.text;
+    expect(promptText).toContain("Verify every command.");
+    expect(promptText).toContain("Ready to continue.");
+    expect(promptText).not.toContain("Private Diary");
+
+    await Bun.sleep(10);
+    expect(state.usageEvents.some((e) => e.tool_name === "prompt:cardinal_onboard" && e.ok)).toBe(true);
+    expect(state.usageEvents[0]!.auth).toBe(`Bearer ${KEY_CODING}`);
+    server.close();
   });
 
-  test("vault fuera de scope en read/list → error isError con 403-like message", async () => {
-    const { rpcJson } = makeDeps(makeState());
-    const { json } = await rpcJson(KEY_SCOPED, {
+  test("context tools enforce ACLs, prevent personal/** leaks, and write sandboxed handoffs/proposals", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    const listRes = await rpcJson(KEY_CODING, {
       jsonrpc: "2.0",
       id: 7,
       method: "tools/call",
+      params: { name: "cardinal_list", arguments: { depth: 3 } },
+    });
+    expect(listRes.json.result.isError).toBeUndefined();
+    const listed = JSON.parse(listRes.json.result.content[0].text);
+    expect(listed.files.some((f: any) => f.path.includes("personal"))).toBe(false);
+    expect(listed.files.some((f: any) => f.path === "skills/coding/git.md")).toBe(true);
+
+    const searchRes = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 8,
+      method: "tools/call",
+      params: { name: "cardinal_search", arguments: { query: "force push", top_k: 5 } },
+    });
+    const hits = JSON.parse(searchRes.json.result.content[0].text).results;
+    expect(hits.map((h: any) => h.path)).toEqual(["skills/coding/git.md"]);
+
+    const deniedRead = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 9,
+      method: "tools/call",
+      params: { name: "cardinal_read", arguments: { path: "personal/diary.md" } },
+    });
+    expect(deniedRead.json.result.isError).toBe(true);
+    expect(deniedRead.json.result.content[0].text).toMatch(/forbidden/i);
+
+    const travRead = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 10,
+      method: "tools/call",
+      params: { name: "cardinal_read", arguments: { path: "../personal/diary.md" } },
+    });
+    expect(travRead.json.result.isError).toBe(true);
+
+    const handoffRes = await rpcJson(KEY_CODING, {
+      jsonrpc: "2.0",
+      id: 11,
+      method: "tools/call",
       params: {
-        name: "cardinal_read_memory",
-        arguments: { vault: "for-my-agents", path: "tasks.md" },
+        name: "cardinal_handoff",
+        arguments: {
+          project: "cardinal-v2",
+          summary: "Streamable HTTP hub active.",
+          next_steps: ["Verify with Codex"],
+        },
       },
     });
-    expect(json.result.isError).toBe(true);
-    expect(json.result.content[0].text).toMatch(/forbidden|scope/i);
+    expect(handoffRes.json.result.isError).toBeUndefined();
+    const written = JSON.parse(handoffRes.json.result.content[0].text);
+    expect(written.path).toBe("agents/handoffs/cardinal-v2.md");
+    expect(readFileSync(join(WRITABLE, "handoffs", "cardinal-v2.md"), "utf8")).toContain(
+      "Streamable HTTP hub active.",
+    );
+
+    const proposalRes = await rpcJson(KEY_CODING, {
+      jsonrpc: "2.0",
+      id: 12,
+      method: "tools/call",
+      params: {
+        name: "cardinal_propose_skill",
+        arguments: {
+          skill_path: "skills/coding/git.md",
+          reason: "Add rebase flag note",
+          content: "Use --rebase-merges carefully.",
+        },
+      },
+    });
+    expect(proposalRes.json.result.isError).toBeUndefined();
+    const proposal = JSON.parse(proposalRes.json.result.content[0].text);
+    expect(proposal.path.startsWith("agents/proposals/")).toBe(true);
+
+    await Bun.sleep(15);
+    expect(state.usageEvents.some((e) => e.tool_name === "cardinal_search")).toBe(true);
+    expect(state.usageEvents.some((e) => e.tool_name === "cardinal_handoff")).toBe(true);
+    server.close();
+  });
+
+  test("board and mailbox tools proxy cleanly for board/mailbox scoped keys", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    const created = await rpcJson(KEY_BOARD, {
+      jsonrpc: "2.0",
+      id: 20,
+      method: "tools/call",
+      params: { name: "cardinal_task_create", arguments: { goal: "ship hub" } },
+    });
+    const task = JSON.parse(created.json.result.content[0].text).task;
+    expect(task.created_by).toBe("coord-1");
+
+    const claimed = await rpcJson(KEY_BOARD, {
+      jsonrpc: "2.0",
+      id: 21,
+      method: "tools/call",
+      params: { name: "cardinal_task_claim", arguments: { id: task.id } },
+    });
+    expect(JSON.parse(claimed.json.result.content[0].text).task.assigned_to).toBe("coord-1");
+
+    const sent = await rpcJson(KEY_BOARD, {
+      jsonrpc: "2.0",
+      id: 22,
+      method: "tools/call",
+      params: {
+        name: "cardinal_agent_send",
+        arguments: { to_agent: "coord-1", type: "handoff", payload_ref: "agents/handoffs/demo.md" },
+      },
+    });
+    expect(JSON.parse(sent.json.result.content[0].text).message.from_agent).toBe("coord-1");
+
+    const inbox = await rpcJson(KEY_BOARD, {
+      jsonrpc: "2.0",
+      id: 23,
+      method: "tools/call",
+      params: { name: "cardinal_agent_inbox", arguments: {} },
+    });
+    expect(JSON.parse(inbox.json.result.content[0].text).messages).toHaveLength(1);
+    server.close();
+  });
+
+  test("cardinal_bootstrap_repo serves starter files and curated vault skills safely", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    const bootTool = await rpcJson(KEY_CODING, {
+      jsonrpc: "2.0",
+      id: 30,
+      method: "tools/call",
+      params: {
+        name: "cardinal_bootstrap_repo",
+        arguments: {
+          preset: "default",
+          project: "fresh-service",
+          stack: "TypeScript, Bun",
+          extra_skills: ["personal/diary.md"],
+        },
+      },
+    });
+    expect(bootTool.json.result.isError).toBeUndefined();
+    const bootText = bootTool.json.result.content[0].text;
+    expect(bootText).toContain("# fresh-service — Agent Conduct & Repo Rules");
+    expect(bootText).toContain("Verify every command.");
+    expect(bootText).toContain("Keep diffs and notes concise.");
+    expect(bootText).toContain("Missing or outside key scopes");
+    expect(bootText).not.toContain("Private Diary");
+
+    const bootPrompt = await rpcJson(KEY_CODING, {
+      jsonrpc: "2.0",
+      id: 31,
+      method: "prompts/get",
+      params: { name: "cardinal_bootstrap_repo", arguments: { preset: "list" } },
+    });
+    expect(bootPrompt.status).toBe(200);
+    expect(bootPrompt.json.result.messages[0].content.text).toContain("Cardinal New-Repo Bootstrap Presets");
+
+    await Bun.sleep(10);
+    expect(state.usageEvents.some((e) => e.tool_name === "cardinal_bootstrap_repo" && e.ok)).toBe(true);
+    expect(state.usageEvents.some((e) => e.tool_name === "prompt:cardinal_bootstrap_repo" && e.ok)).toBe(true);
+    server.close();
+  });
+
+  test("cardinal_agent_config and cardinal_user_config enforce redaction, filename blocks, and strict opt-in", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    const agentList = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 40,
+      method: "tools/call",
+      params: { name: "cardinal_agent_config", arguments: { action: "list", depth: 3 } },
+    });
+    expect(agentList.json.result.isError).toBeUndefined();
+    const listedAgents = JSON.parse(agentList.json.result.content[0].text);
+    expect(listedAgents.files.map((f: any) => f.path)).toEqual(["opencode/opencode.json"]);
+
+    const agentRead = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 41,
+      method: "tools/call",
+      params: { name: "cardinal_agent_config", arguments: { path: "opencode/opencode.json" } },
+    });
+    expect(agentRead.json.result.isError).toBeUndefined();
+    const parsedAgent = JSON.parse(agentRead.json.result.content[0].text);
+    expect(parsedAgent.redactedCount).toBe(1);
+    expect(parsedAgent.content).toContain("[REDACTED]");
+    expect(parsedAgent.content).not.toContain("AbCdEfGh1234567890XyZ");
+
+    const authBlocked = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 42,
+      method: "tools/call",
+      params: { name: "cardinal_agent_config", arguments: { path: "opencode/auth.json" } },
+    });
+    expect(authBlocked.json.result.isError).toBe(true);
+
+    // Wildcard KEY_FULL must not be able to invoke cardinal_user_config.
+    const wildcardUserDenied = await rpcJson(KEY_FULL, {
+      jsonrpc: "2.0",
+      id: 43,
+      method: "tools/call",
+      params: { name: "cardinal_user_config", arguments: { path: "kitty/kitty.conf" } },
+    });
+    expect(wildcardUserDenied.json.error || wildcardUserDenied.json.result?.isError).toBeTruthy();
+
+    // Explicit config:read:user/** opt-in succeeds cleanly.
+    const userRead = await rpcJson(KEY_USER_CFG, {
+      jsonrpc: "2.0",
+      id: 44,
+      method: "tools/call",
+      params: { name: "cardinal_user_config", arguments: { path: "kitty/kitty.conf" } },
+    });
+    expect(userRead.json.result.isError).toBeUndefined();
+    expect(JSON.parse(userRead.json.result.content[0].text).content).toContain("font_size 11");
+
+    await Bun.sleep(10);
+    expect(state.usageEvents.some((e) => e.tool_name === "cardinal_agent_config" && e.ok)).toBe(true);
+    expect(state.usageEvents.some((e) => e.tool_name === "cardinal_user_config" && e.ok)).toBe(true);
+    server.close();
   });
 });
