@@ -13,12 +13,13 @@ Health is `/api/health`, not `/health`.
 | `POST` | `/api/auth/logout` | — | clears cookie |
 | `GET` | `/api/auth/me` | JWT | current user |
 | `POST` | `/api/internal/keys/validate` | Bearer or `{key}` | `{agent, kind, scopes}` or 401 |
+| `POST` | `/api/internal/mcp/usage` | Bearer key | `{ok: true}` (logs caller MCP tool call to `mcp_usage`) |
 
 ## Dashboard (JWT)
 
 | Method | Path | Returns |
 |--------|------|---------|
-| `GET` | `/api/system` | flat `{version, uptime_seconds, db_path, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked}` |
+| `GET` | `/api/system` | flat `{version, uptime_seconds, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked, mcp_calls_7d, mcp_calls_30d, mcp_last_call_at}` |
 | `GET` | `/api/agents` | `{agents}` |
 | `GET` | `/api/agents/:name` | `{agent, events}` |
 | `GET` | `/api/devices` | `{devices}` |
@@ -38,7 +39,7 @@ Health is `/api/health`, not `/health`.
 
 ## Board / mailbox (JWT or agent key)
 
-On these routes the agent key **is** identity (`agent_name`).
+On these routes the agent key **is** identity (`agent_name`) and **must** carry matching scopes (`*`, `board`, `board:read`/`board:write` for `/api/tasks*`; `*`, `mailbox`, `mailbox:read`/`mailbox:write` for `/api/messages*`) — otherwise `403 {error: "scope_denied"}`.
 
 | Method | Path |
 |--------|------|
@@ -51,6 +52,15 @@ On these routes the agent key **is** identity (`agent_name`).
 | `POST` | `/api/rag/search` |
 
 `POST /api/rag/search` enforces agent vault scopes server-side.
+
+## MCP Hub (`:8789`)
+
+| Method | Path | Auth | Returns |
+|--------|------|------|---------|
+| `GET` | `/health` | none | `{status, version, searchEngine, indexedFiles}` |
+| `POST` | `/mcp` | Bearer `sk-cardinal-*` | Streamable HTTP MCP JSON-RPC (stateless, ACLs for vaults, repo bootstrap, and redacted agent/user configs) |
+
+Full tool/prompt spec and `keygen` examples: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](features/2026-11-25-mcp-context-hub-v2.md).
 
 ## Router (agent key)
 
