@@ -1,0 +1,16 @@
+# Optional QMD sidecar for local hybrid markdown search (BM25 + GGUF embeddings + reranker).
+# Enabled via: podman-compose --profile qmd up -d
+FROM docker.io/library/node:22-slim
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 build-essential git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN npm install -g @tobilu/qmd
+
+USER node
+ENV HOME=/home/node
+
+EXPOSE 8181
+
+ENTRYPOINT ["qmd", "mcp", "--http", "--host", "0.0.0.0", "--port", "8181"]

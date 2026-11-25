@@ -82,16 +82,36 @@ services:
       # Root workspace manifests (bun install must run from monorepo root)
       - ./package.json:/app/package.json
       - ./bun.lock:/app/bun.lock
-      # Vaults markdown, fuente de verdad de memoria, read-only
+      # Source vaults and config snapshots remain strictly read-only; agent writes go to isolated agent-state
       - ${VAULTS_HOST_PATH:-./vaults}:/data/vaults:ro
+      - ${AGENT_STATE_HOST_PATH:-./agent-state}:/data/agent-state:rw
+      - ${CONFIGS_HOST_PATH:-./configs}:/data/configs:ro
     environment:
       PORT: 8789
       CARDINAL_BACKEND_URL: http://backend:8787
       CARDINAL_VAULTS_ROOT: /data/vaults
-      CARDINAL_VAULTS: "${CARDINAL_VAULTS:-personal,cardinal-system,projects,knowledge,agents}"
-      CARDINAL_SERVICE_KEY: ${CARDINAL_SERVICE_KEY}
+      CARDINAL_WRITABLE_ROOT: /data/agent-state
+      CARDINAL_CONFIGS_ROOT: /data/configs
+      CARDINAL_INDEX_DB: /tmp/cardinal-mcp-index.db
+      CARDINAL_DENY_PREFIXES: "${CARDINAL_DENY_PREFIXES:-personal}"
+      CARDINAL_GIT_AUTOCOMMIT: "${CARDINAL_GIT_AUTOCOMMIT:-true}"
+      QMD_URL: "${QMD_URL:-}"
     depends_on:
       - backend
+    networks:
+      - cardinal-net
+    restart: unless-stopped
+
+  qmd:
+    profiles:
+      - qmd
+    build:
+      context: .
+      dockerfile: deploy/Containerfile.qmd
+    container_name: cardinal-qmd
+    volumes:
+      - ${VAULTS_HOST_PATH:-./vaults}:/data/vaults:ro
+      - qmd-cache:/home/node/.cache/qmd
     networks:
       - cardinal-net
     restart: unless-stopped
@@ -102,3 +122,4 @@ networks:
 
 volumes:
   cardinal-db:
+  qmd-cache:
