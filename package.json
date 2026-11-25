@@ -14,6 +14,8 @@
     "keygen": "bun packages/keys/src/cli.ts",
     "cloud-agent": "bun scripts/cloud-agent.ts",
     "bootstrap:password": "bash scripts/bootstrap-admin-password.sh",
+    "hooks:install": "bash scripts/install-hooks.sh",
+    "standards:sync": "bun scripts/sync-repo-standards.ts",
     "seed:router": "python3 scripts/seed-router.py"
   },
   "devDependencies": {

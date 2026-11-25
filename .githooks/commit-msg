@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# commit-msg: enforce Conventional Commits and owner-only authorship.
+set -euo pipefail
+
+msg_file="${1:?usage: commit-msg <message-file>}"
+body="$(awk '/^# -+ >8 -+$/ {exit} !/^#/ {print}' "$msg_file")"
+subject="$(awk 'NF {print; exit}' <<<"$body")"
+
+if [ -z "$subject" ]; then
+  echo "commit-msg: empty commit subject." >&2
+  exit 1
+fi
+
+if grep -Eq '^(Merge |Revert "|fixup! |squash! |amend! )' <<<"$subject"; then
+  exit 0
+fi
+
+if [ "${#subject}" -gt 72 ]; then
+  echo "commit-msg: subject is ${#subject} characters; keep it at 72 or fewer." >&2
+  exit 1
+fi
+
+if ! grep -Eq '^(feat|fix|chore|docs|refactor|test|style|perf|ci|build|revert)(\([a-zA-Z0-9._/#-]+\))?!?: [^ ].*$' <<<"$subject"; then
+  echo "commit-msg: use Conventional Commits, e.g. 'feat(api): add rate limiting'." >&2
+  exit 1
+fi
+
+if grep -Eiq '^co-authored-by:.*(claude|anthropic|openai|chatgpt|codex|gemini|copilot|cursor|antigravity|devin|aider)' <<<"$body"; then
+  echo "commit-msg: commits are authored by the repo owner; remove AI co-author trailers." >&2
+  exit 1
+fi
+
+if grep -Eiq '(generated (with|by) (claude|chatgpt|copilot|cursor|gemini|codex|antigravity)|\u{1f916})' <<<"$body"; then
+  echo "commit-msg: remove AI generator watermark lines." >&2
+  exit 1
+fi

@@ -19,7 +19,7 @@ Reworked `packages/mcp` into a security-hardened, usage-tracked Streamable HTTP 
 - **Deterministic Zero-LLM Onboarding & New-Repo Bootstrap (`packages/mcp/src/onboard.ts`, `bootstrap.ts`):**
   - `cardinal_onboard` prompt & tool support `mode: "coding" | "hermes"`, building a bounded markdown packet + two-level readable topic map without calling any LLM.
   - `hermes` mode skips `SOUL.md` and `USER.md` so Hermes keeps ownership of its own profile files.
-  - `cardinal_bootstrap_repo` prompt & tool ("Configuration 101") assemble conduct rules, starter `AGENTS.md` / `.github/PULL_REQUEST_TEMPLATE.md` boilerplate, and portable workflow skills resolved via caller ACLs from `/data/vaults` (presets: `default`, `prd`, `minimal`, `list`, plus optional `cardinal-system/bootstrap.md` manifest), delivering skills like `caveman`, commit/PR workflows, and Matt Pocock planning/architecture skills without client-side installs.
+  - `cardinal_bootstrap_repo` prompt & tool ("Configuration 101", `packages/mcp/src/repo-standards.ts`) assemble conduct rules, scope-tiered repo standards (`scope`: `lite` | `standard` | `full`, `hooks`: `auto` | `none` | `light` | `full`, `format`: `markdown` | `json`), and portable workflow skills resolved via caller ACLs from `/data/vaults` (presets: `default`, `brainstorm`, `standards`, `prd`, `minimal`, `list`, plus optional `cardinal-system/bootstrap.md` manifest), delivering `README.md`, `AGENTS.md` (`writing-for-agents`), `CLAUDE.md` (`@AGENTS.md`), `.githooks/`, `scripts/install-hooks.sh`, GitHub templates, and skills (`caveman`, `grilling`, `to-spec`, `to-tickets`, commit/PR workflows) without client-side installs. Cardinal itself dogfoods the `full`-tier hooks via `bun run standards:sync` and `bun run hooks:install`.
 - **Sanitized Config Read Tools (`packages/mcp/src/configs.ts`, `redact.ts`, `scripts/sync-configs.sh`):**
   - `cardinal_agent_config` exposes allowlisted, secret-redacted agent harness configs under `/data/configs/agents` (OpenCode, OMP, AGY, Cursor, Claude, Codex, Hermes, RTK) when caller holds `*` or `config:read:agents/**`.
   - `cardinal_user_config` exposes allowlisted, secret-redacted terminal/shell/personal configs under `/data/configs/user` (Kitty, Alacritty, Foot, Ghostty, Fish, Zsh, Bash, Starship, Git, Tmux, Zellij) strictly opt-in via explicit `config:read:user/**` (never granted by `*` or `config:read:*`).
@@ -31,10 +31,10 @@ Reworked `packages/mcp` into a security-hardened, usage-tracked Streamable HTTP 
 
 ## MCP Surface
 
-- **Prompts:** `cardinal_onboard(mode?, project?)`, `cardinal_bootstrap_repo(preset?, project?, stack?, skills?)`
+- **Prompts:** `cardinal_onboard(mode?, project?)`, `cardinal_bootstrap_repo(preset?, project?, stack?, skills?, scope?)`
 - **Context tools (when caller has readable vault scopes):**
   - `cardinal_onboard(mode?, project?)`
-  - `cardinal_bootstrap_repo(preset?, project?, stack?, skills?, extra_skills?, include_starter_files?, max_bytes?)`
+  - `cardinal_bootstrap_repo(preset?, scope?, hooks?, default_branch?, project?, stack?, skills?, extra_skills?, include_starter_files?, format?, max_bytes?)`
   - `cardinal_list(prefix?, depth?)`
   - `cardinal_search(query, prefix?, top_k?)`
   - `cardinal_read(path, max_bytes?)`

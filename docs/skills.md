@@ -12,6 +12,7 @@ Do not duplicate `AGENTS.md` inside a skill. Skills are procedures or pointers. 
 | `cardinal-commit` | `skills/cardinal-commit.md` | Conventional commits, English subject and body |
 | `cardinal-pr` | `skills/cardinal-pr.md` | Branch → bump → commit → push → template → reviewers |
 | `cardinal-system` | `skills/cardinal-system.md` | Runtime URLs; pointers to API, pitfalls, stack |
+| `cardinal-standards` | `skills/cardinal-standards.md` | Canonical personal-repo standards, scope tiers, and hooks |
 
 ## Covered elsewhere (no extra skill)
 

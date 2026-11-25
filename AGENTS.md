@@ -54,8 +54,11 @@ English only: docs, skills, source comments, identifiers, commits, PRs, and agen
 | `cardinal-commit` | Commit format and rules (detail) |
 | `cardinal-pr` | Create a PR step by step |
 | `cardinal-system` | Runtime, API, operational quirks |
+| `cardinal-standards` | Enforce uniform personal-repo standards across repos |
 
 Planned and pending skills: [`docs/skills.md`](./docs/skills.md).
+
+Git hooks: activate versioned `.githooks/` once per clone via `bun run hooks:install` (`bash scripts/install-hooks.sh`); regenerate from `packages/mcp/src/repo-standards.ts` via `bun run standards:sync`.
 
 ---
 

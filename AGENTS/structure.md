@@ -48,7 +48,10 @@ cardinal-system/
 │   ├── api.md                 REST + WS reference
 │   ├── vision.md              vision and principles
 │   └── roadmap.md             live priorities
-├── skills/                    Cardinal skills (source of truth; sync out to Hermes)
+├── .agents/
+│   └── skills/              auto-discovered repo-local skills (synced from skills/)
+├── .githooks/               enforced pre-commit & commit-msg hooks (core.hooksPath)
+├── skills/                    Cardinal skills (source of truth; sync out to .agents/skills & Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)
 ├── README.md
@@ -66,3 +69,4 @@ cardinal-system/
 - `cardinal-commit` — commit format: conventional commits, English subject and body.
 - `cardinal-pr` — create a PR: branch → bump → commit → push → template → reviewers.
 - `cardinal-system` — runtime URLs; pointers to `docs/api.md` and `docs/guides/pitfalls.md`.
+- `cardinal-standards` — canonical personal-repo standards blueprint & hooks.

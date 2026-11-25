@@ -56,5 +56,6 @@ sync_skill "cardinal-dev"
 sync_skill "cardinal-pr"
 sync_skill "cardinal-commit"
 sync_skill "cardinal-system"
+sync_skill "cardinal-standards"
 
 echo "$synced skills synced."

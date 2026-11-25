@@ -82,7 +82,7 @@ podman run --rm docker.io/oven/bun:1 bun -e 'console.log(await Bun.password.hash
 # paste the hash into ADMIN_PASSWORD_HASH; set ADMIN_USER (default admin)
 ```
 
-Do not put the plaintext password on the compose command line. If Bun is already on the host, `bun run bootstrap:password` remains valid (`scripts/bootstrap-admin-password.sh`).
+Do not put the plaintext password on the compose command line. If Bun is already on the host, `bun run bootstrap:password` remains valid (`scripts/bootstrap-admin-password.sh`). Activate enforced `.githooks/` once per clone with `bash scripts/install-hooks.sh` (`bun run hooks:install`).
 
 MCP Context Hub: set `VAULTS_HOST_PATH` (mounted `:ro` at `/data/vaults`), `AGENT_STATE_HOST_PATH` (mounted `:rw` at `/data/agent-state`), and `CONFIGS_HOST_PATH` (populate with `bash scripts/sync-configs.sh`, mounted `:ro` at `/data/configs`) in `.env`. Optionally enable the QMD sidecar via `podman-compose --profile qmd up -d` with `QMD_URL=http://qmd:8181`. Generate scoped agent keys inside the backend container (`podman exec`), never host `bun run keygen` against a different DB — see [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md) and [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md).
 
