@@ -193,3 +193,19 @@ export interface MessageRow {
   read: number;
   created_at: string;
 }
+
+export interface McpUsageRow {
+  id: number;
+  agent_name: string;
+  tool_name: string;
+  ok: number;
+  bytes_out: number;
+  duration_ms: number;
+  created_at: string;
+}
+
+export interface McpUsageSummary {
+  calls7d: number;
+  calls30d: number;
+  lastCallAt: string | null;
+}

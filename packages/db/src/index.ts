@@ -62,6 +62,8 @@ export {
   consumeBudgetUsd,
   logUsage,
   listUsage,
+  logMcpUsage,
+  getMcpUsageSummary,
 } from "./repos";
 export type {
   AgentKind,
@@ -90,6 +92,9 @@ export type {
   TaskRow,
   TaskStatus,
   MessageRow,
+  McpUsageFields,
+  McpUsageRow,
+  McpUsageSummary,
   WireFormat,
   ProviderStatus,
   ProviderRow,

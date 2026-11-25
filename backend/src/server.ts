@@ -20,6 +20,7 @@ import {
   handleListTasks,
 } from "./api/tasks";
 import { handleInbox, handleMarkRead, handleSendMessage } from "./api/messages";
+import { handleLogMcpUsage } from "./api/mcp-usage";
 import { handleSystem } from "./api/system";
 import { handleCreateKey, handleListKeys, handleRevokeKey, handleValidateKey } from "./api/keys";
 import { extractBearerKey } from "./api/router";
@@ -70,6 +71,17 @@ async function requireDashboardOrAgentKey(
   return { kind: "agent", agent: keyRow.agent_name, scopes: parseScopes(keyRow.scopes) };
 }
 
+function agentHasScope(
+  scopes: string[],
+  group: "board" | "mailbox",
+  mode: "read" | "write",
+): boolean {
+  if (scopes.includes("*") || scopes.includes(group) || scopes.includes(`${group}:${mode}`)) {
+    return true;
+  }
+  return mode === "read" && scopes.includes(`${group}:write`);
+}
+
 export function createServer(config: Config, db: Database): Server<ConnData> {
   const hub = new Hub(db, { pingIntervalMs: config.pingIntervalMs });
 
@@ -94,6 +106,14 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       // si la key es válida (401 si no), así se protege por naturaleza.
       if (pathname === "/api/internal/keys/validate" && method === "POST") {
         return handleValidateKey(db, req);
+      }
+
+      if (pathname === "/api/internal/mcp/usage" && method === "POST") {
+        const svcKey = extractBearerKey(req);
+        if (svcKey === null) return json({ error: "unauthorized" }, 401);
+        const keyRow = findActiveKeyByHash(db, hashKey(svcKey));
+        if (keyRow === null) return json({ error: "unauthorized" }, 401);
+        return handleLogMcpUsage(db, req, keyRow.agent_name);
       }
 
       if (pathname === "/api/auth/login" && method === "POST") return handleLogin(req, config);
@@ -230,8 +250,10 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       }
 
       if (pathname === "/api/tasks" && method === "GET") {
-        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
-          return json({ error: "unauthorized" }, 401);
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "board", "read")) {
+          return json({ error: "scope_denied" }, 403);
         }
         return handleListTasks(db, req);
       }
@@ -239,6 +261,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (pathname === "/api/tasks" && method === "POST") {
         const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
         if (auth === null) return json({ error: "unauthorized" }, 401);
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "board", "write")) {
+          return json({ error: "scope_denied" }, 403);
+        }
         const agent = auth.kind === "agent" ? auth.agent : undefined;
         return handleCreateTask(db, req, (t) => hub.broadcastTask(t), agent);
       }
@@ -247,6 +272,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (taskClaimMatch && method === "PUT") {
         const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
         if (auth === null) return json({ error: "unauthorized" }, 401);
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "board", "write")) {
+          return json({ error: "scope_denied" }, 403);
+        }
         const agent = auth.kind === "agent" ? auth.agent : undefined;
         return handleClaimTask(db, decodeURIComponent(taskClaimMatch[1]!), req, (t) => hub.broadcastTask(t), agent);
       }
@@ -255,6 +283,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       if (taskCompleteMatch && method === "PUT") {
         const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
         if (auth === null) return json({ error: "unauthorized" }, 401);
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "board", "write")) {
+          return json({ error: "scope_denied" }, 403);
+        }
         const agent = auth.kind === "agent" ? auth.agent : undefined;
         return handleCompleteTask(
           db,
@@ -267,8 +298,10 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
       const taskMatch = pathname.match(/^\/api\/tasks\/([^/]+)$/);
       if (taskMatch && method === "GET") {
-        if ((await requireDashboardOrAgentKey(req, config.jwtSecret, db)) === null) {
-          return json({ error: "unauthorized" }, 401);
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "board", "read")) {
+          return json({ error: "scope_denied" }, 403);
         }
         return handleGetTask(db, decodeURIComponent(taskMatch[1]!));
       }
@@ -278,6 +311,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         if (auth === null) {
           return json({ error: "unauthorized" }, 401);
         }
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "mailbox", "read")) {
+          return json({ error: "scope_denied" }, 403);
+        }
         return handleInbox(db, req, auth.kind === "agent" ? auth.agent : undefined);
       }
 
@@ -285,6 +321,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
         if (auth === null) {
           return json({ error: "unauthorized" }, 401);
+        }
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "mailbox", "write")) {
+          return json({ error: "scope_denied" }, 403);
         }
         return handleSendMessage(
           db,
@@ -299,6 +338,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
         if (auth === null) {
           return json({ error: "unauthorized" }, 401);
+        }
+        if (auth.kind === "agent" && !agentHasScope(auth.scopes, "mailbox", "write")) {
+          return json({ error: "scope_denied" }, 403);
         }
         return handleMarkRead(
           db,
