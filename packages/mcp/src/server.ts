@@ -5,6 +5,7 @@ import rootPkg from "../../../package.json";
 import {
   canReadAnyVault,
   canReadConfigCategory,
+  canWritePath,
   canWritePrefix,
   DEFAULT_DENY_PREFIXES,
   hasServiceScope,
@@ -185,8 +186,9 @@ export function createMcpServer(options: McpServerOptions) {
 
     const canRead = canReadAnyVault(identity.scopes, aclConfig);
 
-    mcp.registerPrompt(
-      "cardinal_onboard",
+    if (canRead) {
+      mcp.registerPrompt(
+        "cardinal_onboard",
       {
         title: "Cardinal Onboarding",
         description:
@@ -304,8 +306,7 @@ export function createMcpServer(options: McpServerOptions) {
       },
     );
 
-    if (canRead) {
-      mcp.registerTool(
+    mcp.registerTool(
         "cardinal_bootstrap_repo",
         {
           title: "Bootstrap Repository (Configuration 101)",
@@ -473,75 +474,77 @@ export function createMcpServer(options: McpServerOptions) {
       );
     }
 
-    const configTools: Array<{
-      name: "cardinal_agent_config" | "cardinal_user_config";
-      category: ConfigCategory;
-      title: string;
-      description: string;
-      examplePath: string;
-    }> = [
-      {
-        name: "cardinal_agent_config",
-        category: "agents",
-        title: "Read Agent Harness Configs",
-        description:
-          "List or read sanitized, secret-redacted agent harness configurations (OpenCode, OMP, AGY, Cursor, Claude, Codex, Hermes) under /data/configs/agents.",
-        examplePath: "opencode/opencode.json",
-      },
-      {
-        name: "cardinal_user_config",
-        category: "user",
-        title: "Read Personal Terminal & User Configs",
-        description:
-          "List or read sanitized, secret-redacted terminal/shell/personal configurations (Kitty, Fish, Zsh, Starship, Git) under /data/configs/user. Requires explicit config:read:user/** opt-in.",
-        examplePath: "kitty/kitty.conf",
-      },
-    ];
-
-    for (const cfg of configTools) {
-      if (!canReadConfigCategory(identity.scopes, cfg.category)) continue;
-      mcp.registerTool(
-        cfg.name,
+    if (options.configsRoot) {
+      const configTools: Array<{
+        name: "cardinal_agent_config" | "cardinal_user_config";
+        category: ConfigCategory;
+        title: string;
+        description: string;
+        examplePath: string;
+      }> = [
         {
-          title: cfg.title,
-          description: cfg.description,
-          inputSchema: {
-            action: z
-              .enum(["list", "read"])
-              .optional()
-              .describe("Action: 'list' (default unless path is set) or 'read' one file."),
-            path: z
-              .string()
-              .optional()
-              .describe(`Relative path inside ${cfg.category}/ when reading (e.g. '${cfg.examplePath}').`),
-            prefix: z.string().optional().describe("Optional relative directory prefix when listing."),
-            depth: z.number().int().min(1).max(5).optional().describe("Max directory depth (1-5, default 2) when listing."),
-            max_bytes: z.number().int().min(128).max(131_072).optional().describe("Optional byte limit when reading (default 32768)."),
-          },
-          annotations: { readOnlyHint: true },
+          name: "cardinal_agent_config",
+          category: "agents",
+          title: "Read Agent Harness Configs",
+          description:
+            "List or read sanitized, secret-redacted agent harness configurations (OpenCode, OMP, AGY, Cursor, Claude, Codex, Hermes) under /data/configs/agents.",
+          examplePath: "opencode/opencode.json",
         },
-        async (args) =>
-          withToolTelemetry(identityKey, cfg.name, async () => {
-            const action = args.action ?? (args.path ? "read" : "list");
-            if (action === "read") {
-              if (!args.path || args.path.trim() === "") {
-                throw new Error("path is required when action='read'");
+        {
+          name: "cardinal_user_config",
+          category: "user",
+          title: "Read Personal Terminal & User Configs",
+          description:
+            "List or read sanitized, secret-redacted terminal/shell/personal configurations (Kitty, Fish, Zsh, Starship, Git) under /data/configs/user. Requires explicit config:read:user/** opt-in.",
+          examplePath: "kitty/kitty.conf",
+        },
+      ];
+
+      for (const cfg of configTools) {
+        if (!canReadConfigCategory(identity.scopes, cfg.category)) continue;
+        mcp.registerTool(
+          cfg.name,
+          {
+            title: cfg.title,
+            description: cfg.description,
+            inputSchema: {
+              action: z
+                .enum(["list", "read"])
+                .optional()
+                .describe("Action: 'list' (default unless path is set) or 'read' one file."),
+              path: z
+                .string()
+                .optional()
+                .describe(`Relative path inside ${cfg.category}/ when reading (e.g. '${cfg.examplePath}').`),
+              prefix: z.string().optional().describe("Optional relative directory prefix when listing."),
+              depth: z.number().int().min(1).max(5).optional().describe("Max directory depth (1-5, default 2) when listing."),
+              max_bytes: z.number().int().min(128).max(131_072).optional().describe("Optional byte limit when reading (default 32768)."),
+            },
+            annotations: { readOnlyHint: true },
+          },
+          async (args) =>
+            withToolTelemetry(identityKey, cfg.name, async () => {
+              const action = args.action ?? (args.path ? "read" : "list");
+              if (action === "read") {
+                if (!args.path || args.path.trim() === "") {
+                  throw new Error("path is required when action='read'");
+                }
+                const res = await configStore.readConfig(
+                  identity.scopes,
+                  cfg.category,
+                  args.path,
+                  args.max_bytes,
+                );
+                return JSON.stringify(res, null, 2);
               }
-              const res = await configStore.readConfig(
-                identity.scopes,
-                cfg.category,
-                args.path,
-                args.max_bytes,
-              );
-              return JSON.stringify(res, null, 2);
-            }
-            const listing = await configStore.listConfigs(identity.scopes, cfg.category, {
-              prefix: args.prefix,
-              depth: args.depth,
-            });
-            return JSON.stringify(listing, null, 2);
-          }),
-      );
+              const listing = await configStore.listConfigs(identity.scopes, cfg.category, {
+                prefix: args.prefix,
+                depth: args.depth,
+              });
+              return JSON.stringify(listing, null, 2);
+            }),
+        );
+      }
     }
 
     if (writer !== null && canWritePrefix(identity.scopes, "agents/handoffs", aclConfig)) {
@@ -566,6 +569,11 @@ export function createMcpServer(options: McpServerOptions) {
               summary: args.summary,
               nextSteps: args.next_steps,
               refs: args.refs,
+              assertAllowed: (logicalPath) => {
+                if (!canWritePath(identity.scopes, logicalPath, aclConfig)) {
+                  throw new Error(`forbidden: write scope denies ${logicalPath}`);
+                }
+              },
             });
             return JSON.stringify(res, null, 2);
           }),
@@ -592,13 +600,18 @@ export function createMcpServer(options: McpServerOptions) {
               skillPath: args.skill_path,
               reason: args.reason,
               content: args.content,
+              assertAllowed: (logicalPath) => {
+                if (!canWritePath(identity.scopes, logicalPath, aclConfig)) {
+                  throw new Error(`forbidden: write scope denies ${logicalPath}`);
+                }
+              },
             });
             return JSON.stringify(res, null, 2);
           }),
       );
     }
 
-    if (hasServiceScope(identity.scopes, "board")) {
+    if (hasServiceScope(identity.scopes, "board", "write")) {
       mcp.registerTool(
         "cardinal_task_create",
         {
@@ -622,7 +635,9 @@ export function createMcpServer(options: McpServerOptions) {
             return JSON.stringify(data, null, 2);
           }),
       );
+    }
 
+    if (hasServiceScope(identity.scopes, "board", "read")) {
       mcp.registerTool(
         "cardinal_task_list",
         {
@@ -643,7 +658,9 @@ export function createMcpServer(options: McpServerOptions) {
             return JSON.stringify(data, null, 2);
           }),
       );
+    }
 
+    if (hasServiceScope(identity.scopes, "board", "write")) {
       mcp.registerTool(
         "cardinal_task_claim",
         {
@@ -696,7 +713,7 @@ export function createMcpServer(options: McpServerOptions) {
       );
     }
 
-    if (hasServiceScope(identity.scopes, "mailbox")) {
+    if (hasServiceScope(identity.scopes, "mailbox", "write")) {
       mcp.registerTool(
         "cardinal_agent_send",
         {
@@ -720,7 +737,9 @@ export function createMcpServer(options: McpServerOptions) {
             return JSON.stringify(data, null, 2);
           }),
       );
+    }
 
+    if (hasServiceScope(identity.scopes, "mailbox", "read")) {
       mcp.registerTool(
         "cardinal_agent_inbox",
         {

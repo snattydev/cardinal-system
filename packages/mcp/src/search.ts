@@ -135,7 +135,11 @@ async function scanMarkdownDocs(
   await walk(realRoot, "");
 }
 
-function normalizeQmdPath(rawPath: string, vaultsRoot: string): string | null {
+export function normalizeQmdPath(
+  rawPath: string,
+  vaultsRoot: string,
+  writableRoot?: string,
+): string | null {
   let candidate = rawPath.trim();
   if (candidate === "") return null;
 
@@ -144,8 +148,11 @@ function normalizeQmdPath(rawPath: string, vaultsRoot: string): string | null {
   }
 
   const rootClean = vaultsRoot.replace(/\/+$/, "");
+  const writableClean = writableRoot ? writableRoot.replace(/\/+$/, "") : "";
   if (rootClean !== "" && candidate.startsWith(`${rootClean}/`)) {
     candidate = candidate.slice(rootClean.length + 1);
+  } else if (writableClean !== "" && candidate.startsWith(`${writableClean}/`)) {
+    candidate = `agents/${candidate.slice(writableClean.length + 1)}`;
   } else if (candidate.startsWith("/data/vaults/")) {
     candidate = candidate.slice("/data/vaults/".length);
   } else if (candidate.startsWith("/data/agent-state/")) {
@@ -278,36 +285,64 @@ export function makeSearchEngine(options: SearchEngineOptions) {
     const ftsQuery = buildSafeFtsQuery(query);
     if (ftsQuery === null) return [];
 
-    const candidateLimit = Math.max(topK * 5, 25);
-    const rows = db
-      .query(
-        `SELECT
+    const pageSize = Math.max(topK * 5, 50);
+    const maxScan = 1000;
+    let offset = 0;
+    const results: SearchHit[] = [];
+
+    const hasPrefix = normPrefix !== "";
+    const prefixExact = normPrefix;
+    const prefixLike = `${normPrefix.replace(/[\\%_]/g, "\\$&")}/%`;
+
+    const sql = hasPrefix
+      ? `SELECT
+           path,
+           -bm25(docs_fts, 0.0, 2.0, 1.0) AS score,
+           snippet(docs_fts, 2, '', '', '...', 48) AS snippet
+         FROM docs_fts
+         WHERE docs_fts MATCH ?
+           AND (path = ? OR path LIKE ? ESCAPE '\\')
+         ORDER BY bm25(docs_fts, 0.0, 2.0, 1.0) ASC
+         LIMIT ? OFFSET ?`
+      : `SELECT
            path,
            -bm25(docs_fts, 0.0, 2.0, 1.0) AS score,
            snippet(docs_fts, 2, '', '', '...', 48) AS snippet
          FROM docs_fts
          WHERE docs_fts MATCH ?
          ORDER BY bm25(docs_fts, 0.0, 2.0, 1.0) ASC
-         LIMIT ?`,
-      )
-      .all(ftsQuery, candidateLimit) as Array<{
-      path: string;
-      score: number;
-      snippet: string;
-    }>;
+         LIMIT ? OFFSET ?`;
 
-    const results: SearchHit[] = [];
-    for (const row of rows) {
-      if (!canReadPath(scopes, row.path, aclConfig)) continue;
-      if (normPrefix !== "" && row.path !== normPrefix && !row.path.startsWith(`${normPrefix}/`)) {
-        continue;
+    const stmt = db.query(sql);
+
+    while (offset < maxScan && results.length < topK) {
+      const params = hasPrefix
+        ? [ftsQuery, prefixExact, prefixLike, pageSize, offset]
+        : [ftsQuery, pageSize, offset];
+
+      const rows = stmt.all(...params) as Array<{
+        path: string;
+        score: number;
+        snippet: string;
+      }>;
+
+      for (const row of rows) {
+        if (!canReadPath(scopes, row.path, aclConfig)) continue;
+        if (normPrefix !== "" && row.path !== normPrefix && !row.path.startsWith(`${normPrefix}/`)) {
+          continue;
+        }
+        results.push({
+          path: row.path,
+          score: Number(row.score),
+          snippet: truncateSnippet(row.snippet ?? ""),
+        });
+        if (results.length >= topK) break;
       }
-      results.push({
-        path: row.path,
-        score: Number(row.score),
-        snippet: truncateSnippet(row.snippet ?? ""),
-      });
-      if (results.length >= topK) break;
+
+      if (rows.length < pageSize) {
+        break;
+      }
+      offset += pageSize;
     }
 
     return results;
@@ -355,7 +390,7 @@ export function makeSearchEngine(options: SearchEngineOptions) {
               : typeof r.uri === "string"
                 ? r.uri
                 : "";
-      const relPath = normalizeQmdPath(rawPath, vaultsRoot);
+      const relPath = normalizeQmdPath(rawPath, vaultsRoot, writableRoot);
       if (relPath === null) continue;
       if (!canReadPath(scopes, relPath, aclConfig)) continue;
       if (normPrefix !== "" && relPath !== normPrefix && !relPath.startsWith(`${normPrefix}/`)) {

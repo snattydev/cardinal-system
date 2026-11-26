@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { PERSONAL_OPT_IN_SCOPE } from "./acl";
-import { buildSafeFtsQuery, makeSearchEngine } from "./search";
+import { buildSafeFtsQuery, makeSearchEngine, normalizeQmdPath } from "./search";
 
 const ROOT = join(import.meta.dir, ".tmp-search-test");
 const VAULTS = join(ROOT, "vaults");
@@ -99,6 +99,40 @@ describe("makeSearchEngine (FTS5)", () => {
 
     engine.close();
   });
+
+  test("prevents FTS5 search starvation when denied prefix has >25 matching hits", async () => {
+    const starvRoot = join(ROOT, "starvation-vaults");
+    const personalDir = join(starvRoot, "personal");
+    const projectsDir = join(starvRoot, "projects");
+    mkdirSync(personalDir, { recursive: true });
+    mkdirSync(projectsDir, { recursive: true });
+
+    for (let i = 1; i <= 35; i++) {
+      writeFileSync(
+        join(personalDir, `secret-${String(i).padStart(2, "0")}.md`),
+        `# Personal Secret ${i}\n\nquantum quantum quantum confidential notes.\n`,
+      );
+    }
+
+    writeFileSync(
+      join(projectsDir, "alpha.md"),
+      "# Project Alpha\n\nquantum once in project alpha.\n",
+    );
+    writeFileSync(
+      join(projectsDir, "beta.md"),
+      "# Project Beta\n\nquantum once in project beta.\n",
+    );
+
+    const engine = makeSearchEngine({ vaultsRoot: starvRoot });
+    await engine.syncIndex(true);
+
+    const hits = await engine.search(["*"], { query: "quantum", topK: 5 });
+    expect(hits.engine).toBe("fts5");
+    const paths = hits.results.map((r) => r.path).sort();
+    expect(paths).toEqual(["projects/alpha.md", "projects/beta.md"]);
+
+    engine.close();
+  });
 });
 
 describe("makeSearchEngine (QMD sidecar + fallback)", () => {
@@ -148,6 +182,42 @@ describe("makeSearchEngine (QMD sidecar + fallback)", () => {
     expect(out.engine).toBe("fts5");
     expect(out.fallbackFrom).toBe("qmd");
     expect(out.results.map((r) => r.path)).toEqual(["projects/cardinal.md"]);
+    engine.close();
+  });
+
+  test("maps custom writableRoot path to agents/* in QMD path normalization", async () => {
+    expect(
+      normalizeQmdPath(`${WRITABLE}/handoffs/my-app.md`, VAULTS, WRITABLE),
+    ).toBe("agents/handoffs/my-app.md");
+    expect(
+      normalizeQmdPath(`qmd://${WRITABLE}/handoffs/my-app.md`, VAULTS, WRITABLE),
+    ).toBe("agents/handoffs/my-app.md");
+
+    const engine = makeSearchEngine({
+      vaultsRoot: VAULTS,
+      writableRoot: WRITABLE,
+      qmdUrl: "http://qmd:8181",
+      fetchImpl: (async () =>
+        Response.json({
+          results: [
+            {
+              file: `${WRITABLE}/handoffs/my-app.md`,
+              score: 0.95,
+              snippet: "Next step: verify Streamable HTTP transport.",
+            },
+          ],
+        })) as unknown as typeof fetch,
+    });
+
+    const out = await engine.search(["*"], { query: "Streamable", topK: 5 });
+    expect(out.engine).toBe("qmd");
+    expect(out.results).toEqual([
+      {
+        path: "agents/handoffs/my-app.md",
+        score: 0.95,
+        snippet: "Next step: verify Streamable HTTP transport.",
+      },
+    ]);
     engine.close();
   });
 });

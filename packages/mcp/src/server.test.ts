@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createMcpServer } from "./server";
 
@@ -87,6 +87,9 @@ const KEY_BOARD = "sk-cardinal-board-key";
 const KEY_FULL = "sk-cardinal-full-key";
 const KEY_USER_CFG = "sk-cardinal-usercfg-key";
 const KEY_EMPTY = "sk-cardinal-empty-key";
+const KEY_NARROW_HANDOFF = "sk-cardinal-narrow-handoff-key";
+const KEY_NARROW_PROPOSAL = "sk-cardinal-narrow-proposal-key";
+const KEY_RO_SERVICE = "sk-cardinal-ro-service-key";
 
 function makeState(): FakeBackendState {
   return {
@@ -124,6 +127,30 @@ function makeState(): FakeBackendState {
         },
       ],
       [KEY_EMPTY, { agent: "idle-agent", kind: "agent", scopes: [] }],
+      [
+        KEY_NARROW_HANDOFF,
+        {
+          agent: "narrow-coder",
+          kind: "agent",
+          scopes: ["vault:write:agents/handoffs/allowed-proj.md"],
+        },
+      ],
+      [
+        KEY_NARROW_PROPOSAL,
+        {
+          agent: "narrow-proposer",
+          kind: "agent",
+          scopes: ["vault:write:agents/proposals/exact-only.md"],
+        },
+      ],
+      [
+        KEY_RO_SERVICE,
+        {
+          agent: "observer-1",
+          kind: "agent",
+          scopes: ["board:read", "mailbox:read"],
+        },
+      ],
     ]),
     tasks: [],
     messages: [],
@@ -638,5 +665,130 @@ describe("MCP Streamable HTTP server v2", () => {
     expect(state.usageEvents.some((e) => e.tool_name === "cardinal_agent_config" && e.ok)).toBe(true);
     expect(state.usageEvents.some((e) => e.tool_name === "cardinal_user_config" && e.ok)).toBe(true);
     server.close();
+  });
+
+  test("read-only board:read and mailbox:read keys only see read tools", async () => {
+    const { server, rpcJson } = makeDeps(makeState());
+    const res = await rpcJson(KEY_RO_SERVICE, { jsonrpc: "2.0", id: 50, method: "tools/list" });
+    expect(res.json.result.tools.map((t: any) => t.name).sort()).toEqual([
+      "cardinal_agent_inbox",
+      "cardinal_task_list",
+    ]);
+    server.close();
+  });
+
+  test("enforces narrow write path scopes on handoffs and proposals", async () => {
+    const state = makeState();
+    const { server, rpcJson } = makeDeps(state);
+
+    // Narrow handoff key can write allowed-proj.md
+    const allowedHandoff = await rpcJson(KEY_NARROW_HANDOFF, {
+      jsonrpc: "2.0",
+      id: 51,
+      method: "tools/call",
+      params: {
+        name: "cardinal_handoff",
+        arguments: {
+          project: "allowed-proj",
+          summary: "Handoff for allowed project.",
+        },
+      },
+    });
+    expect(allowedHandoff.json.result.isError).toBeUndefined();
+    expect(existsSync(join(WRITABLE, "handoffs", "allowed-proj.md"))).toBe(true);
+
+    // Narrow handoff key is rejected when trying to write other-proj.md
+    const forbiddenHandoff = await rpcJson(KEY_NARROW_HANDOFF, {
+      jsonrpc: "2.0",
+      id: 52,
+      method: "tools/call",
+      params: {
+        name: "cardinal_handoff",
+        arguments: {
+          project: "other-proj",
+          summary: "Should be forbidden.",
+        },
+      },
+    });
+    expect(forbiddenHandoff.json.result.isError).toBe(true);
+    expect(forbiddenHandoff.json.result.content[0].text).toMatch(/forbidden|denies/i);
+    expect(existsSync(join(WRITABLE, "handoffs", "other-proj.md"))).toBe(false);
+
+    // Narrow proposal key is rejected when proposal filename does not match scope
+    const forbiddenProposal = await rpcJson(KEY_NARROW_PROPOSAL, {
+      jsonrpc: "2.0",
+      id: 53,
+      method: "tools/call",
+      params: {
+        name: "cardinal_propose_skill",
+        arguments: {
+          skill_path: "skills/coding/git.md",
+          reason: "Should be rejected because filename is generated and does not match exact-only.md",
+          content: "Proposal content",
+        },
+      },
+    });
+    expect(forbiddenProposal.json.result.isError).toBe(true);
+    expect(forbiddenProposal.json.result.content[0].text).toMatch(/forbidden|denies/i);
+
+    server.close();
+  });
+
+  test("gates config tools when configsRoot is omitted and hides prompts without vault read scope", async () => {
+    const state = makeState();
+    const fetchImpl = (async (url: string | URL, init?: RequestInit): Promise<Response> => {
+      const urlStr = String(url);
+      const auth = (init?.headers as Record<string, string> | undefined)?.authorization ?? "";
+      if (urlStr.endsWith("/api/internal/keys/validate")) {
+        const key = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+        const id = state.validKeys.get(key);
+        if (!id) return Response.json({ error: "unauthorized" }, { status: 401 });
+        return Response.json(id);
+      }
+      return new Response("not found", { status: 404 });
+    }) as unknown as typeof fetch;
+
+    const noConfigServer = createMcpServer({
+      backendUrl: "http://backend:8787",
+      vaultsRoot: VAULTS,
+      writableRoot: WRITABLE,
+      configsRoot: undefined,
+      gitAutoCommit: false,
+      fetchImpl,
+    });
+
+    const headers = {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+      authorization: `Bearer ${KEY_FULL}`,
+    };
+
+    const res = await noConfigServer.fetch(
+      new Request("http://localhost:8789/mcp", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ jsonrpc: "2.0", id: 60, method: "tools/list" }),
+      }),
+    );
+    const json = (await res.json()) as any;
+    const toolNames = json.result.tools.map((t: any) => t.name);
+    expect(toolNames).not.toContain("cardinal_agent_config");
+    expect(toolNames).not.toContain("cardinal_user_config");
+
+    // Keys with empty scopes (no vault read) see no prompts
+    const emptyPromptRes = await noConfigServer.fetch(
+      new Request("http://localhost:8789/mcp", {
+        method: "POST",
+        headers: {
+          ...headers,
+          authorization: `Bearer ${KEY_EMPTY}`,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 61, method: "prompts/list" }),
+      }),
+    );
+    const emptyPromptJson = (await emptyPromptRes.json()) as any;
+    expect(emptyPromptJson.result.prompts).toEqual([]);
+
+    noConfigServer.close();
   });
 });

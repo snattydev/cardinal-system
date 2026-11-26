@@ -305,7 +305,15 @@ export function canWritePrefix(
 export function hasServiceScope(
   scopes: readonly string[],
   service: "board" | "mailbox",
+  mode?: "read" | "write",
 ): boolean {
+  if (mode === "write") {
+    return (
+      scopes.includes("*") ||
+      scopes.includes(service) ||
+      scopes.includes(`${service}:write`)
+    );
+  }
   return (
     scopes.includes("*") ||
     scopes.includes(service) ||
@@ -344,7 +352,7 @@ export function canReadConfig(
       if (!scope.startsWith("config:read:")) continue;
       const glob = scope.slice("config:read:".length).trim().replace(/^\/+|\/+$/g, "");
       if (glob === "") continue;
-      if (glob === "*" || glob === "**") return true;
+      if (glob === "*" || glob === "**" || glob === "agents") return true;
       if (matchGlob(glob, fullPath)) return true;
     }
     return false;

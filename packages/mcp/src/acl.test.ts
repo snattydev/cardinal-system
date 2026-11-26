@@ -162,10 +162,24 @@ describe("canWritePath & service scopes", () => {
     expect(hasServiceScope(["board:write"], "board")).toBe(true);
     expect(hasServiceScope(["mailbox:read"], "board")).toBe(false);
     expect(hasServiceScope(["mailbox:write"], "mailbox")).toBe(true);
+
+    // Read vs write modes
+    expect(hasServiceScope(["board:read"], "board", "read")).toBe(true);
+    expect(hasServiceScope(["board:read"], "board", "write")).toBe(false);
+    expect(hasServiceScope(["board:write"], "board", "read")).toBe(true);
+    expect(hasServiceScope(["board:write"], "board", "write")).toBe(true);
+    expect(hasServiceScope(["board"], "board", "write")).toBe(true);
+    expect(hasServiceScope(["*"], "board", "write")).toBe(true);
+    expect(hasServiceScope(["mailbox:read"], "mailbox", "read")).toBe(true);
+    expect(hasServiceScope(["mailbox:read"], "mailbox", "write")).toBe(false);
+    expect(hasServiceScope(["mailbox:write"], "mailbox", "read")).toBe(true);
+    expect(hasServiceScope(["mailbox:write"], "mailbox", "write")).toBe(true);
   });
 
   test("canReadConfig enforces agents vs strict user opt-in", () => {
     expect(canReadConfig(["*"], "agents", "opencode/opencode.json")).toBe(true);
+    expect(canReadConfig(["config:read:agents"], "agents", "opencode/opencode.json")).toBe(true);
+    expect(canReadConfig(["config:read:agents"], "user", "kitty/kitty.conf")).toBe(false);
     expect(canReadConfig(["config:read:agents/**"], "agents", "omp/config.toml")).toBe(true);
     expect(canReadConfig(["config:read:agents/opencode/**"], "agents", "omp/config.toml")).toBe(false);
     expect(canReadConfig(["board:read"], "agents", "opencode/opencode.json")).toBe(false);

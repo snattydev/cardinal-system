@@ -34,6 +34,8 @@ export const ALLOWED_CONFIG_EXTENSIONS = new Set([
   "",
 ]);
 
+export const MAX_CONFIG_FILE_BYTES = 1_048_576;
+
 export class ConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -293,19 +295,26 @@ export function makeConfigStore(options: ConfigStoreOptions) {
       throw new ConfigError(`forbidden: binary content blocked (${cleanRel})`);
     }
 
+    if (raw.byteLength > MAX_CONFIG_FILE_BYTES) {
+      throw new ConfigError(
+        `config file exceeds max readable size (${MAX_CONFIG_FILE_BYTES} bytes)`,
+      );
+    }
+
     const boundedLimit = Math.max(
       1,
       Math.min(HARD_MAX_READ_BYTES, Math.floor(Number.isFinite(maxBytes) ? maxBytes : DEFAULT_MAX_READ_BYTES)),
     );
-    const truncated = raw.byteLength > boundedLimit;
-    const boundedText = decodeUtf8Bounded(raw, boundedLimit);
-    const redacted = redactSecrets(boundedText);
+    const redacted = redactSecrets(raw.toString("utf8"));
+    const redactedBuf = Buffer.from(redacted.text, "utf8");
+    const truncated = redactedBuf.byteLength > boundedLimit;
+    const content = decodeUtf8Bounded(redactedBuf, boundedLimit);
 
     return {
       category,
       path: cleanRel,
-      content: redacted.text,
-      bytes: Buffer.byteLength(redacted.text, "utf8"),
+      content,
+      bytes: Buffer.byteLength(content, "utf8"),
       totalBytes: raw.byteLength,
       truncated,
       redactedCount: redacted.redactedCount,

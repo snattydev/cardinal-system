@@ -111,6 +111,7 @@ services:
     container_name: cardinal-qmd
     volumes:
       - ${VAULTS_HOST_PATH:-./vaults}:/data/vaults:ro
+      - ${AGENT_STATE_HOST_PATH:-./agent-state}:/data/agent-state:ro
       - qmd-cache:/home/node/.cache/qmd
     networks:
       - cardinal-net

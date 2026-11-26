@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MAX_WRITE_BYTES, makeSandboxedWriter } from "./writer";
 
-const ROOT = join(import.meta.dir, ".tmp-writer-test");
+const ROOT = mkdtempSync(join(tmpdir(), "cardinal-writer-test-"));
 const WRITABLE = join(ROOT, "agent-state");
 const OUTSIDE = join(ROOT, "outside");
 
@@ -118,5 +119,42 @@ describe("makeSandboxedWriter", () => {
     });
     expect(res.path).toBe("agents/handoffs/graceful.md");
     expect(typeof res.committed).toBe("boolean");
+  });
+
+  test("aborts and writes nothing when assertAllowed throws", async () => {
+    let capturedPath = "";
+    await expect(
+      writer.writeHandoff({
+        agent: "coder-1",
+        project: "blocked-project",
+        summary: "Should not be written.",
+        assertAllowed: (logicalPath) => {
+          capturedPath = logicalPath;
+          throw new Error("denied by assertAllowed");
+        },
+      }),
+    ).rejects.toThrow("denied by assertAllowed");
+
+    expect(capturedPath).toBe("agents/handoffs/blocked-project.md");
+    expect(existsSync(join(WRITABLE, "handoffs", "blocked-project.md"))).toBe(false);
+
+    let capturedProposalPath = "";
+    await expect(
+      writer.writeSkillProposal({
+        agent: "coder-1",
+        skillPath: "skills/coding/git/SKILL.md",
+        reason: "Test assertAllowed",
+        content: "Should not be written.",
+        assertAllowed: (logicalPath) => {
+          capturedProposalPath = logicalPath;
+          throw new Error("proposal denied by assertAllowed");
+        },
+      }),
+    ).rejects.toThrow("proposal denied by assertAllowed");
+
+    expect(capturedProposalPath.startsWith("agents/proposals/")).toBe(true);
+    expect(
+      existsSync(join(WRITABLE, capturedProposalPath.slice("agents/".length))),
+    ).toBe(false);
   });
 });

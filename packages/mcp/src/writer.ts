@@ -1,6 +1,6 @@
 import { existsSync } from "node:fs";
 import { lstat, mkdir, realpath, rename, writeFile } from "node:fs/promises";
-import { join, sep } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { normalizeRelativePath } from "./acl";
 
 export const SLUG_RE = /^[a-z0-9][a-z0-9._-]{0,63}$/;
@@ -24,6 +24,7 @@ export interface HandoffWriteInput {
   summary: string;
   nextSteps?: string[];
   refs?: string[];
+  assertAllowed?: (logicalPath: string) => void;
 }
 
 export interface SkillProposalWriteInput {
@@ -31,6 +32,7 @@ export interface SkillProposalWriteInput {
   skillPath: string;
   reason: string;
   content: string;
+  assertAllowed?: (logicalPath: string) => void;
 }
 
 export interface WriteResult {
@@ -90,6 +92,7 @@ export function makeSandboxedWriter(options: SandboxedWriterOptions) {
 
     const env = {
       ...process.env,
+      GIT_CEILING_DIRECTORIES: dirname(resolve(writableRoot)),
       GIT_AUTHOR_NAME: "Cardinal Context Hub",
       GIT_AUTHOR_EMAIL: "cardinal@local",
       GIT_COMMITTER_NAME: "Cardinal Context Hub",
@@ -193,6 +196,8 @@ export function makeSandboxedWriter(options: SandboxedWriterOptions) {
 
     const markdown = `${lines.join("\n")}\n`;
     const filename = `${input.project}.md`;
+    const logicalPath = `agents/handoffs/${filename}`;
+    input.assertAllowed?.(logicalPath);
     const { bytes, relInsideRoot } = await writeAtomic("handoffs", filename, markdown);
     const committed = await tryGitCommit(
       relInsideRoot,
@@ -219,6 +224,8 @@ export function makeSandboxedWriter(options: SandboxedWriterOptions) {
     const shortId = crypto.randomUUID().slice(0, 8);
     const slug = toSafeSlug(cleanSkillPath);
     const filename = `${datePrefix}-${slug}-${shortId}.md`;
+    const logicalPath = `agents/proposals/${filename}`;
+    input.assertAllowed?.(logicalPath);
 
     const markdown = [
       `# Skill Proposal: ${cleanSkillPath}`,

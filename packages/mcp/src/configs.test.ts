@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ConfigError, makeConfigStore } from "./configs";
+import { ConfigError, makeConfigStore, MAX_CONFIG_FILE_BYTES } from "./configs";
 
 let root: string;
 let outsideFile: string;
@@ -109,5 +109,56 @@ describe("makeConfigStore", () => {
     await expect(store.readConfig(["*"], "agents", "opencode/opencode.json")).rejects.toThrow(
       ConfigError,
     );
+  });
+
+  test("redacts multi-line PEM private key when maxBytes truncates before raw closing delimiter", async () => {
+    const pemHeader = ["-----BEGIN RSA", "PRIVATE KEY-----"].join(" ");
+    const pemFooter = ["-----END RSA", "PRIVATE KEY-----"].join(" ");
+    const syntheticBody = [
+      "SYNTHETIC_PEM_PRIVATE_KEY_PAYLOAD_CHUNK_LINE_ONE_ABCD1234EFGH",
+      "SYNTHETIC_PEM_PRIVATE_KEY_PAYLOAD_CHUNK_LINE_TWO_IJKL5678MNOP",
+      "SYNTHETIC_PEM_PRIVATE_KEY_PAYLOAD_CHUNK_LINE_THREE_QRST9012UVWX",
+    ].join("\n");
+    const rawPemBlock = `${pemHeader}\n${syntheticBody}\n${pemFooter}\n`;
+    expect(Buffer.byteLength(rawPemBlock, "utf8")).toBeGreaterThan(128);
+
+    const normalConfig = [
+      "server_port = 8080",
+      "environment = production",
+      "log_level = info",
+      "worker_threads = 4",
+      "cache_ttl_seconds = 3600",
+      "max_connections = 1000",
+      "keep_alive_timeout = 60",
+    ].join("\n") + "\n";
+
+    const configContent = `${rawPemBlock}${normalConfig}`;
+    await writeFile(join(root, "agents/opencode/gateway.conf"), configContent);
+
+    const store = makeConfigStore({ configsRoot: root });
+    const maxBytes = 128;
+    const res = await store.readConfig(
+      ["config:read:agents/**"],
+      "agents",
+      "opencode/gateway.conf",
+      maxBytes,
+    );
+
+    expect(res.redactedCount).toBeGreaterThanOrEqual(1);
+    expect(res.content).toContain("[REDACTED]");
+    expect(res.content).not.toContain("SYNTHETIC_PEM_PRIVATE_KEY_PAYLOAD");
+    expect(res.truncated).toBe(true);
+    expect(res.bytes).toBeLessThanOrEqual(maxBytes);
+    expect(res.totalBytes).toBe(Buffer.byteLength(configContent, "utf8"));
+  });
+
+  test("rejects config files exceeding MAX_CONFIG_FILE_BYTES", async () => {
+    const store = makeConfigStore({ configsRoot: root });
+    const oversizedFile = join(root, "agents/opencode/oversized.txt");
+    await writeFile(oversizedFile, Buffer.alloc(MAX_CONFIG_FILE_BYTES + 1, 0x61));
+
+    await expect(
+      store.readConfig(["config:read:agents/**"], "agents", "opencode/oversized.txt"),
+    ).rejects.toThrow(`config file exceeds max readable size (${MAX_CONFIG_FILE_BYTES} bytes)`);
   });
 });
