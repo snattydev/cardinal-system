@@ -22,6 +22,8 @@ import type {
   SyncDirection,
   TaskRow,
   TaskStatus,
+  McpUsageRow,
+  McpUsageSummary,
   UsageLogRow,
   WireFormat,
 } from "@cardinal/core";
@@ -49,6 +51,8 @@ export type {
   SyncDirection,
   TaskRow,
   TaskStatus,
+  McpUsageRow,
+  McpUsageSummary,
   UsageLogRow,
   WireFormat,
 };
@@ -925,4 +929,38 @@ export function markMessageRead(db: Database, id: string): MessageRow | null {
   if (getMessage(db, id) === null) return null;
   db.run("UPDATE messages SET read = 1 WHERE id = ?", [id]);
   return getMessage(db, id);
+}
+
+export interface McpUsageFields {
+  agentName: string;
+  toolName: string;
+  ok: boolean;
+  bytesOut: number;
+  durationMs: number;
+}
+
+export function logMcpUsage(db: Database, args: McpUsageFields): void {
+  db.run(
+    `INSERT INTO mcp_usage (agent_name, tool_name, ok, bytes_out, duration_ms)
+     VALUES (?, ?, ?, ?, ?)`,
+    [args.agentName, args.toolName, args.ok ? 1 : 0, args.bytesOut, args.durationMs],
+  );
+}
+
+export function getMcpUsageSummary(db: Database): McpUsageSummary {
+  const row7d = db
+    .query("SELECT COUNT(*) AS count FROM mcp_usage WHERE created_at >= datetime('now', '-7 days')")
+    .get() as { count: number };
+  const row30d = db
+    .query("SELECT COUNT(*) AS count FROM mcp_usage WHERE created_at >= datetime('now', '-30 days')")
+    .get() as { count: number };
+  const rowLast = db
+    .query("SELECT MAX(created_at) AS last_call_at FROM mcp_usage")
+    .get() as { last_call_at: string | null };
+
+  return {
+    calls7d: Number(row7d.count),
+    calls30d: Number(row30d.count),
+    lastCallAt: rowLast.last_call_at ?? null,
+  };
 }

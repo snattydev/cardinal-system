@@ -33,7 +33,9 @@ import {
   listSkills,
   listSkillsForProfile,
   listUsage,
+  logMcpUsage,
   logUsage,
+  getMcpUsageSummary,
   markAgentDisconnected,
   registerAgent,
   revokeKeysForAgent,
@@ -60,13 +62,14 @@ function tableNames(db: ReturnType<typeof createDb>): string[] {
 }
 
 describe("migrations", () => {
-  test("migrate creates the 17 tables and sets user_version to 14", () => {
+  test("migrate creates the 18 tables and sets user_version to 15", () => {
     const db = createDb(":memory:");
     expect(tableNames(db)).toEqual([
       "agent_events",
       "agent_keys",
       "agents",
       "config_templates",
+      "mcp_usage",
       "memory_mirror",
       "messages",
       "model_routes",
@@ -82,7 +85,7 @@ describe("migrations", () => {
       "usage_log",
     ]);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(14);
+    expect(row.user_version).toBe(15);
     db.close();
   });
 
@@ -91,8 +94,8 @@ describe("migrations", () => {
     migrate(db);
     migrate(db);
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(14);
-    expect(tableNames(db)).toHaveLength(17);
+    expect(row.user_version).toBe(15);
+    expect(tableNames(db)).toHaveLength(18);
     db.close();
   });
 
@@ -102,7 +105,7 @@ describe("migrations", () => {
     const names = cols.map((c) => c.name);
     expect(names).toContain("device_info");
     const row = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(row.user_version).toBe(14);
+    expect(row.user_version).toBe(15);
     db.close();
   });
 
@@ -174,7 +177,7 @@ describe("migrations", () => {
     expect(row.budget_usd_used).toBe(0);
 
     const version = db.query("PRAGMA user_version").get() as { user_version: number };
-    expect(version.user_version).toBe(14);
+    expect(version.user_version).toBe(15);
     db.close();
   });
 
@@ -1563,6 +1566,44 @@ describe("sessions repo", () => {
   test("upsertSession throws on unknown profile (FK)", () => {
     const db = createDb(":memory:");
     expect(() => upsertSession(db, { id: "s1", profile_name: "ghost" })).toThrow();
+    db.close();
+  });
+});
+
+describe("mcp_usage repo", () => {
+  test("getMcpUsageSummary returns zeros and null lastCallAt on empty db", () => {
+    const db = createDb(":memory:");
+    expect(getMcpUsageSummary(db)).toEqual({
+      calls7d: 0,
+      calls30d: 0,
+      lastCallAt: null,
+    });
+    db.close();
+  });
+
+  test("logMcpUsage persists rows and respects 7d / 30d windows", () => {
+    const db = createDb(":memory:");
+    logMcpUsage(db, {
+      agentName: "coder-1",
+      toolName: "cardinal_search",
+      ok: true,
+      bytesOut: 420,
+      durationMs: 12,
+    });
+    db.run(
+      `INSERT INTO mcp_usage (agent_name, tool_name, ok, bytes_out, duration_ms, created_at)
+       VALUES ('coder-1', 'cardinal_read', 1, 100, 5, datetime('now', '-10 days'))`,
+    );
+    db.run(
+      `INSERT INTO mcp_usage (agent_name, tool_name, ok, bytes_out, duration_ms, created_at)
+       VALUES ('coder-1', 'cardinal_read', 0, 50, 3, datetime('now', '-45 days'))`,
+    );
+
+    const summary = getMcpUsageSummary(db);
+    expect(summary.calls7d).toBe(1);
+    expect(summary.calls30d).toBe(2);
+    expect(typeof summary.lastCallAt).toBe("string");
+    expect(summary.lastCallAt).not.toBe("");
     db.close();
   });
 });

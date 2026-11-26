@@ -743,3 +743,138 @@ test("agent key cannot spoof task created_by, claim as another agent, or complet
   expect(dashComplete.status).toBe(200);
   expect(((await dashComplete.json()) as { task: { status: string } }).task.status).toBe("done");
 });
+
+test("POST /api/internal/mcp/usage logs telemetry and updates GET /api/system", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tool_name: "cardinal_search" }),
+  });
+  expect(anon.status).toBe(401);
+
+  const badBody = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TEST_KEY}` },
+    body: JSON.stringify({ tool_name: "" }),
+  });
+  expect(badBody.status).toBe(400);
+
+  const ok = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TEST_KEY}` },
+    body: JSON.stringify({
+      tool_name: "cardinal_search",
+      ok: true,
+      bytes_out: 512,
+      duration_ms: 19,
+    }),
+  });
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ ok: true });
+
+  const cookie = await login();
+  const sys = await fetch(`http://localhost:${port}/api/system`, { headers: { cookie } });
+  expect(sys.status).toBe(200);
+  const sysBody = (await sys.json()) as {
+    mcp_calls_7d: number;
+    mcp_calls_30d: number;
+    mcp_last_call_at: string | null;
+  };
+  expect(sysBody.mcp_calls_7d).toBeGreaterThanOrEqual(1);
+  expect(sysBody.mcp_calls_30d).toBeGreaterThanOrEqual(1);
+  expect(typeof sysBody.mcp_last_call_at).toBe("string");
+});
+
+test("board and mailbox routes enforce agent key scopes", async () => {
+  const vaultOnlyKey = generateKey();
+  const boardReadKey = generateKey();
+  const boardWriteKey = generateKey();
+  const mailboxReadKey = generateKey();
+
+  registerAgent(db, "vault-agent", "agent");
+  createAgentKey(db, {
+    keyHash: hashKey(vaultOnlyKey),
+    agentName: "vault-agent",
+    scopes: ["vault:read:skills/**"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(boardReadKey),
+    agentName: "vault-agent",
+    scopes: ["board:read"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(boardWriteKey),
+    agentName: "vault-agent",
+    scopes: ["board:write"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(mailboxReadKey),
+    agentName: "vault-agent",
+    scopes: ["mailbox:read"],
+  });
+
+  // Key with only vault:read cannot touch tasks or messages
+  const listDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${vaultOnlyKey}` },
+  });
+  expect(listDenied.status).toBe(403);
+  expect(await listDenied.json()).toEqual({ error: "scope_denied" });
+
+  const postTaskDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${vaultOnlyKey}` },
+    body: JSON.stringify({ goal: "blocked" }),
+  });
+  expect(postTaskDenied.status).toBe(403);
+
+  const msgGetDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    headers: { authorization: `Bearer ${vaultOnlyKey}` },
+  });
+  expect(msgGetDenied.status).toBe(403);
+
+  const msgPostDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${vaultOnlyKey}` },
+    body: JSON.stringify({ from_agent: "vault-agent", to_agent: "shinon", type: "ping" }),
+  });
+  expect(msgPostDenied.status).toBe(403);
+
+  // board:read allows GET /api/tasks but denies POST /api/tasks
+  const readAllowed = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${boardReadKey}` },
+  });
+  expect(readAllowed.status).toBe(200);
+
+  const writeDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${boardReadKey}` },
+    body: JSON.stringify({ goal: "read only" }),
+  });
+  expect(writeDenied.status).toBe(403);
+
+  // board:write allows both POST and GET
+  const writeAllowed = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${boardWriteKey}` },
+    body: JSON.stringify({ goal: "allowed write" }),
+  });
+  expect(writeAllowed.status).toBe(200);
+
+  const readViaWrite = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${boardWriteKey}` },
+  });
+  expect(readViaWrite.status).toBe(200);
+
+  // mailbox:read allows GET /api/messages but denies POST
+  const inboxAllowed = await fetch(`http://localhost:${port}/api/messages`, {
+    headers: { authorization: `Bearer ${mailboxReadKey}` },
+  });
+  expect(inboxAllowed.status).toBe(200);
+
+  const sendDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${mailboxReadKey}` },
+    body: JSON.stringify({ from_agent: "vault-agent", to_agent: "shinon", type: "ping" }),
+  });
+  expect(sendDenied.status).toBe(403);
+});

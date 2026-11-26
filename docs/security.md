@@ -35,10 +35,23 @@
 | Level | Scope |
 |-------|-------|
 | Admin (human) | Everything: dashboard, keygen, config. RAG unfiltered. Tasks/mailbox with body identity. |
-| Agent key | WS connection + router usage. RAG filtered by key JSON scopes (`*` or `vault:<name>`). On `/api/tasks` and `/api/messages` the key **is** identity (`agent_name`). |
+| Agent key | WS connection + router usage + MCP Context Hub. On `/api/tasks*` and `/api/messages*` the key **is** identity (`agent_name`) and requires `board:*` / `mailbox:*` (or `*`). Vault access enforces path-glob ACLs server-side. |
 | Subagent key | Single task execution only (ephemeral, scoped) |
 
-Vault scopes in `POST /api/rag/search` are enforced server-side for agent keys. Finer scopes (read/write per service, e.g. `board`) are still pending.
+### Vault & MCP Path-Glob ACLs (`packages/mcp`)
+
+- **Allowed read scopes:** `*`, `vault:read:<glob>`, or legacy `vault:<name>` (`<name>/**`).
+- **Allowed write scopes:** explicit `vault:write:<glob>` only. **`*` and legacy `vault:<name>` never grant write access.**
+- **Hard-denied prefixes (`CARDINAL_DENY_PREFIXES`, default `personal`):**
+  - `personal/**` is unconditionally denied on reads—even for `*` keys—unless the key explicitly carries **both** `vault:allow-personal` and a matching `vault:read:` scope.
+  - `personal/**` is **always write-denied** regardless of scopes.
+- **Physical R/W separation & traversal safety:** Source vaults mount `:ro` (`/data/vaults`); agent handoffs and skill proposals write only to isolated `:rw` `CARDINAL_WRITABLE_ROOT` (`/data/agent-state`). Paths block traversal, URL-encoded `%2e`/`%2f`/`%5c`, backslashes, null bytes, dotfiles (`.git`, `.env`, `.obsidian`), non-`.md` files, and symlink escapes via `realpath`.
+- **Read-only config snapshots & redaction (`CARDINAL_CONFIGS_ROOT`):**
+  - `scripts/sync-configs.sh` copies only explicitly allowlisted harness (`agents/**`) and terminal/shell (`user/**`) configs into a `:ro` mount (`/data/configs`), stripping credentials on copy while never touching `auth*`, `*token*`, `*secret*`, `.env*`, SSH keys, sqlite DBs, or shell histories.
+  - `cardinal_agent_config` requires `*` or `config:read:agents/**`.
+  - `cardinal_user_config` (`user/**`) is **strictly opt-in** via explicit `config:read:user/**` (never granted by `*`, `config:read:*`, or `config:read:**`).
+  - Both MCP config tools enforce filename blocklists, config extension allowlists, non-binary checks, `realpath` confinement, byte limits, and defense-in-depth runtime secret redaction (`packages/mcp/src/redact.ts`).
+- **Stateless per-request identity:** `POST /mcp` builds a fresh `McpServer` bound to the validated caller identity per request, preventing cross-tenant tool/scope leakage.
 
 ## Sensitive data
 
@@ -81,4 +94,4 @@ Before every push to `dev`:
 
 ---
 
-*Updated: 2026-09-06.*
+*Updated: 2026-11-25.*

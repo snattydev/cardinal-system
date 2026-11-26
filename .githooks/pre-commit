@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+# pre-commit: block protected-branch commits, sensitive files, and leaked secrets.
+set -euo pipefail
+
+branch="$(git symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+git_dir="$(git rev-parse --git-dir 2>/dev/null || echo .git)"
+if [ -z "${ALLOW_PROTECTED_COMMIT:-}" ] && [ ! -f "$git_dir/MERGE_HEAD" ]; then
+  case "$branch" in
+    main|master|dev)
+      echo "pre-commit: direct commits to '$branch' are blocked; commit on a feature branch (override: ALLOW_PROTECTED_COMMIT=1)." >&2
+      exit 1
+      ;;
+  esac
+fi
+
+TOKEN_RE='(sk-[A-Za-z0-9_-]{32,}|(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,}|AIza[0-9A-Za-z_-]{35}|AKIA[0-9A-Z]{16}|xox[baprs]-[0-9A-Za-z-]{10,}|-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----)'
+ALLOWLIST=".githooks/secret-scan-allowlist"
+
+is_allowlisted() {
+  local file="$1" pattern
+  [ -f "$ALLOWLIST" ] || return 1
+  while IFS= read -r pattern || [ -n "$pattern" ]; do
+    case "$pattern" in ''|'#'*) continue ;; esac
+    # shellcheck disable=SC2254
+    case "$file" in $pattern) return 0 ;; esac
+  done < "$ALLOWLIST"
+  return 1
+}
+
+status=0
+while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  case "$file" in .githooks/*) continue ;; esac
+  if is_allowlisted "$file"; then continue; fi
+
+  base="$(basename "$file" | tr '[:upper:]' '[:lower:]')"
+  case "$base" in
+    .env.example|.env.sample|.env.template) ;;
+    .env|.env.*|*.pem|*.key|*.p12|*.pfx|*.jks|*.keystore|*.kdbx|*.sqlite|*.sqlite3|*.db|id_rsa*|id_ed25519*|id_ecdsa*|id_dsa*|.git-credentials|.netrc|.pypirc|.pgpass)
+      echo "pre-commit: sensitive file staged: $file" >&2
+      status=1
+      continue
+      ;;
+  esac
+
+  if grep -Eq '^(.*[-_.])?(auth|credentials?|secrets?|oauth)([-_.].*)?\.(json|ya?ml|toml)$' <<<"$base"; then
+    echo "pre-commit: credential config staged: $file" >&2
+    status=1
+    continue
+  fi
+
+  added="$(git diff --cached --unified=0 --diff-filter=ACM -- "$file" | awk '/^\+\+\+ / {next} /^\+/ {print substr($0, 2)}' | grep -v 'secret-scan:ignore' || true)"
+  [ -n "$added" ] || continue
+
+  if grep -Eq "$TOKEN_RE" <<<"$added"; then
+    echo "pre-commit: possible secret in $file (mark intentional fixtures with 'secret-scan:ignore')." >&2
+    status=1
+  fi
+
+  if grep -E '/(home|Users)/[A-Za-z0-9._-]+/' <<<"$added" | grep -Ev '/(home|Users)/(node|app|bun|runner|user|ubuntu|vscode|example|username|your-user)/' >/dev/null; then
+    echo "pre-commit: absolute host home path in $file; use a relative path or placeholder." >&2
+    status=1
+  fi
+done < <(git diff --cached --name-only --diff-filter=ACM)
+
+exit "$status"

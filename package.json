@@ -1,6 +1,6 @@
 {
   "name": "cardinal-system",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "private": true,
   "workspaces": ["packages/*", "backend", "frontend"],
   "scripts": {
@@ -10,10 +10,12 @@
     "start": "bun backend/src/index.ts",
     "test": "bun test --timeout 30000 packages/*/src backend/src scripts/*.test.ts",
     "test:e2e": "bun run --cwd frontend playwright test",
-    "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
+    "typecheck": "bun x tsc --noEmit -p backend/tsconfig.json && bun x tsc --noEmit -p packages/mcp/tsconfig.json && bun x tsc --noEmit -p frontend/tsconfig.json",
     "keygen": "bun packages/keys/src/cli.ts",
     "cloud-agent": "bun scripts/cloud-agent.ts",
     "bootstrap:password": "bash scripts/bootstrap-admin-password.sh",
+    "hooks:install": "bash scripts/install-hooks.sh",
+    "standards:sync": "bun scripts/sync-repo-standards.ts",
     "seed:router": "python3 scripts/seed-router.py"
   },
   "devDependencies": {

@@ -1,38 +1,33 @@
 import { describe, expect, test } from "bun:test";
-import { allowedVaults, canAccessVault } from "./auth";
+import { allowedVaults, canAccessVault, PERSONAL_OPT_IN_SCOPE } from "./auth";
 
-const VAULTS = ["the portal", "for-my-agents"] as const;
+const VAULTS = ["portal", "agents", "personal"] as const;
 
-describe("allowedVaults", () => {
-  test('scope "*" → todas las vaults conocidas', () => {
-    expect(allowedVaults(["*"], VAULTS)).toEqual(new Set(VAULTS));
+describe("allowedVaults compatibility helpers", () => {
+  test('scope "*" grants known non-denied vaults while excluding personal/**', () => {
+    expect(allowedVaults(["*"], VAULTS)).toEqual(new Set(["portal", "agents"]));
   });
 
-  test('scopes "vault:<name>" → allowlist exacta', () => {
-    expect(allowedVaults(["vault:the portal"], VAULTS)).toEqual(new Set(["the portal"]));
-    expect(allowedVaults(["vault:the portal", "vault:for-my-agents"], VAULTS)).toEqual(new Set(VAULTS));
+  test('scopes "vault:<name>" and "vault:read:<glob>" enforce allowlist', () => {
+    expect(allowedVaults(["vault:portal"], VAULTS)).toEqual(new Set(["portal"]));
+    expect(allowedVaults(["vault:read:portal/**"], VAULTS)).toEqual(new Set(["portal"]));
+    expect(
+      allowedVaults(["vault:portal", "vault:personal", PERSONAL_OPT_IN_SCOPE], VAULTS),
+    ).toEqual(new Set(["portal", "personal"]));
   });
 
-  test('scope "vault:x" no conocida → set con x (403 al pedir vaults reales distintas)', () => {
-    const set = allowedVaults(["vault:nope"], VAULTS);
-    expect(set.has("nope")).toBe(true);
-    expect(set.has("the portal")).toBe(false);
-  });
-
-  test("sin scopes de vault → vacío", () => {
+  test("unknown or non-vault scopes produce an empty set", () => {
     expect(allowedVaults([], VAULTS).size).toBe(0);
-    expect(allowedVaults(["fast"], VAULTS).size).toBe(0);
+    expect(allowedVaults(["board:read"], VAULTS).size).toBe(0);
+    expect(allowedVaults(["vault:nope"], VAULTS).size).toBe(0);
   });
 });
 
 describe("canAccessVault", () => {
-  test('"*" permite cualquier vault conocida', () => {
-    expect(canAccessVault(["*"], "the portal", VAULTS)).toBe(true);
-    expect(canAccessVault(["*"], "for-my-agents", VAULTS)).toBe(true);
-  });
-
-  test("allowlist limita", () => {
-    expect(canAccessVault(["vault:the portal"], "the portal", VAULTS)).toBe(true);
-    expect(canAccessVault(["vault:the portal"], "for-my-agents", VAULTS)).toBe(false);
+  test("enforces vault visibility and personal opt-in", () => {
+    expect(canAccessVault(["*"], "portal", VAULTS)).toBe(true);
+    expect(canAccessVault(["*"], "personal", VAULTS)).toBe(false);
+    expect(canAccessVault(["vault:portal"], "portal", VAULTS)).toBe(true);
+    expect(canAccessVault(["vault:portal"], "agents", VAULTS)).toBe(false);
   });
 });

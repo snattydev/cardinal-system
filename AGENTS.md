@@ -54,20 +54,23 @@ English only: docs, skills, source comments, identifiers, commits, PRs, and agen
 | `cardinal-commit` | Commit format and rules (detail) |
 | `cardinal-pr` | Create a PR step by step |
 | `cardinal-system` | Runtime, API, operational quirks |
+| `cardinal-standards` | Enforce uniform personal-repo standards across repos |
 
 Planned and pending skills: [`docs/skills.md`](./docs/skills.md).
 
+Git hooks: activate versioned `.githooks/` once per clone via `bun run hooks:install` (`bash scripts/install-hooks.sh`); regenerate from `packages/mcp/src/repo-standards.ts` via `bun run standards:sync`.
+
 ---
 
-## Current state (2026-09-14)
+## Current state (2026-11-25)
 
 | Phase | Status | Spec |
 |-------|--------|------|
 | Phase 0 — Living Skeleton | Complete | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
 | Phase 1 — Context Store | Complete (v0.2.0+) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
-| Phase 2 — Cardinal v2 (Blackboard + MCP + Pool) | Closing (v0.2.6; PR [#12](https://github.com/snattydev/cardinal-system/pull/12), issue [#16](https://github.com/snattydev/cardinal-system/issues/16)) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
-| Phase 2.5 — Cardinal v3 | Planning (tracking [#28](https://github.com/snattydev/cardinal-system/issues/28)) | [`docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md`](./docs/superpowers/plans/2026-09-07-cardinal-v3-backlog.md) |
-| Phase 3+ — Graph + Automations | Future | — |
+| Phase 2 — Blackboard + MCP + Pool | Complete (`v0.2.6` on `main`; N1 merged on `dev`) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
+| **Context Hub v2 (Stage 1)** | **Active (`feature/mcp-context-hub`, usage-gated [#62](https://github.com/snattydev/cardinal-system/issues/62))** | [`docs/features/2026-11-25-mcp-context-hub-v2.md`](./docs/features/2026-11-25-mcp-context-hub-v2.md) |
+| Stage 2+ — Conditional Extensions | Gated on 30-day usage (`mcp_usage`) | [`docs/roadmap.md`](./docs/roadmap.md) |
 
 SDLC lives in GitHub Issues. Runtime coordination lives on the Blackboard. Policy: [`AGENTS/issues.md`](./AGENTS/issues.md).
 

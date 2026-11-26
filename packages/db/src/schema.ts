@@ -191,6 +191,18 @@ ALTER TABLE agent_keys ADD COLUMN expires_at TEXT;
 ALTER TABLE agent_keys ADD COLUMN budget_usd_limit REAL;
 ALTER TABLE agent_keys ADD COLUMN budget_usd_used REAL NOT NULL DEFAULT 0;
 `,
+  `
+CREATE TABLE mcp_usage (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_name  TEXT NOT NULL,
+  tool_name   TEXT NOT NULL,
+  ok          INTEGER NOT NULL DEFAULT 1,
+  bytes_out   INTEGER NOT NULL DEFAULT 0,
+  duration_ms INTEGER NOT NULL DEFAULT 0,
+  created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX idx_mcp_usage_created_at ON mcp_usage(created_at);
+`,
 ];
 
 export function migrate(db: Database): void {
