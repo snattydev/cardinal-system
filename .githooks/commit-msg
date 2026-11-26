@@ -30,7 +30,7 @@ if grep -Eiq '^co-authored-by:.*(claude|anthropic|openai|chatgpt|codex|gemini|co
   exit 1
 fi
 
-if grep -Eiq '(generated (with|by) (claude|chatgpt|copilot|cursor|gemini|codex|antigravity)|\u{1f916})' <<<"$body"; then
+if grep -Eiq '(generated (with|by) (claude|chatgpt|copilot|cursor|gemini|codex|antigravity)|🤖)' <<<"$body"; then
   echo "commit-msg: remove AI generator watermark lines." >&2
   exit 1
 fi

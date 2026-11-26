@@ -185,6 +185,7 @@ describe(".githooks/commit-msg", () => {
       "feat:missing space\n",
       "feat: add thing\n\nCo-Authored-By: Claude <noreply@anthropic.com>\n",
       "feat: add thing\n\nGenerated with Claude Code\n",
+      `feat: add thing\n\n${"\u{1f916}"} auto commit\n`,
     ]) {
       expect({ msg, status: runCommitMsg(msg).status }).toEqual({ msg, status: 1 });
     }
