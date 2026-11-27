@@ -6,7 +6,7 @@
 
 ## Principles
 
-- **Nothing exposed without auth.** Every endpoint under `/api/` requires JWT or API key.
+- **Nothing exposed without auth.** Every endpoint under `/api/` (except `GET /api/health`) and `/v1/` (`/v1/chat/completions`, `/v1/models`) requires JWT or API key.
 - **Keys are identity.** `sk-cardinal-*` = the agent. Only SHA-256 hash in DB.
 - **Human-in-the-loop.** The human closes every loop (merge, confirmation, gates).
 - **Ephemeral by default.** State in git/DB, never in the process.
@@ -16,10 +16,11 @@
 
 | Actor | Method | Storage | Lifetime |
 |-------|--------|---------|----------|
-| Human (dashboard) | JWT (HS256) via `POST /api/auth/login` | `httpOnly` cookie, `SameSite=Strict` | 12h |
+| Human (dashboard) | JWT (HS256) via `POST /api/auth/login` (failure-rate-limited per client IP) | `httpOnly` cookie, `SameSite=Strict` | 12h |
 | Agent (WS) | API key `sk-cardinal-*` in `hello` message | DB: `key_hash` (SHA-256) | Revocable |
 | Agent (REST) | API key `sk-cardinal-*` via `Authorization: ***` | Same as WS | Revocable |
-| Subagent (localhost) | API key `created_by=system`, auto-revocable | DB: `key_hash` | Ephemeral |
+| Subagent (localhost) | API key `created_by=system`, auto-revocable; passed to worker container via env (not CLI args) | DB: `key_hash` | Ephemeral |
+| Internal MCP -> backend | `/api/internal/keys/validate`, `/api/internal/mcp/usage` (`403` at `deploy/nginx.conf`, optional `INTERNAL_SERVICE_SECRET` via `x-cardinal-internal-secret`) | Env var | Service lifetime |
 
 ## API keys
 
@@ -52,6 +53,7 @@
   - `cardinal_user_config` (`user/**`) is **strictly opt-in** via explicit `config:read:user/**` (never granted by `*`, `config:read:*`, or `config:read:**`).
   - Both MCP config tools enforce filename blocklists, config extension allowlists, non-binary checks, `realpath` confinement, byte limits, and defense-in-depth runtime secret redaction (`packages/mcp/src/redact.ts`).
 - **Stateless per-request identity:** `POST /mcp` builds a fresh `McpServer` bound to the validated caller identity per request, preventing cross-tenant tool/scope leakage.
+- **Legacy RAG route (`/api/rag/search`):** Normalizes vault-relative paths, blocks traversal segments, enforces `CARDINAL_DENY_PREFIXES` (denies `personal/**` even for `*` unless `vault:allow-personal` plus an explicit scope matches), and uses segment/prefix matching instead of substring checks.
 
 ## Sensitive data
 
@@ -88,10 +90,18 @@ Before every push to `dev`:
 
 ## WS security
 
-- **Close codes:** 4401 (auth failed), 4400 (invalid message)
+- **Origin check:** When an `Origin` header is present on `/ws`, its host must match the request `Host` (`X-Forwarded-Host` fallback); mismatched origins fail with `403`.
+- **Handshake deadline & caps:** Unauthenticated sockets must send `hello` or `subscribe` within 10s (`4401 auth_timeout`), with bounded unauthenticated (`100`) and dashboard (`50`) connection caps (`4429 too_many_connections`).
+- **Close codes:** 4401 (auth failed / timeout), 4400 (invalid message), 4429 (too many connections)
 - **Timeout:** 2 lost pings (60s) → disconnect
-- **Rate limit:** Not implemented in F0. Pending F2.
+- **Rate limit:** Login brute-force protection via `LoginRateLimiter` on `POST /api/auth/login` (`429` + `Retry-After`). WS message rate limit remains pending.
+
+## Container and helper script hardening
+
+- **Backend container (`deploy/Containerfile`):** Runs as non-root `USER bun` with `/data` owned by `bun:bun`.
+- **Worker containers (`backend/src/orchestrator/podman-driver.ts`):** Ephemeral `CARDINAL_KEY` is inherited from process environment (`-e CARDINAL_KEY`) rather than exposed in container CLI argv.
+- **Helper proxies (`scripts/omp-gateway.sh`, `scripts/vault-query-proxy.py`):** Bind `127.0.0.1` by default and fail closed when unauthenticated on non-loopback interfaces; `vault-query-proxy.py` compares `X-Vault-Token` with `hmac.compare_digest`.
 
 ---
 
-*Updated: 2026-11-25.*
+*Updated: 2026-11-27.*

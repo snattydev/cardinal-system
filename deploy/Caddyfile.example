@@ -7,7 +7,7 @@
 # from the pod's port 80 via cardinal-caddy).
 
 # Production (VPS): uncomment once the domain is ready
-# cardinal.snatdy.dev {
+# cardinal.example.com {
 #     reverse_proxy 127.0.0.1:8080
 # }
 
