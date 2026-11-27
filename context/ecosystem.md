@@ -101,11 +101,12 @@ Production multi-agent architectural principles derived from field deployments. 
 
 ## Versioning and Status
 
-Cardinal follows `MAJOR.FASE.PATCH` versioning (e.g. `0.2.5`), with root `package.json` acting as the source of truth, surfaced via `GET /api/health`.
+Cardinal follows `MAJOR.FASE.PATCH` versioning (e.g. `0.2.7`), with root `package.json` acting as the source of truth, surfaced via `GET /api/health`.
 
-- **Current Status**: `v0.2.5`
+- **Current Status**: `v0.2.7`
 - **Phase 0 (Living Skeleton)**: Complete
 - **Phase 1 (Context Store)**: Complete
-- **Phase 2 (Blackboard + MCP + Router)**: Closing
+- **Phase 2 (Blackboard + MCP + Router)**: Complete (`v0.2.6`)
+- **Context Hub v2 (Stage 1)**: Shipped (`v0.2.7` on `main`; 30-day usage gate active in `#62`)
 
 Detailed milestone tracking and phase deliverables are maintained in [`../docs/roadmap.md`](../docs/roadmap.md).

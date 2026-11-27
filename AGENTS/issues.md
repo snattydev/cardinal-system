@@ -45,5 +45,6 @@ Additional qualifiers: `security`, `frontend`, `backend`, `protocol`, `good firs
 3. **Commits:**
    - Commits addressing or finishing the issue must reference it in the body: `Closes #<id>` or `Relates to #<id>` (`AGENTS/commits.md`).
 4. **Pull Requests:**
-   - The PR body must explicitly state `Closes #<id>` so merging to `dev` / `main` automatically closes the issue (`AGENTS/prs.md`).
+   - The PR body must explicitly state `Closes #<id>` so merging to `main` automatically closes the issue (`AGENTS/prs.md`).
+   - Note: GitHub only auto-closes `Closes #N` when merging into the default branch (`main`). Merging a feature/docs PR into `dev` does **not** auto-close the issue; wait for the `dev -> main` release PR or close manually once verified on `dev`.
    - PR description links to the issue and summarizes resolution against the issue's acceptance criteria.

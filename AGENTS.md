@@ -9,6 +9,8 @@
 - [`docs/api.md`](./docs/api.md) — REST, WebSocket, JWT recipe
 - [`docs/roadmap.md`](./docs/roadmap.md) — phases and priorities
 - [`context/ecosystem.md`](./context/ecosystem.md) — knowledge base
+- [`SECURITY.md`](./SECURITY.md) — vulnerability disclosure and hardening checklist
+- [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) — CI verification (`typecheck`, `test`, `build`)
 
 ---
 
@@ -62,14 +64,14 @@ Git hooks: activate versioned `.githooks/` once per clone via `bun run hooks:ins
 
 ---
 
-## Current state (2026-11-25)
+## Current state (2026-11-27)
 
 | Phase | Status | Spec |
 |-------|--------|------|
 | Phase 0 — Living Skeleton | Complete | [`docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-fase-0-design.md) |
 | Phase 1 — Context Store | Complete (v0.2.0+) | [`docs/roadmap/fase-1.md`](./docs/roadmap/fase-1.md) · [`docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md`](./docs/superpowers/specs/2026-07-23-cardinal-context-store-design.md) |
-| Phase 2 — Blackboard + MCP + Pool | Complete (`v0.2.6` on `main`; N1 merged on `dev`) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
-| **Context Hub v2 (Stage 1)** | **Active (`feature/mcp-context-hub`, usage-gated [#62](https://github.com/snattydev/cardinal-system/issues/62))** | [`docs/features/2026-11-25-mcp-context-hub-v2.md`](./docs/features/2026-11-25-mcp-context-hub-v2.md) |
+| Phase 2 — Blackboard + MCP + Pool | Complete (`v0.2.6`) | [`docs/roadmap/fase-2.md`](./docs/roadmap/fase-2.md) · [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](./docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md) |
+| **Context Hub v2 (Stage 1)** | **Shipped (`v0.2.7` on `main`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** | [`docs/features/2026-11-25-mcp-context-hub-v2.md`](./docs/features/2026-11-25-mcp-context-hub-v2.md) |
 | Stage 2+ — Conditional Extensions | Gated on 30-day usage (`mcp_usage`) | [`docs/roadmap.md`](./docs/roadmap.md) |
 
 SDLC lives in GitHub Issues. Runtime coordination lives on the Blackboard. Policy: [`AGENTS/issues.md`](./AGENTS/issues.md).

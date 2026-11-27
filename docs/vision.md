@@ -10,7 +10,7 @@
 
 - Authenticates agents across devices (`sk-cardinal-*` keys with scopes, budgets, and expiry)
 - Enforces path-glob ACLs over Markdown knowledge vaults (read-only vaults vs. isolated writable agent state, with `personal/**` denied by default)
-- Serves progressive-disclosure onboarding (`coding` and `hermes` modes), hybrid/BM25 search (built-in SQLite FTS5 + optional QMD sidecar), and sandboxed cross-session handoffs via Streamable HTTP MCP (`:8789`)
+- Serves progressive-disclosure onboarding (`coding` and `hermes` modes), repo standards bootstrap (`cardinal_bootstrap_repo`), hybrid/BM25 search (built-in SQLite FTS5 + optional QMD sidecar), sanitized `:ro` config snapshots (`cardinal_agent_config` / `cardinal_user_config`), and sandboxed cross-session handoffs via Streamable HTTP MCP (`:8789`)
 - Measures real MCP usage (`mcp_usage`) to gate future work behind demonstrated daily utility
 - Retains an optional human dashboard (SAO aesthetic), blackboard/mailbox APIs, and legacy router/key management
 
@@ -89,4 +89,4 @@ Agent harness → Streamable HTTP MCP (Bearer sk-cardinal-*) → receives:
 
 ---
 
-*Updated: 2026-11-25.*
+*Updated: 2026-11-27.*

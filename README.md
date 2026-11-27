@@ -4,27 +4,27 @@ Central backend and Sovereign Context Policy Plane of the SAO agent ecosystem: i
 
 Thesis: **orchestration and routing are commodity**. Cardinal focuses on identity, vault path-glob ACLs, and usage-gated context delivery; T3 Code, Hermes, and CLIs are the hands.
 
-**Version:** v0.2.6 (Context Hub v2 Stage 1 active on `feature/mcp-context-hub`). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
+**Version:** v0.2.7 (Context Hub v2 Stage 1 shipped on `main`; 30-day usage gate active in [#62](https://github.com/snattydev/cardinal-system/issues/62)). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
 
 | Phase | What | Status |
 |-------|------|--------|
 | 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
 | 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
-| 2 | Blackboard, MCP hub, key pool / router | Complete (`v0.2.6` on `main`; N1 merged on `dev`) |
-| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Active (`feature/mcp-context-hub`, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
+| 2 | Blackboard, MCP hub, key pool / router | Complete (`v0.2.6`) |
+| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Shipped (`v0.2.7`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
 
 Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). Context Hub v2 spec: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md).
 
 ## What is in today
 
-- **Human auth:** JWT in `httpOnly` cookie (dashboard login)
+- **Human auth:** JWT in `httpOnly` cookie (dashboard login, IP failure rate-limited with `429` + `Retry-After`)
 - **Agent auth:** `sk-cardinal-*` keys (SHA-256 in DB, scopes + budget tokens/USD + expiry)
-- **Agent Hub:** native WebSocket on `/ws` (roster, ping/pong, events)
+- **Agent Hub:** native WebSocket on `/ws` (roster, ping/pong, events, `Origin` host check, 10s handshake timeout, connection caps)
 - **Context Store:** profiles, souls, skills, memory mirror, sessions, RAG proxy
 - **Blackboard:** tasks CRUD + claim/complete, UI `/tasks`, WS broadcast
 - **Mailbox:** `GET/POST /api/messages` (agent-to-agent handoff; key = identity)
-- **MCP Context Hub:** `packages/mcp` on `:8789` (`POST /mcp` Streamable HTTP, `GET /health`; deterministic `coding`/`hermes` onboarding, path-glob ACLs with `personal/**` hard-deny, built-in FTS5 + optional QMD sidecar, sandboxed handoffs/proposals, `mcp_usage` telemetry)
-- **Router:** `POST /v1/chat/completions` + `GET /v1/models` (Bearer `sk-cardinal-*`); Fusion/MoA with `model=fusion`
+- **MCP Context Hub:** `packages/mcp` on `:8789` (`POST /mcp` Streamable HTTP, `GET /health`; deterministic `coding`/`hermes` onboarding, `cardinal_bootstrap_repo` tiered repo standards / "Configuration 101", path-glob ACLs with `personal/**` hard-deny, built-in FTS5 + optional QMD sidecar, sandboxed handoffs/proposals, sanitized `:ro` `cardinal_agent_config` / `cardinal_user_config` reads, `mcp_usage` telemetry)
+- **Router:** `POST /v1/chat/completions` + `GET /v1/models` (Bearer `sk-cardinal-*`, or dashboard JWT on `/v1/models`; Fusion/MoA with `model=fusion`; frozen under Context Hub v2)
 - **Router UI:** operative catalog at `/router` (JWT; providers, aliases, chains)
 - **Keys UI:** create / list / revoke at `/keys` (scopes, tokens, expiry, USD cap)
 
@@ -73,11 +73,12 @@ sudo usermod --add-subuids 100000-165535 --add-subgids 100000-165535 "$USER"
 ### First-run secrets (no host Bun)
 
 ```bash
-git clone <repo-url> && cd cardinal-system
+git clone https://github.com/snattydev/cardinal-system.git && cd cardinal-system
 cp deploy/env.example .env
 
 openssl rand -hex 32   # JWT_SECRET
 openssl rand -hex 32   # POOL_SECRET
+openssl rand -hex 32   # INTERNAL_SERVICE_SECRET (optional; authenticates MCP -> backend /api/internal/*)
 read -r -s -p "Admin password: " PW; echo
 printf '%s' "$PW" | podman run --rm -i docker.io/oven/bun:1 bun -e 'const pw = await new Response(Bun.stdin.stream()).text(); console.log(await Bun.password.hash(pw));'
 unset PW
@@ -115,7 +116,7 @@ Compose gotchas (`EBUSY` lockfile, env-not-injected, `--infra=false` port bugs):
 Optional path for Cloud Agent (`.cursor/install.sh`) or hosts without a container engine. Same `.env` keys as above.
 
 ```bash
-git clone <repo-url> && cd cardinal-system
+git clone https://github.com/snattydev/cardinal-system.git && cd cardinal-system
 bun install
 
 cp deploy/env.example .env
@@ -170,10 +171,15 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 |--------|-------------|
 | `bun run dev:backend` | Backend with watch on http://127.0.0.1:8787 |
 | `bun run dev:frontend` | Vite dev server on http://127.0.0.1:5173 |
-| `bun run keygen -- ...` | API keys CLI: `--agent <name>`, `--revoke <name>`, `--list` |
+| `bun run start` | Start backend without watch |
 | `bun run build` | Frontend production build -> `frontend/dist/` |
-| `bun test` | Packages + backend suite |
-| `bun run typecheck` | `tsc --noEmit` backend + frontend |
+| `bun test` | Packages + backend + scripts suite |
+| `bun run test:e2e` | Playwright E2E tests (`frontend/e2e/`) |
+| `bun run typecheck` | `tsc --noEmit` on `backend`, `packages/mcp`, and `frontend` |
+| `bun run keygen -- ...` | API keys CLI: `--agent <name>`, `--revoke <name>`, `--list` |
+| `bun run bootstrap:password` | Interactive TTY hash generator for `ADMIN_PASSWORD_HASH` |
+| `bun run hooks:install` | Activate versioned `.githooks/` (`core.hooksPath`) |
+| `bun run standards:sync` | Regenerate `.githooks/` and `scripts/install-hooks.sh` from `packages/mcp/src/repo-standards.ts` |
 
 ## Documentation
 
@@ -182,13 +188,16 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 | [`docs/roadmap.md`](docs/roadmap.md) | Phase priorities and status |
 | [`docs/stack.md`](docs/stack.md) | Stack and technical decisions |
 | [`docs/security.md`](docs/security.md) | Security model |
+| [`SECURITY.md`](SECURITY.md) | Vulnerability reporting policy and deployment hardening checklist |
 | [`docs/api.md`](docs/api.md) | REST, WebSocket, JWT recipe |
+| [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md) | Context Hub v2 MCP surface, ACLs, keygen, usage gate |
+| [`docs/features/2026-11-27-oss-security-hardening.md`](docs/features/2026-11-27-oss-security-hardening.md) | OSS security hardening and governance summary |
 | [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md) | Operational gotchas |
 | [`deploy/README.md`](deploy/README.md) | Production Quadlet pod |
 | [`AGENTS.md`](AGENTS.md) | Development rules (language: English only, branching, TDD, roles) |
 | [`docs/features/`](docs/features/) | What was done, why, decisions per feature |
 | [`docs/features/2026-09-03-router-surface.md`](docs/features/2026-09-03-router-surface.md) | Router v0.2.5 index (dashboard + keys + fusion) |
-| [`docs/guides/router-usage.md`](docs/guides/router-usage.md) | LLM router manual |
+| [`docs/guides/router-usage.md`](docs/guides/router-usage.md) | Legacy LLM router manual (frozen) |
 
 ## Future: split the monorepo
 
@@ -198,14 +207,14 @@ Today the repo is Bun workspaces (`packages/*`, `backend`, `frontend`) with one 
 
 The frontend has **zero** `@cardinal/*` imports. It talks HTTP/WS only (`VITE_API_URL` / `VITE_WS_URL` / `VITE_HOST` in `frontend/vite.config.ts`) and is the first extractable repo.
 
-MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router}` and owns the SQLite file. The worker (unmerged N1) depends on `@cardinal/core` only.
+MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router,worker}` and owns the SQLite file. `packages/worker` (N1, merged and frozen under Context Hub v2) depends on `@cardinal/core` only.
 
 **Extraction order (when later scheduled):**
 
 1. Publish or vendor `@cardinal/core` (and then `db`, `keys`, …) as versioned packages so workspaces are not required at install time.
 2. Extract `frontend/` first (own repo, own Containerfile; env `VITE_API_URL` / `VITE_WS_URL` already exist).
 3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
-4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
+4. Extract `packages/worker` with `deploy/Containerfile.worker` if ever un-frozen.
 5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.
 
 ## Security

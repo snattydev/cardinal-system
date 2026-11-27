@@ -7,17 +7,23 @@ cardinal-system/
 ├── .cursor/
 │   ├── agents/              Cursor subagent adapters
 │   └── rules/
+├── .github/
+│   ├── ISSUE_TEMPLATE/
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/ci.yml     CI verification (typecheck, test, build)
 ├── .opencode/
 │   ├── agents/              legacy agents
 │   └── commands/
 ├── packages/                  Bun workspaces (internal packages)
 │   ├── core/                  shared types, config, zod schemas
-│   ├── auth/                  JWT sign/verify, login, logout
+│   ├── auth/                  JWT sign/verify, login, logout, rate-limit
 │   ├── keys/                  generation, hash, revocation
 │   ├── ws/                    protocol, hub, messages
 │   ├── db/                    schema, migrations, queries
-│   ├── router/                model routing (Phase 2)
-│   └── mcp/                   MCP hub (Phase 2)
+│   ├── rag/                   legacy RAG client/scope helper
+│   ├── router/                model routing (Phase 2, frozen)
+│   ├── mcp/                   Streamable HTTP MCP Context Hub (ACL, FTS5/QMD, bootstrap, config tools)
+│   └── worker/                internal maintenance worker (N1, frozen)
 ├── backend/
 │   └── src/                   composition: server, api handlers, static serve
 ├── frontend/
@@ -25,9 +31,16 @@ cardinal-system/
 ├── examples/
 │   └── ws-agent.ts            reference WS client (not an SDK)
 ├── deploy/
-│   ├── Containerfile
+│   ├── Caddyfile
 │   ├── Caddyfile.example
-│   └── quadlet/
+│   ├── Containerfile
+│   ├── Containerfile.frontend
+│   ├── Containerfile.qmd
+│   ├── Containerfile.worker
+│   ├── env.example
+│   ├── nginx.conf
+│   ├── quadlet/
+│   └── README.md
 ├── docs/
 │   ├── features/              documentation of completed features
 │   ├── agents/                SOULs, prompts, canonical roles, checklists
@@ -54,6 +67,9 @@ cardinal-system/
 ├── skills/                    Cardinal skills (source of truth; sync out to .agents/skills & Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)
+├── LICENSE                    MIT license
+├── SECURITY.md                vulnerability disclosure and hardening checklist
+├── compose.yaml               local Podman dev stack (backend, frontend, mcp, optional qmd)
 ├── README.md
 └── package.json               workspaces + version source of truth
 ```
