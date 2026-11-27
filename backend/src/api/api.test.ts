@@ -698,6 +698,59 @@ describe("handleRagSearch", () => {
     expect(calls).toHaveLength(1);
     db.close();
   });
+
+  test("vaultScopes * denies personal/** unless vault:allow-personal is present", async () => {
+    const db = createDb(":memory:");
+    const hits = [
+      { file_path: "/data/vaults/for-my-agents/tasks.md", content: "ok", heading: "", rrf_score: 0.9 },
+      { file_path: "/data/vaults/personal/diary.md", content: "secret", heading: "", rrf_score: 0.8 },
+    ];
+    const fetchImpl = mockRagFetch(hits, []);
+    const starRes = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["*"],
+    });
+    const starBody = (await starRes.json()) as { results: Array<{ path: string }> };
+    expect(starBody.results.map((r) => r.path)).toEqual(["/data/vaults/for-my-agents/tasks.md"]);
+
+    const optInRes = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:allow-personal", "vault:read:personal/**"],
+    });
+    const optInBody = (await optInRes.json()) as { results: Array<{ path: string }> };
+    expect(optInBody.results.map((r) => r.path)).toEqual(["/data/vaults/personal/diary.md"]);
+    db.close();
+  });
+
+  test("blocks substring match bypass and supports vault:read:<glob>", async () => {
+    const db = createDb(":memory:");
+    const hits = [
+      { file_path: "/data/vaults/personal/the portal/secret.md", content: "x", heading: "", rrf_score: 0.9 },
+      { file_path: "/data/vaults/other/the portal/note.md", content: "y", heading: "", rrf_score: 0.8 },
+      { file_path: "/data/vaults/for-my-agents/tasks.md", content: "z", heading: "", rrf_score: 0.7 },
+      { file_path: "/data/vaults/the portal/index.md", content: "p", heading: "", rrf_score: 0.6 },
+    ];
+    const fetchImpl = mockRagFetch(hits, []);
+
+    const legacyRes = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:the portal"],
+    });
+    const legacyBody = (await legacyRes.json()) as { results: Array<{ path: string }> };
+    expect(legacyBody.results.map((r) => r.path)).toEqual(["/data/vaults/the portal/index.md"]);
+
+    const globRes = await handleRagSearch(db, ragReq({ query: "kirito" }), {
+      fetchImpl,
+      baseUrl: "http://vault:8788",
+      vaultScopes: ["vault:read:for-my-agents/**"],
+    });
+    const globBody = (await globRes.json()) as { results: Array<{ path: string }> };
+    expect(globBody.results.map((r) => r.path)).toEqual(["/data/vaults/for-my-agents/tasks.md"]);
+    db.close();
+  });
 });
 
 describe("handleGetConfig", () => {

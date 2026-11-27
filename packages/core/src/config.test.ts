@@ -43,6 +43,7 @@ describe("loadConfig", () => {
     expect(config.adminPasswordHash).toBe("argon2:fakehash");
     expect(config.jwtSecret).toBe("test-secret");
     expect(config.poolSecret).toBe("test-pool-secret");
+    expect(config.internalServiceSecret).toBeUndefined();
   });
 
   test("respects explicit overrides", () => {
@@ -52,10 +53,12 @@ describe("loadConfig", () => {
       DB_PATH: "/tmp/cardinal-test.db",
       STATIC_DIR: "public",
       PING_INTERVAL_MS: "5000",
+      INTERNAL_SERVICE_SECRET: "  svc-secret-123  ",
     });
     expect(config.port).toBe(9999);
     expect(config.dbPath).toBe("/tmp/cardinal-test.db");
     expect(config.staticDir).toBe("public");
     expect(config.pingIntervalMs).toBe(5000);
+    expect(config.internalServiceSecret).toBe("svc-secret-123");
   });
 });

@@ -113,10 +113,23 @@ test("POST /api/internal/keys/validate: valid key → agent info, invalid → 40
   expect(await bad.json()).toEqual({ error: "unauthorized" });
 });
 
-test("GET /v1/models returns OpenAI list format", async () => {
-  const res = await fetch(`http://localhost:${port}/v1/models`);
-  expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ object: "list", data: [] });
+test("GET /v1/models requires auth and returns OpenAI list format", async () => {
+  const anon = await fetch(`http://localhost:${port}/v1/models`);
+  expect(anon.status).toBe(401);
+  expect(await anon.json()).toEqual({ error: "unauthorized" });
+
+  const viaKey = await fetch(`http://localhost:${port}/v1/models`, {
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(viaKey.status).toBe(200);
+  expect(await viaKey.json()).toEqual({ object: "list", data: [] });
+
+  const cookie = await login();
+  const viaJwt = await fetch(`http://localhost:${port}/v1/models`, {
+    headers: { cookie },
+  });
+  expect(viaJwt.status).toBe(200);
+  expect(await viaJwt.json()).toEqual({ object: "list", data: [] });
 });
 
 test("auth flow: bad login 401, good login sets cookie, /me with and without cookie", async () => {
@@ -877,4 +890,85 @@ test("board and mailbox routes enforce agent key scopes", async () => {
     body: JSON.stringify({ from_agent: "vault-agent", to_agent: "shinon", type: "ping" }),
   });
   expect(sendDenied.status).toBe(403);
+});
+
+test("internal routes require x-cardinal-internal-secret when internalServiceSecret is configured", async () => {
+  const hash = await Bun.password.hash("sao123");
+  const db2 = createDb(":memory:");
+  const k = generateKey();
+  registerAgent(db2, "mcp-caller", "agent");
+  createAgentKey(db2, { keyHash: hashKey(k), agentName: "mcp-caller" });
+
+  const srv = createServer({ ...testConfig(hash), internalServiceSecret: "svc-secret-xyz" }, db2);
+  try {
+    const p2 = srv.port!;
+
+    const noHeaderValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${k}` },
+    });
+    expect(noHeaderValidate.status).toBe(401);
+
+    const wrongHeaderValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "wrong",
+      },
+    });
+    expect(wrongHeaderValidate.status).toBe(401);
+
+    const okValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "svc-secret-xyz",
+      },
+    });
+    expect(okValidate.status).toBe(200);
+
+    const noHeaderUsage = await fetch(`http://localhost:${p2}/api/internal/mcp/usage`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${k}` },
+      body: JSON.stringify({ tool_name: "cardinal_search" }),
+    });
+    expect(noHeaderUsage.status).toBe(401);
+
+    const okUsage = await fetch(`http://localhost:${p2}/api/internal/mcp/usage`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "svc-secret-xyz",
+      },
+      body: JSON.stringify({ tool_name: "cardinal_search" }),
+    });
+    expect(okUsage.status).toBe(200);
+  } finally {
+    srv.stop(true);
+    db2.close();
+  }
+});
+
+test("WS /ws blocks mismatched Origin header with 403 and allows matching Origin", async () => {
+  const badOrigin = await fetch(`http://localhost:${port}/ws`, {
+    headers: {
+      connection: "Upgrade",
+      upgrade: "websocket",
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+      "sec-websocket-version": "13",
+      origin: "https://evil.example",
+    },
+  });
+  expect(badOrigin.status).toBe(403);
+  expect(await badOrigin.json()).toEqual({ error: "forbidden_origin" });
+
+  const ws = await new Promise<WebSocket>((resolve, reject) => {
+    const sock = new WebSocket(`ws://localhost:${port}/ws`, {
+      headers: { origin: `http://localhost:${port}` },
+    } as never);
+    sock.onopen = () => resolve(sock);
+    sock.onerror = () => reject(new Error("ws connect failed"));
+  });
+  ws.close();
 });

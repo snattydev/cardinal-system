@@ -23,8 +23,11 @@ RUN bun install --production --frozen-lockfile
 # Backend source (packages/ already copied above — Bun runs TS from src/)
 COPY backend ./backend
 
-# Persistent volume for SQLite database
+# Persistent volume for SQLite database (writable by non-root bun user)
+RUN mkdir -p /data && chown bun:bun /data
 VOLUME /data
+
+USER bun
 
 EXPOSE 8787
 

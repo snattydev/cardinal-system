@@ -95,6 +95,7 @@ services:
       CARDINAL_INDEX_DB: /tmp/cardinal-mcp-index.db
       CARDINAL_DENY_PREFIXES: "${CARDINAL_DENY_PREFIXES:-personal}"
       CARDINAL_GIT_AUTOCOMMIT: "${CARDINAL_GIT_AUTOCOMMIT:-true}"
+      INTERNAL_SERVICE_SECRET: "${INTERNAL_SERVICE_SECRET:-}"
       QMD_URL: "${QMD_URL:-}"
     depends_on:
       - backend

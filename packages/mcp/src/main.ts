@@ -16,6 +16,7 @@ const writableRoot = process.env.CARDINAL_WRITABLE_ROOT?.trim() || undefined;
 const configsRoot = process.env.CARDINAL_CONFIGS_ROOT?.trim() || undefined;
 const indexDbPath = process.env.CARDINAL_INDEX_DB?.trim() || "/tmp/cardinal-mcp-index.db";
 const qmdUrl = process.env.QMD_URL?.trim() || undefined;
+const internalServiceSecret = process.env.INTERNAL_SERVICE_SECRET?.trim() || undefined;
 
 const denyPrefixes = (process.env.CARDINAL_DENY_PREFIXES ?? "personal")
   .split(",")
@@ -32,6 +33,7 @@ const mcp = createMcpServer({
   configsRoot,
   indexDbPath,
   qmdUrl,
+  internalServiceSecret,
   denyPrefixes,
   gitAutoCommit,
 });

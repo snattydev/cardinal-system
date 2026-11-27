@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from "node:crypto";
 import type { Server } from "bun";
 import type { Database } from "bun:sqlite";
 import type { Config } from "@cardinal/core";
@@ -37,8 +38,7 @@ import {
   handlePutRouterRoute,
   handleSyncRouterProviderModels,
 } from "./api/router-dashboard";
-import { handleLogin, handleLogout, handleMe } from "@cardinal/auth";
-import { getSessionUser } from "@cardinal/auth";
+import { handleLogin, handleLogout, handleMe, getSessionUser, LoginRateLimiter } from "@cardinal/auth";
 import { Hub, type ConnData } from "@cardinal/ws";
 import { serveStatic } from "./static";
 
@@ -82,8 +82,32 @@ function agentHasScope(
   return mode === "read" && scopes.includes(`${group}:write`);
 }
 
+function hasValidInternalSecret(req: Request, expected?: string): boolean {
+  if (!expected) return true;
+  const provided = req.headers.get("x-cardinal-internal-secret");
+  if (!provided) return false;
+  const a = createHash("sha256").update(provided).digest();
+  const b = createHash("sha256").update(expected).digest();
+  return timingSafeEqual(a, b);
+}
+
+function isAllowedWsOrigin(req: Request): boolean {
+  const origin = req.headers.get("origin");
+  if (origin === null || origin === "") return true;
+  let originHost: string;
+  try {
+    originHost = new URL(origin).host.toLowerCase();
+  } catch {
+    return false;
+  }
+  const forwardedHost = req.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const expectedHost = (forwardedHost || req.headers.get("host") || new URL(req.url).host).toLowerCase();
+  return originHost === expectedHost;
+}
+
 export function createServer(config: Config, db: Database): Server<ConnData> {
   const hub = new Hub(db, { pingIntervalMs: config.pingIntervalMs });
+  const loginLimiter = new LoginRateLimiter();
 
   return Bun.serve<ConnData>({
     port: config.port,
@@ -93,6 +117,9 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
       const method = req.method;
 
       if (method === "GET" && pathname === "/ws") {
+        if (!isAllowedWsOrigin(req)) {
+          return json({ error: "forbidden_origin" }, 403);
+        }
         const user = await getSessionUser(req, config.jwtSecret);
         const upgraded = server.upgrade(req, {
           data: { dashboardAuthed: user !== null, role: null, agentName: null },
@@ -102,13 +129,19 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
 
       if (pathname === "/api/health") return handleHealth();
 
-      // Service-to-service: valida agent keys sin JWT de dashboard. Solo responde
-      // si la key es válida (401 si no), así se protege por naturaleza.
+      // Service-to-service: validates agent keys without a dashboard JWT. Protected
+      // by valid-key lookup (401 on invalid) and optional INTERNAL_SERVICE_SECRET.
       if (pathname === "/api/internal/keys/validate" && method === "POST") {
+        if (!hasValidInternalSecret(req, config.internalServiceSecret)) {
+          return json({ error: "unauthorized" }, 401);
+        }
         return handleValidateKey(db, req);
       }
 
       if (pathname === "/api/internal/mcp/usage" && method === "POST") {
+        if (!hasValidInternalSecret(req, config.internalServiceSecret)) {
+          return json({ error: "unauthorized" }, 401);
+        }
         const svcKey = extractBearerKey(req);
         if (svcKey === null) return json({ error: "unauthorized" }, 401);
         const keyRow = findActiveKeyByHash(db, hashKey(svcKey));
@@ -116,7 +149,14 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         return handleLogMcpUsage(db, req, keyRow.agent_name);
       }
 
-      if (pathname === "/api/auth/login" && method === "POST") return handleLogin(req, config);
+      if (pathname === "/api/auth/login" && method === "POST") {
+        const clientKey =
+          req.headers.get("x-real-ip")?.trim() ||
+          req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+          server.requestIP(req)?.address ||
+          "unknown";
+        return handleLogin(req, config, { rateLimiter: loginLimiter, clientKey });
+      }
       if (pathname === "/api/auth/logout" && method === "POST") return handleLogout(req);
       if (pathname === "/api/auth/me" && method === "GET") return handleMe(req, config);
 
@@ -355,6 +395,8 @@ export function createServer(config: Config, db: Database): Server<ConnData> {
         return handleChatCompletions(req, db, config);
       }
       if (pathname === "/v1/models" && method === "GET") {
+        const auth = await requireDashboardOrAgentKey(req, config.jwtSecret, db);
+        if (auth === null) return json({ error: "unauthorized" }, 401);
         return handleListModels(db);
       }
 

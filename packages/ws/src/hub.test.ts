@@ -22,7 +22,15 @@ function mockWs(data: Partial<ConnData> = {}) {
 const hubs: Hub[] = [];
 const dbs: Database[] = [];
 
-function makeHub(opts: { pingIntervalMs?: number; kindOverride?: "agent" | "subagent" } = {}) {
+function makeHub(
+  opts: {
+    pingIntervalMs?: number;
+    kindOverride?: "agent" | "subagent";
+    authTimeoutMs?: number;
+    maxUnauthedConnections?: number;
+    maxDashboards?: number;
+  } = {},
+) {
   const db = createDb(":memory:");
   registerAgent(db, "shinon", "agent");
   createAgentKey(db, {
@@ -30,7 +38,12 @@ function makeHub(opts: { pingIntervalMs?: number; kindOverride?: "agent" | "suba
     agentName: "shinon",
     ...(opts.kindOverride ? { kindOverride: opts.kindOverride } : {}),
   });
-  const hub = new Hub(db, { pingIntervalMs: opts.pingIntervalMs ?? 30_000 });
+  const hub = new Hub(db, {
+    pingIntervalMs: opts.pingIntervalMs ?? 30_000,
+    authTimeoutMs: opts.authTimeoutMs,
+    maxUnauthedConnections: opts.maxUnauthedConnections,
+    maxDashboards: opts.maxDashboards,
+  });
   hubs.push(hub);
   dbs.push(db);
   return { db, hub };
@@ -220,6 +233,45 @@ describe("Hub", () => {
     // Active session's close DOES disconnect
     hub.websocket.close(second.ws);
     expect(getAgent(db, "shinon")?.connected).toBe(0);
+  });
+
+  test("unauthed socket times out with 4401 auth_timeout", async () => {
+    const { hub } = makeHub({ authTimeoutMs: 30 });
+    const sock = mockWs();
+    hub.websocket.open(sock.ws);
+
+    await Bun.sleep(60);
+    expect(sock.sent[0]).toEqual({ type: "error", reason: "auth_timeout" });
+    expect(sock.closed[0]).toEqual({ code: 4401, reason: "auth_timeout" });
+  });
+
+  test("authenticating clears the handshake timeout", async () => {
+    const { hub } = makeHub({ authTimeoutMs: 40 });
+    const sock = mockWs();
+    hub.websocket.open(sock.ws);
+    hub.websocket.message(sock.ws, JSON.stringify({ type: "hello", key: TEST_KEY, device: "pc" }));
+
+    await Bun.sleep(70);
+    expect(sock.closed).toHaveLength(0);
+    expect(sock.sent[0]).toEqual({ type: "welcome", agent: "shinon", kind: "agent" });
+  });
+
+  test("enforces maxUnauthedConnections and maxDashboards caps with 4429", () => {
+    const { hub } = makeHub({ maxUnauthedConnections: 1, maxDashboards: 1, authTimeoutMs: 5_000 });
+
+    const u1 = mockWs();
+    const u2 = mockWs();
+    hub.websocket.open(u1.ws);
+    hub.websocket.open(u2.ws);
+    expect(u2.sent[0]).toEqual({ type: "error", reason: "too_many_connections" });
+    expect(u2.closed[0]).toEqual({ code: 4429, reason: "too_many_connections" });
+
+    const d1 = mockWs({ dashboardAuthed: true });
+    const d2 = mockWs({ dashboardAuthed: true });
+    hub.websocket.message(d1.ws, JSON.stringify({ type: "subscribe" }));
+    hub.websocket.message(d2.ws, JSON.stringify({ type: "subscribe" }));
+    expect(d2.sent[0]).toEqual({ type: "error", reason: "too_many_connections" });
+    expect(d2.closed[0]).toEqual({ code: 4429, reason: "too_many_connections" });
   });
 });
 

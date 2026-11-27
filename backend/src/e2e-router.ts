@@ -20,9 +20,11 @@ createAgentKey(db, {
 const BASE = "http://127.0.0.1:8787";
 const results: string[] = [];
 
-// 1. /v1/models — lista modelos disponibles (formato OpenAI)
+// 1. /v1/models — list available models (OpenAI format)
 {
-  const r = await fetch(`${BASE}/v1/models`);
+  const r = await fetch(`${BASE}/v1/models`, {
+    headers: { Authorization: `Bearer ${key}` },
+  });
   const j = (await r.json()) as { object: string; data: { id: string }[] };
   results.push(`GET /v1/models → ${r.status} object=${j.object} models=[${j.data.map((m) => m.id).join(", ")}]`);
 }

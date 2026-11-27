@@ -7,6 +7,7 @@ export interface Config {
   poolSecret: string;
   staticDir: string;
   pingIntervalMs: number;
+  internalServiceSecret?: string;
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
@@ -31,5 +32,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     poolSecret: env.POOL_SECRET,
     staticDir: env.STATIC_DIR ?? "frontend/dist",
     pingIntervalMs: Number(env.PING_INTERVAL_MS ?? 30000),
+    internalServiceSecret: env.INTERNAL_SERVICE_SECRET?.trim() || undefined,
   };
 }

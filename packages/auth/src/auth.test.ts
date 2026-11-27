@@ -3,6 +3,7 @@ import { SignJWT } from "jose";
 import type { Config } from "@cardinal/core";
 import { signSession, verifySession } from "./jwt";
 import { clearSessionCookie, readCookie, sessionCookie } from "./session";
+import { LoginRateLimiter } from "./rate-limit";
 import { handleLogin, handleLogout, handleMe } from "./routes";
 
 describe("jwt", () => {
@@ -178,5 +179,71 @@ describe("routes", () => {
     });
     const res = handleLogout(req);
     expect(res.headers.get("set-cookie")).toContain("Secure");
+  });
+
+  test("handleLogin: enforces LoginRateLimiter after maxFailures and resets on valid login", async () => {
+    let now = 1_000;
+    const limiter = new LoginRateLimiter({ maxFailures: 3, windowMs: 60_000, now: () => now });
+    const opts = { rateLimiter: limiter, clientKey: "10.0.0.1" };
+
+    for (let i = 0; i < 3; i += 1) {
+      const bad = await handleLogin(
+        loginReq(JSON.stringify({ user: "admin", password: "wrong" })),
+        config,
+        opts,
+      );
+      expect(bad.status).toBe(401);
+    }
+
+    const blocked = await handleLogin(
+      loginReq(JSON.stringify({ user: "admin", password: "sao123" })),
+      config,
+      opts,
+    );
+    expect(blocked.status).toBe(429);
+    expect(await blocked.json()).toEqual({ error: "too_many_requests" });
+    expect(Number(blocked.headers.get("retry-after"))).toBeGreaterThan(0);
+
+    now += 60_001;
+    const ok = await handleLogin(
+      loginReq(JSON.stringify({ user: "admin", password: "sao123" })),
+      config,
+      opts,
+    );
+    expect(ok.status).toBe(200);
+  });
+});
+
+describe("LoginRateLimiter", () => {
+  test("blocks after maxFailures, resets after windowMs or reset(), and caps maxEntries", () => {
+    let now = 0;
+    const limiter = new LoginRateLimiter({
+      maxFailures: 2,
+      windowMs: 10_000,
+      maxEntries: 2,
+      now: () => now,
+    });
+
+    expect(limiter.check("ip1")).toEqual({ allowed: true, retryAfterSec: 0 });
+    limiter.recordFailure("ip1");
+    expect(limiter.check("ip1").allowed).toBe(true);
+    limiter.recordFailure("ip1");
+    expect(limiter.check("ip1")).toEqual({ allowed: false, retryAfterSec: 10 });
+
+    limiter.reset("ip1");
+    expect(limiter.check("ip1").allowed).toBe(true);
+
+    limiter.recordFailure("ip1");
+    limiter.recordFailure("ip1");
+    expect(limiter.check("ip1").allowed).toBe(false);
+    now += 5_000;
+    expect(limiter.check("ip1")).toEqual({ allowed: false, retryAfterSec: 5 });
+    now += 5_000;
+    expect(limiter.check("ip1").allowed).toBe(true);
+
+    limiter.recordFailure("a");
+    limiter.recordFailure("b");
+    limiter.recordFailure("c");
+    expect(limiter.size()).toBeLessThanOrEqual(2);
   });
 });
