@@ -8,6 +8,7 @@ Repo PR flow. Detailed execution steps live in the `cardinal-pr` skill.
 2. Verifies evidence before marking ready: `bun test` and `bun run build`.
 3. The merge to `dev` is done by that same agent after green.
 4. If there are changes in `auth/`, `keys/`, `ws/`, or protocol → also apply Security Review.
+5. Note: GitHub only auto-closes `Closes #N` when merging into the default branch (`main`). Keep `Closes #N` in the PR body for traceability, and either wait for `dev -> main` or close manually once verified on `dev`.
 
 ## Flow `dev → main`
 

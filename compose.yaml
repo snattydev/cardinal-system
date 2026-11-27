@@ -6,7 +6,7 @@
 #
 # Before first run, create .env at repo root from deploy/env.example:
 #   cp deploy/env.example .env
-#   # then fill in ADMIN_PASSWORD_HASH and JWT_SECRET
+#   # then fill in ADMIN_PASSWORD_HASH, JWT_SECRET, and POOL_SECRET
 
 services:
   backend:

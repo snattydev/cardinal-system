@@ -1,10 +1,12 @@
 # Cardinal LLM Router — User Guide
 
+> **Frozen under Context Hub v2 ([#62](https://github.com/snattydev/cardinal-system/issues/62)):** The internal LLM router remains functional for existing keys, but new expansion is frozen in favor of BYO subscriptions or a Bifrost sidecar. See [`docs/roadmap.md`](../roadmap.md).
+
 Cardinal's internal LLM router: configurable provider pool + OpenAI-compatible
 endpoints with transparent failover, per-key scopes, and metering.
 
 > Spec: `docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md` (section 6).
-> Status: v0.2.5 (2026-09-03). Index:
+> Status: v0.2.5 (2026-09-03; auth updated in v0.2.7). Index:
 > [`docs/features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md).
 
 ---
@@ -44,7 +46,7 @@ POST http://127.0.0.1:8787/v1/chat/completions
 | Endpoint | Auth | Description |
 |----------|------|-------------|
 | `POST /v1/chat/completions` | Bearer `sk-cardinal-*` | OpenAI-compatible completion (streaming, non-streaming, Fusion) |
-| `GET /v1/models` | — | List of available models and aliases (OpenAI format) |
+| `GET /v1/models` | Bearer `sk-cardinal-*` or JWT cookie | List of available models and aliases (OpenAI format) |
 | `GET /api/router/providers` | JWT cookie | Dashboard: providers + models (without `api_key_enc`) |
 | `POST /api/router/providers` | JWT cookie | Provider registration/rotation: `name`, `base_url`, `api_key`, `models[]`. The key is encrypted (AES-256-GCM) and **never** returned in the response |
 | `GET /api/router/routes` | JWT cookie | Dashboard: aliases and `fallback_chain` (arrays; Fusion appears empty) |
@@ -61,9 +63,9 @@ API Base URL: `http://127.0.0.1:8787/v1` (completions) and `http://127.0.0.1:878
 ## 3. Starting the Stack
 
 ```bash
-cd ~/Data/Projects/ai-agents/cardinal-system
-podman-compose up -d        # backend :8787 + frontend :5173
-curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.5"}
+cd cardinal-system
+podman-compose up -d        # backend :8787 + frontend :5173 + mcp :8789
+curl -s http://127.0.0.1:8787/api/health   # {"status":"ok","version":"0.2.7"}
 ```
 
 Requirements in `.env` (create from `deploy/env.example` if it does not exist):
@@ -229,7 +231,7 @@ Any OpenAI-compatible client works (OpenAI SDK, curl, Claude Code, etc.).
 curl -s http://127.0.0.1:8787/v1/chat/completions \
   -H "Authorization: Bearer sk-cardinal-<KEY>" \
   -H "Content-Type: application/json" \
-  -d '{"model":"fast","messages":[{"role":"user","content":"Hola"}],"max_tokens":100}'
+  -d '{"model":"fast","messages":[{"role":"user","content":"Hello"}],"max_tokens":100}'
 ```
 
 ### curl (streaming SSE)
@@ -238,7 +240,7 @@ curl -s http://127.0.0.1:8787/v1/chat/completions \
 curl -N http://127.0.0.1:8787/v1/chat/completions \
   -H "Authorization: Bearer sk-cardinal-<KEY>" \
   -H "Content-Type: application/json" \
-  -d '{"model":"fast","messages":[{"role":"user","content":"Hola"}],"stream":true}'
+  -d '{"model":"fast","messages":[{"role":"user","content":"Hello"}],"stream":true}'
 ```
 
 ### OpenAI SDK (Python)
@@ -252,7 +254,7 @@ client = OpenAI(
 )
 resp = client.chat.completions.create(
     model="fast",
-    messages=[{"role": "user", "content": "Hola"}],
+    messages=[{"role": "user", "content": "Hello"}],
 )
 print(resp.choices[0].message.content)
 ```
@@ -262,7 +264,7 @@ print(resp.choices[0].message.content)
 ```ts
 import OpenAI from "openai";
 const client = new OpenAI({ baseURL: "http://127.0.0.1:8787/v1", apiKey: "sk-cardinal-<KEY>" });
-const resp = await client.chat.completions.create({ model: "fast", messages: [{ role: "user", content: "Hola" }] });
+const resp = await client.chat.completions.create({ model: "fast", messages: [{ role: "user", content: "Hello" }] });
 console.log(resp.choices[0].message.content);
 ```
 
@@ -342,7 +344,7 @@ metering (`budget_used` + `usage_log`), scope.
 | Key revoked on its own | Exceeded `budget_limit` or `budget_usd_limit` → auto-revoke by design |
 | 401 with previously working key | `expires_at` has passed, or revoked |
 | 400 `fusion_not_configured` | Requested `fusion` without an object route in `model_routes` |
-| Frontend fails to start (dev) | Environment blocker: rolldown native binding + noexec on `~/Data` (ERR_DLOPEN_FAILED). Does not affect the router (pure backend) |
+| Frontend fails to start (dev) | Environment blocker: rolldown native binding + noexec host mounts (ERR_DLOPEN_FAILED). Does not affect the router (pure backend) |
 
 ---
 
