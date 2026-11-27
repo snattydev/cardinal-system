@@ -57,6 +57,7 @@ async function normalizeStreamableRequest(req: Request): Promise<Request> {
 export function createMcpServer(options: McpServerOptions) {
   const doFetch = options.fetchImpl ?? fetch;
   const backendUrl = options.backendUrl.replace(/\/+$/, "");
+  const internalSecret = options.internalServiceSecret?.trim() || undefined;
   const aclConfig: AclConfig = {
     denyPrefixes: options.denyPrefixes ?? DEFAULT_DENY_PREFIXES,
   };
@@ -99,13 +100,17 @@ export function createMcpServer(options: McpServerOptions) {
     bytesOut: number,
     durationMs: number,
   ): void {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      authorization: `Bearer ${identityKey}`,
+    };
+    if (internalSecret) {
+      headers["x-cardinal-internal-secret"] = internalSecret;
+    }
     void Promise.resolve(
       doFetch(`${backendUrl}/api/internal/mcp/usage`, {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${identityKey}`,
-        },
+        headers,
         body: JSON.stringify({
           tool_name: toolName,
           ok,

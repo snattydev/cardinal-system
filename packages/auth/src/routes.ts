@@ -1,9 +1,30 @@
 import type { Config } from "@cardinal/core";
 import { json } from "@cardinal/core";
 import { signSession } from "./jwt";
+import type { LoginRateLimiter } from "./rate-limit";
 import { clearSessionCookie, cookieSecure, getSessionUser, sessionCookie } from "./session";
 
-export async function handleLogin(req: Request, config: Config): Promise<Response> {
+export interface HandleLoginOptions {
+  rateLimiter?: LoginRateLimiter;
+  clientKey?: string;
+}
+
+export async function handleLogin(
+  req: Request,
+  config: Config,
+  opts?: HandleLoginOptions,
+): Promise<Response> {
+  const limiter = opts?.rateLimiter;
+  const clientKey = opts?.clientKey ?? "default";
+  if (limiter) {
+    const limit = limiter.check(clientKey);
+    if (!limit.allowed) {
+      return json({ error: "too_many_requests" }, 429, {
+        "retry-after": String(limit.retryAfterSec),
+      });
+    }
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -15,8 +36,10 @@ export async function handleLogin(req: Request, config: Config): Promise<Respons
     typeof password === "string" &&
     (await Bun.password.verify(password, config.adminPasswordHash).catch(() => false));
   if (user !== config.adminUser || !passwordOk) {
+    limiter?.recordFailure(clientKey);
     return json({ error: "invalid_credentials" }, 401);
   }
+  limiter?.reset(clientKey);
   const token = await signSession(config.jwtSecret, config.adminUser);
   const secure = cookieSecure(req);
   return json({ user: config.adminUser }, 200, { "set-cookie": sessionCookie(token, secure) });

@@ -28,7 +28,8 @@ describe("buildPodmanRunArgs", () => {
     expect(args.some((arg) => arg === "-p" || arg.startsWith("--publish"))).toBe(false);
     expect(args.some((arg) => arg === "-v" || arg.startsWith("--volume"))).toBe(false);
     expect(args).toContain("CARDINAL_URL=http://backend:8787");
-    expect(args).toContain("CARDINAL_KEY=test-key");
+    expect(args).toContain("CARDINAL_KEY");
+    expect(args.join(" ")).not.toContain("test-key");
     expect(args.at(-1)).toBe("localhost/cardinal-worker:latest");
   });
 

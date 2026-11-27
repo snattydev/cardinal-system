@@ -38,7 +38,7 @@
 
 ## Decisions
 
-- **Router + Key Factory first (6, 7).** Santi prioritized having the system in testing
+- **Router + Key Factory first (6, 7).** The owner prioritized having the system in testing
   and semi-operational locally: pool + router deployed in podman containers.
   Blackboard remains at ~60% (CRUD + broadcast) but does NOT block — it resumes afterward.
 - **Provider-agnostic router (decision 2026-08-20).** It is NOT a fixed alias registry
@@ -52,7 +52,7 @@
   available upstream: zen free (`opencode/*-free`, validated). `opencode serve` does NOT expose
   `/v1/chat/completions` (spike-003) — for opencode as upstream,
   `opencode-llm-proxy` (:4010, adapts to OpenAI wire) is used.
-- **CLI:** delegated features -> **cursor-agent** (Santi: "use only cursor to
+- **CLI:** delegated features -> **cursor-agent** (owner decision: "use only cursor to
   develop right now"). Spikes and trivial hygiene go direct.
 - **Blackboard MCP surface (3) is exposed ONLY after validating MCP in spike-002.**
 

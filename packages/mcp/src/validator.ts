@@ -5,10 +5,12 @@ export type FetchLike = (url: string | URL, init?: RequestInit) => Promise<Respo
 
 export interface ValidatorOptions {
   fetchImpl?: FetchLike;
-  /** TTL de la cache en memoria (default 60s). */
+  /** In-memory cache TTL in ms (default 60s). */
   ttlMs?: number;
-  /** Inyectable para tests. */
+  /** Injectable clock for tests. */
   now?: () => number;
+  /** Optional shared secret sent via x-cardinal-internal-secret. */
+  internalServiceSecret?: string;
 }
 
 interface CacheEntry {
@@ -17,15 +19,16 @@ interface CacheEntry {
 }
 
 /**
- * Valida agent keys contra el endpoint interno del backend
- * (POST {CARDINAL_BACKEND_URL}/api/internal/keys/validate) con cache
- * en memoria por key y TTL (default 60s). Falla cerrado: cualquier
- * error de red o respuesta no-200/401 devuelve null.
+ * Validates agent keys against the backend internal endpoint
+ * (POST {CARDINAL_BACKEND_URL}/api/internal/keys/validate) with in-memory
+ * per-key TTL caching (default 60s). Fails closed: network errors or non-200/401
+ * responses return null without caching.
  */
 export function createValidator(backendUrl: string, options: ValidatorOptions = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const ttlMs = options.ttlMs ?? 60_000;
   const now = options.now ?? (() => Date.now());
+  const internalSecret = options.internalServiceSecret?.trim() || undefined;
   const cache = new Map<string, CacheEntry>();
 
   return async function validate(key: string): Promise<KeyIdentity | null> {
@@ -36,9 +39,13 @@ export function createValidator(backendUrl: string, options: ValidatorOptions = 
 
     let identity: KeyIdentity | null = null;
     try {
+      const headers: Record<string, string> = { authorization: `Bearer ${key}` };
+      if (internalSecret) {
+        headers["x-cardinal-internal-secret"] = internalSecret;
+      }
       const res = await fetchImpl(`${backendUrl}/api/internal/keys/validate`, {
         method: "POST",
-        headers: { authorization: `Bearer ${key}` },
+        headers,
       });
       if (res.status === 200) {
         const body = (await res.json()) as Partial<KeyIdentity>;

@@ -1,6 +1,7 @@
 {
   "name": "cardinal-system",
   "version": "0.2.7",
+  "license": "MIT",
   "private": true,
   "workspaces": ["packages/*", "backend", "frontend"],
   "scripts": {

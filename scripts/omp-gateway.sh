@@ -3,7 +3,17 @@ set -euo pipefail
 
 BROKER_PORT="${OMP_BROKER_PORT:-8765}"
 GATEWAY_PORT="${OMP_GATEWAY_PORT:-4000}"
-BIND_HOST="${OMP_GATEWAY_BIND:-0.0.0.0}"
+BIND_HOST="${OMP_GATEWAY_BIND:-127.0.0.1}"
+
+case "$BIND_HOST" in
+  127.0.0.1|localhost|::1|"[::1]") ;;
+  *)
+    if [[ "${OMP_GATEWAY_ALLOW_UNSAFE_BIND:-0}" != "1" ]]; then
+      echo "[omp-gateway] Refusing --no-auth on non-loopback bind host '$BIND_HOST' (set OMP_GATEWAY_ALLOW_UNSAFE_BIND=1 to override)." >&2
+      exit 1
+    fi
+    ;;
+esac
 
 OMP_BIN="$(which omp 2>/dev/null || echo "${HOME}/.bun/bin/omp")"
 

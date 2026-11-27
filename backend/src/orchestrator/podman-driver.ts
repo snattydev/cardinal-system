@@ -36,7 +36,7 @@ export function buildPodmanRunArgs(
     "-e",
     `CARDINAL_URL=${options.backendUrl}`,
     "-e",
-    `CARDINAL_KEY=${options.ephemeralKey}`,
+    "CARDINAL_KEY",
     "-e",
     `TASK_ID=${options.taskId}`,
     limits.imageName,
@@ -83,6 +83,7 @@ export class PodmanWorkerDriver implements WorkerDriver {
       stdin: "pipe",
       stdout: "pipe",
       stderr: "pipe",
+      env: { ...process.env, CARDINAL_KEY: options.ephemeralKey },
     });
 
     // Write input JSON to worker stdin and close

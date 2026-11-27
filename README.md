@@ -78,7 +78,9 @@ cp deploy/env.example .env
 
 openssl rand -hex 32   # JWT_SECRET
 openssl rand -hex 32   # POOL_SECRET
-podman run --rm docker.io/oven/bun:1 bun -e 'console.log(await Bun.password.hash("YOUR_PASSWORD"))'
+read -r -s -p "Admin password: " PW; echo
+printf '%s' "$PW" | podman run --rm -i docker.io/oven/bun:1 bun -e 'const pw = await new Response(Bun.stdin.stream()).text(); console.log(await Bun.password.hash(pw));'
+unset PW
 # paste the hash into ADMIN_PASSWORD_HASH; set ADMIN_USER (default admin)
 ```
 
@@ -117,7 +119,7 @@ git clone <repo-url> && cd cardinal-system
 bun install
 
 cp deploy/env.example .env
-bun -e 'console.log(await Bun.password.hash("your-password"))'  # -> ADMIN_PASSWORD_HASH
+bun run bootstrap:password   # interactive; writes only ADMIN_PASSWORD_HASH to .env
 openssl rand -hex 32                                            # -> JWT_SECRET
 openssl rand -hex 32                                            # -> POOL_SECRET (encrypts provider API keys)
 
@@ -205,3 +207,11 @@ MCP is already a second process (`packages/mcp`, compose `:8789`) but still a wo
 3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
 4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
 5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.
+
+## Security
+
+Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md). Security model and operational practices: [`docs/security.md`](docs/security.md).
+
+## License
+
+[MIT](LICENSE)

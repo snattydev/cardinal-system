@@ -9,11 +9,11 @@ Health is `/api/health`, not `/health`.
 | Method | Path | Auth | Returns |
 |--------|------|------|---------|
 | `GET` | `/api/health` | none | `{status, version}` |
-| `POST` | `/api/auth/login` | body | sets `cardinal_session` |
+| `POST` | `/api/auth/login` | body | sets `cardinal_session` (failure rate-limited per IP: `429` + `Retry-After`) |
 | `POST` | `/api/auth/logout` | — | clears cookie |
 | `GET` | `/api/auth/me` | JWT | current user |
-| `POST` | `/api/internal/keys/validate` | Bearer or `{key}` | `{agent, kind, scopes}` or 401 |
-| `POST` | `/api/internal/mcp/usage` | Bearer key | `{ok: true}` (logs caller MCP tool call to `mcp_usage`) |
+| `POST` | `/api/internal/keys/validate` | Bearer or `{key}` (+ optional `x-cardinal-internal-secret`) | `{agent, kind, scopes}` or 401 (`403` via nginx `/api/internal/`) |
+| `POST` | `/api/internal/mcp/usage` | Bearer key (+ optional `x-cardinal-internal-secret`) | `{ok: true}` (logs caller MCP tool call to `mcp_usage`; `403` via nginx) |
 
 ## Dashboard (JWT)
 
@@ -35,6 +35,7 @@ Health is `/api/health`, not `/health`.
 | `POST` | `/api/keys/:id/revoke` | revoke |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/router/providers` | encrypted provider keys |
 | `POST` | `/api/router/providers/:id/sync-models` | sync model list |
+| `GET` | `/api/router/catalog` | active model, alias, and fusion catalog |
 | `GET`/`PUT` | `/api/router/routes`, `/api/router/routes/:alias` | alias chains |
 
 ## Board / mailbox (JWT or agent key)
@@ -62,18 +63,18 @@ On these routes the agent key **is** identity (`agent_name`) and **must** carry 
 
 Full tool/prompt spec and `keygen` examples: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](features/2026-11-25-mcp-context-hub-v2.md).
 
-## Router (agent key)
+## Router
 
-| Method | Path |
-|--------|------|
-| `POST` | `/v1/chat/completions` |
-| `GET` | `/v1/models` |
+| Method | Path | Auth |
+|--------|------|------|
+| `POST` | `/v1/chat/completions` | Bearer `sk-cardinal-*` |
+| `GET` | `/v1/models` | Bearer `sk-cardinal-*` or dashboard JWT (`401` if unauthenticated) |
 
 Fusion: `model=fusion`. Manual: `docs/guides/router-usage.md`.
 
 ## WebSocket
 
-`GET /ws` upgrades. Agent: `hello` with key. Dashboard: cookie on the upgrade (JS never reads the JWT). Protocol: `context/ecosystem.md`. Client: `examples/ws-agent.ts`.
+`GET /ws` upgrades (validates `Origin` host when present, returning `403` on mismatch). Agent: `hello` with key. Dashboard: cookie on the upgrade (JS never reads the JWT). Unauthenticated sockets time out after 10s (`4401`) and enforce connection caps (`4429`). Protocol: `context/ecosystem.md`. Client: `examples/ws-agent.ts`.
 
 ## JWT from the container (no browser)
 
