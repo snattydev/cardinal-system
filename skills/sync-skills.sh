@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# sync-skills.sh — copy in-repo Cardinal skills out to Hermes (and optional vault).
+# sync-skills.sh — copy in-repo Cardinal skills out to repo-local .agents/skills, Hermes, and optional vault.
 # Source of truth: skills/*.md in this repo.
 # Run: bash skills/sync-skills.sh
 
 set -euo pipefail
 
 REPO_SKILLS="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$REPO_SKILLS/.." && pwd)"
+AGENT_SKILLS="${AGENT_SKILLS:-$REPO_ROOT/.agents/skills}"
 HERMES_SKILLS="${HERMES_SKILLS:-$HOME/.hermes/skills}"
 VAULT_SKILLS="${VAULT_SKILLS:-$HOME/Data/The Archive/for-my-agents/skills}"
 
@@ -30,6 +32,11 @@ sync_skill() {
         return
     fi
 
+    local repo_dest="$AGENT_SKILLS/${name}/SKILL.md"
+    mkdir -p "$(dirname "$repo_dest")"
+    cp "$src" "$repo_dest"
+    echo "  $name -> $repo_dest"
+
     local dest
     dest="$(hermes_dest "$name")"
     mkdir -p "$(dirname "$dest")"
@@ -49,5 +56,6 @@ sync_skill "cardinal-dev"
 sync_skill "cardinal-pr"
 sync_skill "cardinal-commit"
 sync_skill "cardinal-system"
+sync_skill "cardinal-standards"
 
 echo "$synced skills synced."

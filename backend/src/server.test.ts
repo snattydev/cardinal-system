@@ -113,10 +113,23 @@ test("POST /api/internal/keys/validate: valid key → agent info, invalid → 40
   expect(await bad.json()).toEqual({ error: "unauthorized" });
 });
 
-test("GET /v1/models returns OpenAI list format", async () => {
-  const res = await fetch(`http://localhost:${port}/v1/models`);
-  expect(res.status).toBe(200);
-  expect(await res.json()).toEqual({ object: "list", data: [] });
+test("GET /v1/models requires auth and returns OpenAI list format", async () => {
+  const anon = await fetch(`http://localhost:${port}/v1/models`);
+  expect(anon.status).toBe(401);
+  expect(await anon.json()).toEqual({ error: "unauthorized" });
+
+  const viaKey = await fetch(`http://localhost:${port}/v1/models`, {
+    headers: { authorization: `Bearer ${TEST_KEY}` },
+  });
+  expect(viaKey.status).toBe(200);
+  expect(await viaKey.json()).toEqual({ object: "list", data: [] });
+
+  const cookie = await login();
+  const viaJwt = await fetch(`http://localhost:${port}/v1/models`, {
+    headers: { cookie },
+  });
+  expect(viaJwt.status).toBe(200);
+  expect(await viaJwt.json()).toEqual({ object: "list", data: [] });
 });
 
 test("auth flow: bad login 401, good login sets cookie, /me with and without cookie", async () => {
@@ -742,4 +755,220 @@ test("agent key cannot spoof task created_by, claim as another agent, or complet
   });
   expect(dashComplete.status).toBe(200);
   expect(((await dashComplete.json()) as { task: { status: string } }).task.status).toBe("done");
+});
+
+test("POST /api/internal/mcp/usage logs telemetry and updates GET /api/system", async () => {
+  const anon = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ tool_name: "cardinal_search" }),
+  });
+  expect(anon.status).toBe(401);
+
+  const badBody = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TEST_KEY}` },
+    body: JSON.stringify({ tool_name: "" }),
+  });
+  expect(badBody.status).toBe(400);
+
+  const ok = await fetch(`http://localhost:${port}/api/internal/mcp/usage`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${TEST_KEY}` },
+    body: JSON.stringify({
+      tool_name: "cardinal_search",
+      ok: true,
+      bytes_out: 512,
+      duration_ms: 19,
+    }),
+  });
+  expect(ok.status).toBe(200);
+  expect(await ok.json()).toEqual({ ok: true });
+
+  const cookie = await login();
+  const sys = await fetch(`http://localhost:${port}/api/system`, { headers: { cookie } });
+  expect(sys.status).toBe(200);
+  const sysBody = (await sys.json()) as {
+    mcp_calls_7d: number;
+    mcp_calls_30d: number;
+    mcp_last_call_at: string | null;
+  };
+  expect(sysBody.mcp_calls_7d).toBeGreaterThanOrEqual(1);
+  expect(sysBody.mcp_calls_30d).toBeGreaterThanOrEqual(1);
+  expect(typeof sysBody.mcp_last_call_at).toBe("string");
+});
+
+test("board and mailbox routes enforce agent key scopes", async () => {
+  const vaultOnlyKey = generateKey();
+  const boardReadKey = generateKey();
+  const boardWriteKey = generateKey();
+  const mailboxReadKey = generateKey();
+
+  registerAgent(db, "vault-agent", "agent");
+  createAgentKey(db, {
+    keyHash: hashKey(vaultOnlyKey),
+    agentName: "vault-agent",
+    scopes: ["vault:read:skills/**"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(boardReadKey),
+    agentName: "vault-agent",
+    scopes: ["board:read"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(boardWriteKey),
+    agentName: "vault-agent",
+    scopes: ["board:write"],
+  });
+  createAgentKey(db, {
+    keyHash: hashKey(mailboxReadKey),
+    agentName: "vault-agent",
+    scopes: ["mailbox:read"],
+  });
+
+  // Key with only vault:read cannot touch tasks or messages
+  const listDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${vaultOnlyKey}` },
+  });
+  expect(listDenied.status).toBe(403);
+  expect(await listDenied.json()).toEqual({ error: "scope_denied" });
+
+  const postTaskDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${vaultOnlyKey}` },
+    body: JSON.stringify({ goal: "blocked" }),
+  });
+  expect(postTaskDenied.status).toBe(403);
+
+  const msgGetDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    headers: { authorization: `Bearer ${vaultOnlyKey}` },
+  });
+  expect(msgGetDenied.status).toBe(403);
+
+  const msgPostDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${vaultOnlyKey}` },
+    body: JSON.stringify({ from_agent: "vault-agent", to_agent: "shinon", type: "ping" }),
+  });
+  expect(msgPostDenied.status).toBe(403);
+
+  // board:read allows GET /api/tasks but denies POST /api/tasks
+  const readAllowed = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${boardReadKey}` },
+  });
+  expect(readAllowed.status).toBe(200);
+
+  const writeDenied = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${boardReadKey}` },
+    body: JSON.stringify({ goal: "read only" }),
+  });
+  expect(writeDenied.status).toBe(403);
+
+  // board:write allows both POST and GET
+  const writeAllowed = await fetch(`http://localhost:${port}/api/tasks`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${boardWriteKey}` },
+    body: JSON.stringify({ goal: "allowed write" }),
+  });
+  expect(writeAllowed.status).toBe(200);
+
+  const readViaWrite = await fetch(`http://localhost:${port}/api/tasks`, {
+    headers: { authorization: `Bearer ${boardWriteKey}` },
+  });
+  expect(readViaWrite.status).toBe(200);
+
+  // mailbox:read allows GET /api/messages but denies POST
+  const inboxAllowed = await fetch(`http://localhost:${port}/api/messages`, {
+    headers: { authorization: `Bearer ${mailboxReadKey}` },
+  });
+  expect(inboxAllowed.status).toBe(200);
+
+  const sendDenied = await fetch(`http://localhost:${port}/api/messages`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${mailboxReadKey}` },
+    body: JSON.stringify({ from_agent: "vault-agent", to_agent: "shinon", type: "ping" }),
+  });
+  expect(sendDenied.status).toBe(403);
+});
+
+test("internal routes require x-cardinal-internal-secret when internalServiceSecret is configured", async () => {
+  const hash = await Bun.password.hash("sao123");
+  const db2 = createDb(":memory:");
+  const k = generateKey();
+  registerAgent(db2, "mcp-caller", "agent");
+  createAgentKey(db2, { keyHash: hashKey(k), agentName: "mcp-caller" });
+
+  const srv = createServer({ ...testConfig(hash), internalServiceSecret: "svc-secret-xyz" }, db2);
+  try {
+    const p2 = srv.port!;
+
+    const noHeaderValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${k}` },
+    });
+    expect(noHeaderValidate.status).toBe(401);
+
+    const wrongHeaderValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "wrong",
+      },
+    });
+    expect(wrongHeaderValidate.status).toBe(401);
+
+    const okValidate = await fetch(`http://localhost:${p2}/api/internal/keys/validate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "svc-secret-xyz",
+      },
+    });
+    expect(okValidate.status).toBe(200);
+
+    const noHeaderUsage = await fetch(`http://localhost:${p2}/api/internal/mcp/usage`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${k}` },
+      body: JSON.stringify({ tool_name: "cardinal_search" }),
+    });
+    expect(noHeaderUsage.status).toBe(401);
+
+    const okUsage = await fetch(`http://localhost:${p2}/api/internal/mcp/usage`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${k}`,
+        "x-cardinal-internal-secret": "svc-secret-xyz",
+      },
+      body: JSON.stringify({ tool_name: "cardinal_search" }),
+    });
+    expect(okUsage.status).toBe(200);
+  } finally {
+    srv.stop(true);
+    db2.close();
+  }
+});
+
+test("WS /ws blocks mismatched Origin header with 403 and allows matching Origin", async () => {
+  const badOrigin = await fetch(`http://localhost:${port}/ws`, {
+    headers: {
+      connection: "Upgrade",
+      upgrade: "websocket",
+      "sec-websocket-key": "dGhlIHNhbXBsZSBub25jZQ==",
+      "sec-websocket-version": "13",
+      origin: "https://evil.example",
+    },
+  });
+  expect(badOrigin.status).toBe(403);
+  expect(await badOrigin.json()).toEqual({ error: "forbidden_origin" });
+
+  const ws = await new Promise<WebSocket>((resolve, reject) => {
+    const sock = new WebSocket(`ws://localhost:${port}/ws`, {
+      headers: { origin: `http://localhost:${port}` },
+    } as never);
+    sock.onopen = () => resolve(sock);
+    sock.onerror = () => reject(new Error("ws connect failed"));
+  });
+  ws.close();
 });

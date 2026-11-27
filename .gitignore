@@ -11,3 +11,5 @@ test-results/
 playwright-report/
 frontend/test-results/
 frontend/playwright-report/
+configs/
+agent-state/

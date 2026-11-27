@@ -1,21 +1,19 @@
 # Cardinal System
 
-> **Status: paused (2026-11-22).** This project is on hold and the repository is archived (read-only). No new work is planned for now.
+Central backend and Sovereign Context Policy Plane of the SAO agent ecosystem: identity (`sk-cardinal-*`), path-scoped Streamable HTTP MCP Context Hub (onboard, FTS5/QMD search, sandboxed handoffs/proposals), task blackboard, mailbox, and web dashboard. A [Bun](https://bun.sh) + SQLite monolith that serves API, WebSocket, and static assets alongside an isolated MCP server. In production, a rootless Podman pod (Caddy → nginx SPA → Bun backend).
 
-Central backend of the SAO agent ecosystem: identity (`sk-cardinal-*`), context (memories, RAG, profiles), task blackboard, agent-to-agent mailbox, LLM router, and web dashboard. A [Bun](https://bun.sh) + SQLite monolith that serves API, WebSocket, and static assets from a single process. In production, a rootless Podman pod (Caddy → nginx SPA → Bun backend).
+Thesis: **orchestration and routing are commodity**. Cardinal focuses on identity, vault path-glob ACLs, and usage-gated context delivery; T3 Code, Hermes, and CLIs are the hands.
 
-Cardinal v2 thesis: **orchestration is commodity**. Cardinal is the brain (identity + context + blackboard); herdr, Hermes, and CLIs are the hands.
-
-**Version:** v0.2.6 (Phase 2 — Blackboard + MCP + Pool, closing). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
+**Version:** v0.2.6 (Context Hub v2 Stage 1 active on `feature/mcp-context-hub`). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
 
 | Phase | What | Status |
 |-------|------|--------|
 | 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
 | 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
-| 2 | Blackboard, MCP hub, key pool / router | Closing (v0.2.6 on `dev`; freeze PR [#12](https://github.com/snattydev/cardinal-system/pull/12)) |
-| 2.5 | Cardinal v3 (workers, /vaults, cockpit) | Planning ([#28](https://github.com/snattydev/cardinal-system/issues/28)) |
+| 2 | Blackboard, MCP hub, key pool / router | Complete (`v0.2.6` on `main`; N1 merged on `dev`) |
+| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Active (`feature/mcp-context-hub`, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
 
-Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). v2 spec: [`docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](docs/superpowers/specs/2026-08-12-cardinal-v2-architecture.md).
+Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). Context Hub v2 spec: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md).
 
 ## What is in today
 
@@ -25,7 +23,7 @@ Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/v
 - **Context Store:** profiles, souls, skills, memory mirror, sessions, RAG proxy
 - **Blackboard:** tasks CRUD + claim/complete, UI `/tasks`, WS broadcast
 - **Mailbox:** `GET/POST /api/messages` (agent-to-agent handoff; key = identity)
-- **MCP hub:** `packages/mcp` on `:8789` (memory, board, mailbox tools)
+- **MCP Context Hub:** `packages/mcp` on `:8789` (`POST /mcp` Streamable HTTP, `GET /health`; deterministic `coding`/`hermes` onboarding, path-glob ACLs with `personal/**` hard-deny, built-in FTS5 + optional QMD sidecar, sandboxed handoffs/proposals, `mcp_usage` telemetry)
 - **Router:** `POST /v1/chat/completions` + `GET /v1/models` (Bearer `sk-cardinal-*`); Fusion/MoA with `model=fusion`
 - **Router UI:** operative catalog at `/router` (JWT; providers, aliases, chains)
 - **Keys UI:** create / list / revoke at `/keys` (scopes, tokens, expiry, USD cap)
@@ -80,13 +78,15 @@ cp deploy/env.example .env
 
 openssl rand -hex 32   # JWT_SECRET
 openssl rand -hex 32   # POOL_SECRET
-podman run --rm docker.io/oven/bun:1 bun -e 'console.log(await Bun.password.hash("YOUR_PASSWORD"))'
+read -r -s -p "Admin password: " PW; echo
+printf '%s' "$PW" | podman run --rm -i docker.io/oven/bun:1 bun -e 'const pw = await new Response(Bun.stdin.stream()).text(); console.log(await Bun.password.hash(pw));'
+unset PW
 # paste the hash into ADMIN_PASSWORD_HASH; set ADMIN_USER (default admin)
 ```
 
-Do not put the plaintext password on the compose command line. If Bun is already on the host, `bun run bootstrap:password` remains valid (`scripts/bootstrap-admin-password.sh`).
+Do not put the plaintext password on the compose command line. If Bun is already on the host, `bun run bootstrap:password` remains valid (`scripts/bootstrap-admin-password.sh`). Activate enforced `.githooks/` once per clone with `bash scripts/install-hooks.sh` (`bun run hooks:install`).
 
-Optional MCP: set `VAULTS_HOST_PATH` to an absolute host directory of markdown vaults. After the backend is up, set `CARDINAL_SERVICE_KEY` via keygen **inside** the container (`podman exec`), never host `bun run keygen` against a different DB — see [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md).
+MCP Context Hub: set `VAULTS_HOST_PATH` (mounted `:ro` at `/data/vaults`), `AGENT_STATE_HOST_PATH` (mounted `:rw` at `/data/agent-state`), and `CONFIGS_HOST_PATH` (populate with `bash scripts/sync-configs.sh`, mounted `:ro` at `/data/configs`) in `.env`. Optionally enable the QMD sidecar via `podman-compose --profile qmd up -d` with `QMD_URL=http://qmd:8181`. Generate scoped agent keys inside the backend container (`podman exec`), never host `bun run keygen` against a different DB — see [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md) and [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md).
 
 ### Start
 
@@ -102,7 +102,7 @@ Published ports (all `127.0.0.1` only):
 | Dashboard (Vite) | http://127.0.0.1:5173 |
 | MCP | http://127.0.0.1:8789 |
 
-Health: `GET http://127.0.0.1:8787/api/health` → `{"status":"ok","version":"0.2.6"}`. Open the dashboard at `http://127.0.0.1:5173` (not `localhost` — cookie origin). Login: `ADMIN_USER` + the password that produced the hash.
+Health: `GET http://127.0.0.1:8787/api/health` → `{"status":"ok","version":"0.2.7"}`. Open the dashboard at `http://127.0.0.1:5173` (not `localhost` — cookie origin). Login: `ADMIN_USER` + the password that produced the hash.
 
 Dashboard: Overview, Agents, Keys (`/keys`), Tasks (`/tasks`), Router (`/router`), Settings.
 
@@ -119,7 +119,7 @@ git clone <repo-url> && cd cardinal-system
 bun install
 
 cp deploy/env.example .env
-bun -e 'console.log(await Bun.password.hash("your-password"))'  # -> ADMIN_PASSWORD_HASH
+bun run bootstrap:password   # interactive; writes only ADMIN_PASSWORD_HASH to .env
 openssl rand -hex 32                                            # -> JWT_SECRET
 openssl rand -hex 32                                            # -> POOL_SECRET (encrypts provider API keys)
 
@@ -207,3 +207,11 @@ MCP is already a second process (`packages/mcp`, compose `:8789`) but still a wo
 3. Extract `packages/mcp` as its own image/repo once it does not need the root workspace glob (today compose mounts `backend/` and `frontend/` only so `bun install` accepts `workspaces`).
 4. Extract `packages/worker` with `deploy/Containerfile.worker` (after N1 is on `dev`).
 5. Leave `backend` + remaining `@cardinal/*` together until the library packages are published; do not split `db` from the process that opens `cardinal.db`.
+
+## Security
+
+Report vulnerabilities privately as described in [`SECURITY.md`](SECURITY.md). Security model and operational practices: [`docs/security.md`](docs/security.md).
+
+## License
+
+[MIT](LICENSE)

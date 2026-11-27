@@ -38,7 +38,7 @@ Separation of responsibilities:
 
 The pool (v0.2.2) had an engine and `/keys` for list/revoke, but Settings retained
 "MODEL ROUTER coming in Fase 2", key creation was CLI-only, and there was no
-Mixture of Agents. Santi requested all three features together, inspired by
+Mixture of Agents. The owner requested all three features together, inspired by
 FreeLLMAPI, without cloning its unified key or public catalog.
 
 ## Decisions (unified)
@@ -56,7 +56,7 @@ FreeLLMAPI, without cloning its unified key or public catalog.
 
 ## Alternatives Considered
 
-- **Single agent, three serial PRs:** rejected. Santi requested a Cursor session
+- **Single agent, three serial PRs:** rejected. The owner requested a Cursor session
   per feature in Herdr Background.
 - **Fusion as a top-level tab (FreeLLMAPI):** deferred. Cardinal has few
   providers; chain dashboard and key creation come first.

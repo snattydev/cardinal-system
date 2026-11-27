@@ -84,4 +84,23 @@ describe("createValidator", () => {
     expect(await validate("bad")).toBeNull();
     expect(count).toBe(1);
   });
+
+  test("sends x-cardinal-internal-secret only when configured", async () => {
+    const calls: Array<Record<string, string>> = [];
+    const fetchImpl = async (_url: any, init?: any): Promise<Response> => {
+      calls.push(init?.headers as Record<string, string>);
+      return jsonResponse(200, { agent: "shinon", kind: "agent", scopes: ["*"] });
+    };
+
+    const withoutSecret = createValidator(BACKEND, { fetchImpl });
+    await withoutSecret("sk-cardinal-a");
+    expect(calls[0]!["x-cardinal-internal-secret"]).toBeUndefined();
+
+    const withSecret = createValidator(BACKEND, {
+      fetchImpl,
+      internalServiceSecret: "svc-secret",
+    });
+    await withSecret("sk-cardinal-b");
+    expect(calls[1]!["x-cardinal-internal-secret"]).toBe("svc-secret");
+  });
 });

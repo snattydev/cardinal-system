@@ -18,7 +18,8 @@
       "@cardinal/auth": ["../packages/auth/src"],
       "@cardinal/keys": ["../packages/keys/src"],
       "@cardinal/ws": ["../packages/ws/src"],
-      "@cardinal/router": ["../packages/router/src"]
+      "@cardinal/router": ["../packages/router/src"],
+      "@cardinal/worker": ["../packages/worker/src"]
     }
   },
   "include": ["src"]

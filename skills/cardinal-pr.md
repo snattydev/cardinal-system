@@ -68,4 +68,4 @@ If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged 
 - [ ] PR template filled
 - [ ] `docs/features/` updated when required
 - [ ] PR targets `dev` (unless this is the release PR to `main`)
-- [ ] Skills synced if `skills/*.md` changed: `bash skills/sync-skills.sh`
+- [ ] Skills synced if `skills/*.md` changed: `bash skills/sync-skills.sh` (updates `.agents/skills/<name>/SKILL.md` and Hermes)

@@ -93,29 +93,70 @@ export function messageToPayload(row: MessageRow): MessagePayload {
 
 type WS = ServerWebSocket<ConnData>;
 type Timer = ReturnType<typeof setInterval>;
+type Timeout = ReturnType<typeof setTimeout>;
+
+const DEFAULT_AUTH_TIMEOUT_MS = 10_000;
+const DEFAULT_MAX_UNAUTHED_CONNECTIONS = 100;
+const DEFAULT_MAX_DASHBOARDS = 50;
+
+export interface HubOptions {
+  pingIntervalMs: number;
+  authTimeoutMs?: number;
+  maxUnauthedConnections?: number;
+  maxDashboards?: number;
+}
 
 export class Hub {
   private agents = new Map<string, WS>();
   private timers = new Map<string, Timer>();
   private missed = new Map<string, number>();
   private dashboards = new Set<WS>();
+  private unauthed = new Map<WS, Timeout>();
 
   constructor(
     private db: Database,
-    private opts: { pingIntervalMs: number },
+    private opts: HubOptions,
   ) {}
 
   readonly websocket = {
+    open: (ws: WS): void => this.onOpen(ws),
     message: (ws: WS, raw: string | Buffer): void => this.onMessage(ws, raw),
     close: (ws: WS): void => this.onClose(ws),
   };
 
   dispose(): void {
     for (const timer of this.timers.values()) clearInterval(timer);
+    for (const timer of this.unauthed.values()) clearTimeout(timer);
     this.timers.clear();
+    this.unauthed.clear();
     this.agents.clear();
     this.missed.clear();
     this.dashboards.clear();
+  }
+
+  private onOpen(ws: WS): void {
+    if (ws.data.role !== null) return;
+    const maxUnauthed = this.opts.maxUnauthedConnections ?? DEFAULT_MAX_UNAUTHED_CONNECTIONS;
+    if (this.unauthed.size >= maxUnauthed) {
+      this.fail(ws, 4429, "too_many_connections");
+      return;
+    }
+    const authTimeoutMs = this.opts.authTimeoutMs ?? DEFAULT_AUTH_TIMEOUT_MS;
+    const timer = setTimeout(() => {
+      this.unauthed.delete(ws);
+      if (ws.data.role === null) {
+        this.fail(ws, 4401, "auth_timeout");
+      }
+    }, authTimeoutMs);
+    this.unauthed.set(ws, timer);
+  }
+
+  private clearUnauthed(ws: WS): void {
+    const timer = this.unauthed.get(ws);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.unauthed.delete(ws);
+    }
   }
 
   private onMessage(ws: WS, raw: string | Buffer): void {
@@ -168,6 +209,7 @@ export class Hub {
 
     ws.data.role = "agent";
     ws.data.agentName = name;
+    this.clearUnauthed(ws);
     this.agents.set(name, ws);
     this.missed.set(name, 0);
 
@@ -185,6 +227,12 @@ export class Hub {
       this.fail(ws, 4401, "auth_failed");
       return;
     }
+    const maxDashboards = this.opts.maxDashboards ?? DEFAULT_MAX_DASHBOARDS;
+    if (this.dashboards.size >= maxDashboards) {
+      this.fail(ws, 4429, "too_many_connections");
+      return;
+    }
+    this.clearUnauthed(ws);
     ws.data.role = "dashboard";
     this.dashboards.add(ws);
     this.send(ws, { type: "roster", agents: listAgents(this.db).map(agentToPayload) });
@@ -211,6 +259,7 @@ export class Hub {
   }
 
   private onClose(ws: WS): void {
+    this.clearUnauthed(ws);
     if (ws.data.role === "dashboard") {
       this.dashboards.delete(ws);
       return;

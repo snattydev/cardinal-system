@@ -9,16 +9,17 @@ Health is `/api/health`, not `/health`.
 | Method | Path | Auth | Returns |
 |--------|------|------|---------|
 | `GET` | `/api/health` | none | `{status, version}` |
-| `POST` | `/api/auth/login` | body | sets `cardinal_session` |
+| `POST` | `/api/auth/login` | body | sets `cardinal_session` (failure rate-limited per IP: `429` + `Retry-After`) |
 | `POST` | `/api/auth/logout` | — | clears cookie |
 | `GET` | `/api/auth/me` | JWT | current user |
-| `POST` | `/api/internal/keys/validate` | Bearer or `{key}` | `{agent, kind, scopes}` or 401 |
+| `POST` | `/api/internal/keys/validate` | Bearer or `{key}` (+ optional `x-cardinal-internal-secret`) | `{agent, kind, scopes}` or 401 (`403` via nginx `/api/internal/`) |
+| `POST` | `/api/internal/mcp/usage` | Bearer key (+ optional `x-cardinal-internal-secret`) | `{ok: true}` (logs caller MCP tool call to `mcp_usage`; `403` via nginx) |
 
 ## Dashboard (JWT)
 
 | Method | Path | Returns |
 |--------|------|---------|
-| `GET` | `/api/system` | flat `{version, uptime_seconds, db_path, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked}` |
+| `GET` | `/api/system` | flat `{version, uptime_seconds, db_size_bytes, agents_total, agents_online, keys_active, keys_revoked, mcp_calls_7d, mcp_calls_30d, mcp_last_call_at}` |
 | `GET` | `/api/agents` | `{agents}` |
 | `GET` | `/api/agents/:name` | `{agent, events}` |
 | `GET` | `/api/devices` | `{devices}` |
@@ -34,11 +35,12 @@ Health is `/api/health`, not `/health`.
 | `POST` | `/api/keys/:id/revoke` | revoke |
 | `GET`/`POST`/`PATCH`/`DELETE` | `/api/router/providers` | encrypted provider keys |
 | `POST` | `/api/router/providers/:id/sync-models` | sync model list |
+| `GET` | `/api/router/catalog` | active model, alias, and fusion catalog |
 | `GET`/`PUT` | `/api/router/routes`, `/api/router/routes/:alias` | alias chains |
 
 ## Board / mailbox (JWT or agent key)
 
-On these routes the agent key **is** identity (`agent_name`).
+On these routes the agent key **is** identity (`agent_name`) and **must** carry matching scopes (`*`, `board`, `board:read`/`board:write` for `/api/tasks*`; `*`, `mailbox`, `mailbox:read`/`mailbox:write` for `/api/messages*`) — otherwise `403 {error: "scope_denied"}`.
 
 | Method | Path |
 |--------|------|
@@ -52,18 +54,27 @@ On these routes the agent key **is** identity (`agent_name`).
 
 `POST /api/rag/search` enforces agent vault scopes server-side.
 
-## Router (agent key)
+## MCP Hub (`:8789`)
 
-| Method | Path |
-|--------|------|
-| `POST` | `/v1/chat/completions` |
-| `GET` | `/v1/models` |
+| Method | Path | Auth | Returns |
+|--------|------|------|---------|
+| `GET` | `/health` | none | `{status, version, searchEngine, indexedFiles}` |
+| `POST` | `/mcp` | Bearer `sk-cardinal-*` | Streamable HTTP MCP JSON-RPC (stateless, ACLs for vaults, repo bootstrap, and redacted agent/user configs) |
+
+Full tool/prompt spec and `keygen` examples: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](features/2026-11-25-mcp-context-hub-v2.md).
+
+## Router
+
+| Method | Path | Auth |
+|--------|------|------|
+| `POST` | `/v1/chat/completions` | Bearer `sk-cardinal-*` |
+| `GET` | `/v1/models` | Bearer `sk-cardinal-*` or dashboard JWT (`401` if unauthenticated) |
 
 Fusion: `model=fusion`. Manual: `docs/guides/router-usage.md`.
 
 ## WebSocket
 
-`GET /ws` upgrades. Agent: `hello` with key. Dashboard: cookie on the upgrade (JS never reads the JWT). Protocol: `context/ecosystem.md`. Client: `examples/ws-agent.ts`.
+`GET /ws` upgrades (validates `Origin` host when present, returning `403` on mismatch). Agent: `hello` with key. Dashboard: cookie on the upgrade (JS never reads the JWT). Unauthenticated sockets time out after 10s (`4401`) and enforce connection caps (`4429`). Protocol: `context/ecosystem.md`. Client: `examples/ws-agent.ts`.
 
 ## JWT from the container (no browser)
 

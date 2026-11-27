@@ -1,6 +1,6 @@
 # Skills
 
-In-repo skills live in `skills/`. That directory is the source of truth; `skills/sync-skills.sh` copies them out to Hermes.
+In-repo skills live in `skills/`. That directory is the source of truth; `skills/sync-skills.sh` copies them into repo-local `.agents/skills/<name>/SKILL.md` (for Antigravity, T3 Code, OpenCode, Codex, and Claude Code auto-discovery), Hermes, and the optional vault skills folder.
 
 Do not duplicate `AGENTS.md` inside a skill. Skills are procedures or pointers. Skills are written in English (`AGENTS/docs.md`).
 
@@ -12,6 +12,7 @@ Do not duplicate `AGENTS.md` inside a skill. Skills are procedures or pointers. 
 | `cardinal-commit` | `skills/cardinal-commit.md` | Conventional commits, English subject and body |
 | `cardinal-pr` | `skills/cardinal-pr.md` | Branch → bump → commit → push → template → reviewers |
 | `cardinal-system` | `skills/cardinal-system.md` | Runtime URLs; pointers to API, pitfalls, stack |
+| `cardinal-standards` | `skills/cardinal-standards.md` | Canonical personal-repo standards, scope tiers, and hooks |
 
 ## Covered elsewhere (no extra skill)
 
