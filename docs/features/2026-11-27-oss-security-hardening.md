@@ -11,8 +11,8 @@ Hardened Cardinal System's network edges, authentication, container defaults, he
 ## What Changed
 
 ### Privacy & Documentation Cleanup
-- Replaced personal domain placeholder (`cardinal.snatdy.dev` -> `cardinal.example.com`) in `deploy/Caddyfile` and `deploy/Caddyfile.example`.
-- Replaced owner first-name references with `The owner` / `owner decision` in `docs/features/2026-09-03-router-surface.md` and `docs/superpowers/plans/2026-11-27` plan cleanup (`docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`).
+- Replaced personal domain comment in `deploy/Caddyfile` and `deploy/Caddyfile.example` with `cardinal.example.com`.
+- Replaced owner first-name references with `The owner` / `owner decision` in `docs/features/2026-09-03-router-surface.md` and `docs/superpowers/plans/2026-08-17-cardinal-v2-backlog.md`.
 - Updated `README.md` secret bootstrap instructions to pipe passwords via stdin (`read -s` / `bun run bootstrap:password`) instead of CLI arguments.
 
 ### Backend, Auth, WS, RAG, and Worker Hardening
