@@ -1,13 +1,16 @@
 [Unit]
-Description=Cardinal Caddy reverse proxy — TLS termination + routing
+Description=Cardinal Caddy reverse proxy - TLS termination + routing
 After=network-online.target
 
 [Container]
-# No AutoUpdate — Caddy uses a fixed tag for stability
+# No AutoUpdate - Caddy uses a fixed tag for stability
 Image=docker.io/library/caddy:alpine
 Pod=cardinal.pod
+# Pin container UID 0 inside the keep-id pod namespace for :80 and /config.
+User=0
 # Mount the Caddyfile into the container
 Volume=%h/.config/cardinal/Caddyfile:/etc/caddy/Caddyfile:ro,Z
+
 [Service]
 Restart=always
 MemoryMax=64M

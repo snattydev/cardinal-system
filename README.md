@@ -4,14 +4,14 @@ Central backend and Sovereign Context Policy Plane of the SAO agent ecosystem: i
 
 Thesis: **orchestration and routing are commodity**. Cardinal focuses on identity, vault path-glob ACLs, and usage-gated context delivery; T3 Code, Hermes, and CLIs are the hands.
 
-**Version:** v0.2.7 (Context Hub v2 Stage 1 shipped on `main`; 30-day usage gate active in [#62](https://github.com/snattydev/cardinal-system/issues/62)). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
+**Version:** v0.2.8 (Context Hub v2 Stage 1 shipped on `main`; 30-day usage gate active in [#62](https://github.com/snattydev/cardinal-system/issues/62)). Source of truth: root `package.json` (`MAJOR.FASE.PATCH`).
 
 | Phase | What | Status |
 |-------|------|--------|
 | 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
 | 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
 | 2 | Blackboard, MCP hub, key pool / router | Complete (`v0.2.6`) |
-| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Shipped (`v0.2.7`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
+| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Shipped (`v0.2.7` on `main`; Quadlet MCP packaging in `v0.2.8`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
 
 Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). Context Hub v2 spec: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md).
 
@@ -103,7 +103,7 @@ Published ports (all `127.0.0.1` only):
 | Dashboard (Vite) | http://127.0.0.1:5173 |
 | MCP | http://127.0.0.1:8789 |
 
-Health: `GET http://127.0.0.1:8787/api/health` → `{"status":"ok","version":"0.2.7"}`. Open the dashboard at `http://127.0.0.1:5173` (not `localhost` — cookie origin). Login: `ADMIN_USER` + the password that produced the hash.
+Health: `GET http://127.0.0.1:8787/api/health` → `{"status":"ok","version":"0.2.8"}`. Open the dashboard at `http://127.0.0.1:5173` (not `localhost`: cookie origin). Login: `ADMIN_USER` + the password that produced the hash.
 
 Dashboard: Overview, Agents, Keys (`/keys`), Tasks (`/tasks`), Router (`/router`), Settings.
 
@@ -161,7 +161,7 @@ The agent appears online in the dashboard; on close (Ctrl+C) it sends `bye` and 
 
 ## Production (Podman + Quadlet + Caddy)
 
-Production is a **rootless Podman pod** with three containers (Caddy :80 → nginx SPA :8000 → Bun backend :8787). The pod publishes `127.0.0.1:8080:80`. SQLite lives on volume `cardinal-data`.
+Production is a **rootless Podman pod** with four containers (Caddy :80 → nginx SPA :8000 → Bun backend :8787, plus the MCP Context Hub on `127.0.0.1:8789`). The pod publishes `127.0.0.1:8080:80` and `127.0.0.1:8789:8789` (loopback only). SQLite lives on volume `cardinal-data`; MCP reads vaults `:ro` and writes only to `agent-state`.
 
 All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://127.0.0.1:8080/api/health`.
 
@@ -186,6 +186,7 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 | Doc | Purpose |
 |-----|---------|
 | [`docs/roadmap.md`](docs/roadmap.md) | Phase priorities and status |
+| [`CHANGELOG.md`](CHANGELOG.md) | Release history and per-version changes |
 | [`docs/stack.md`](docs/stack.md) | Stack and technical decisions |
 | [`docs/security.md`](docs/security.md) | Security model |
 | [`SECURITY.md`](SECURITY.md) | Vulnerability reporting policy and deployment hardening checklist |
@@ -193,7 +194,7 @@ All steps: [`deploy/README.md`](deploy/README.md). Health in prod: `curl http://
 | [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md) | Context Hub v2 MCP surface, ACLs, keygen, usage gate |
 | [`docs/features/2026-11-27-oss-security-hardening.md`](docs/features/2026-11-27-oss-security-hardening.md) | OSS security hardening and governance summary |
 | [`docs/guides/pitfalls.md`](docs/guides/pitfalls.md) | Operational gotchas |
-| [`deploy/README.md`](deploy/README.md) | Production Quadlet pod |
+| [`deploy/README.md`](deploy/README.md) | Production Quadlet pod (Caddy, nginx, backend, MCP) |
 | [`AGENTS.md`](AGENTS.md) | Development rules (language: English only, branching, TDD, roles) |
 | [`docs/features/`](docs/features/) | What was done, why, decisions per feature |
 | [`docs/features/2026-09-03-router-surface.md`](docs/features/2026-09-03-router-surface.md) | Router v0.2.5 index (dashboard + keys + fusion) |
