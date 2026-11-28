@@ -1,5 +1,5 @@
-# Cardinal System — Backend container
-# Build: podman build -t cardinal-backend:latest -f deploy/Containerfile .
+# Cardinal System - Backend container
+# Build: podman build --format docker -t localhost/cardinal-backend:latest -f deploy/Containerfile .
 #
 # This image contains only the Bun backend (API + WebSocket).
 # Frontend static files are served by the cardinal-frontend container (nginx).

@@ -1,0 +1,41 @@
+# Cardinal System - MCP Context Hub container
+# Build: podman build --format docker -t localhost/cardinal-mcp:latest -f deploy/Containerfile.mcp .
+#
+# Streamable HTTP MCP server (POST /mcp, GET /health) on port 8789.
+# Runs non-root as USER bun. Source vaults are read-only, agent writes are
+# confined to the isolated agent-state root (see packages/mcp/src/writer.ts).
+
+FROM docker.io/oven/bun:1-slim
+WORKDIR /app
+
+# Slim image omits git; see "Git Auto-Commit Degradation" in deploy/README.md
+ENV NODE_ENV=production \
+    PORT=8789 \
+    CARDINAL_BACKEND_URL=http://127.0.0.1:8787 \
+    CARDINAL_VAULTS_ROOT=/data/vaults \
+    CARDINAL_WRITABLE_ROOT=/data/agent-state \
+    CARDINAL_CONFIGS_ROOT=/data/configs \
+    CARDINAL_INDEX_DB=/tmp/cardinal-mcp-index.db \
+    CARDINAL_DENY_PREFIXES=personal \
+    CARDINAL_GIT_AUTOCOMMIT=true
+
+# Workspace manifests (all members required for bun install resolution).
+# packages/mcp/src/server.ts imports ../../../package.json for the version.
+COPY package.json bun.lock ./
+COPY packages ./packages
+COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
+
+RUN bun install --production --frozen-lockfile \
+    && mkdir -p /data/vaults /data/agent-state /data/configs \
+    && chown -R bun:bun /data
+
+USER bun
+
+EXPOSE 8789
+
+# HEALTHCHECK - Bun's built-in fetch, no curl/wget needed in the slim image
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD bun -e "fetch('http://127.0.0.1:8789/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
+
+CMD ["bun", "packages/mcp/src/main.ts"]

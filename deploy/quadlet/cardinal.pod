@@ -1,5 +1,5 @@
 [Unit]
-Description=Cardinal System pod — backend, frontend, and Caddy reverse proxy
+Description=Cardinal System pod - backend, frontend, MCP Context Hub, and Caddy reverse proxy
 After=network-online.target
 
 [Pod]
@@ -8,6 +8,14 @@ PodName=cardinal
 # For production, add :443 to expose HTTPS:
 # PublishPort=127.0.0.1:443:443
 PublishPort=127.0.0.1:8080:80
+# MCP Context Hub: loopback only, never exposed beyond the host
+PublishPort=127.0.0.1:8789:8789
+# Map container UID/GID 1000 (USER bun) to host UID/GID 1000 so non-root
+# backend/MCP services align with host bind-mount ownership. Note: keep-id
+# overrides default container root to UID 1000, so frontend and caddy units
+# explicitly pin User=0 inside the pod namespace. Operators on host UID/GID
+# other than 1000 should adjust uid=,gid= here (and User= on bun units).
+UserNS=keep-id:uid=1000,gid=1000
 
 [Install]
 WantedBy=default.target
