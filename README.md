@@ -208,7 +208,7 @@ Today the repo is Bun workspaces (`packages/*`, `backend`, `frontend`) with one 
 
 The frontend has **zero** `@cardinal/*` imports. It talks HTTP/WS only (`VITE_API_URL` / `VITE_WS_URL` / `VITE_HOST` in `frontend/vite.config.ts`) and is the first extractable repo.
 
-MCP is already a second process (`packages/mcp`, compose `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router,worker}` and owns the SQLite file. `packages/worker` (N1, merged and frozen under Context Hub v2) depends on `@cardinal/core` only.
+MCP is already a second process (`packages/mcp`, compose and Quadlet `:8789`) but still a workspace package depending on `@cardinal/keys`. Backend `cardinal-backend` depends on `@cardinal/{core,db,auth,keys,ws,rag,router,worker}` and owns the SQLite file. `packages/worker` (N1, merged and frozen under Context Hub v2) depends on `@cardinal/core` only.
 
 **Extraction order (when later scheduled):**
 

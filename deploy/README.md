@@ -42,7 +42,7 @@ It runs through root `compose.yaml` when enabled (see root
 
 ## Prerequisites
 
-- Podman >= 4.6 (rootless)
+- Podman >= 5.3 (rootless; required for `[Pod] UserNS=keep-id` in Quadlet)
 - systemd --user enabled
 - `~/.config/containers/systemd/` directory exists
 
@@ -57,14 +57,14 @@ podman build --format docker -t localhost/cardinal-mcp:latest -f deploy/Containe
 # 2. Copy Quadlet files
 cp -r deploy/quadlet/* ~/.config/containers/systemd/
 
-# 3. Create config, env, and data directories
-mkdir -p ~/.config/cardinal
+# 3. Create config, env (0600), and data directories
+mkdir -p ~/.config/cardinal && chmod 700 ~/.config/cardinal
 mkdir -p ~/.local/share/cardinal/{vaults,agent-state,configs}
-cp deploy/env.example ~/.config/cardinal/env
-cp deploy/mcp.env.example ~/.config/cardinal/mcp.env
+install -m 600 deploy/env.example ~/.config/cardinal/env
+install -m 600 deploy/mcp.env.example ~/.config/cardinal/mcp.env
 cp deploy/Caddyfile ~/.config/cardinal/Caddyfile
 # Edit ~/.config/cardinal/env - set ADMIN_PASSWORD_HASH, JWT_SECRET, POOL_SECRET,
-# and INTERNAL_SERVICE_SECRET (leave DB_PATH unset in Quadlet).
+# and INTERNAL_SERVICE_SECRET (keep DB_PATH commented out in Quadlet).
 # Edit ~/.config/cardinal/mcp.env - set the SAME INTERNAL_SERVICE_SECRET and
 # any CARDINAL_DENY_PREFIXES overrides.
 
@@ -163,6 +163,13 @@ systemctl --user stop cardinal-pod.service
 VOL_DIR="$(podman volume inspect systemd-cardinal-data --format '{{.Mountpoint}}' 2>/dev/null || podman volume inspect cardinal-data --format '{{.Mountpoint}}')"
 # In keep-id, container UID 1000 (bun) maps to host UID 1000 (0:0 in podman unshare)
 podman unshare chown -R 0:0 "$VOL_DIR"
+
+# Create the dedicated MCP env file and mount dirs if not already present:
+chmod 700 ~/.config/cardinal
+install -m 600 deploy/mcp.env.example ~/.config/cardinal/mcp.env
+mkdir -p ~/.local/share/cardinal/{vaults,agent-state,configs}
+# Copy matching INTERNAL_SERVICE_SECRET from ~/.config/cardinal/env into
+# ~/.config/cardinal/mcp.env and set CARDINAL_DENY_PREFIXES before starting.
 ```
 
 Then copy the updated Quadlet units, run `systemctl --user daemon-reload`, and
@@ -309,8 +316,8 @@ require manual rebuild/re-pull.
 
 ## Health Checks
 
-- **Backend**: Bun fetch `http://127.0.0.1:8787/api/health` every 30s
-- **Frontend**: wget `http://127.0.0.1:8000/` every 30s
+- **Backend**: Bun fetch `http://localhost:8787/api/health` every 30s
+- **Frontend**: wget `http://localhost:8000/` every 30s
 - **MCP**: Bun fetch `http://127.0.0.1:8789/health` every 30s
 - **Caddy**: (handled by Caddy's built-in health endpoint)
 
