@@ -82,7 +82,7 @@ cardinal-system/
 │   └── skills/              auto-discovered repo-local skills (synced from skills/)
 ├── .githooks/               enforced pre-commit & commit-msg hooks (core.hooksPath)
 ├── context/                   ecosystem knowledge base (context/ecosystem.md, agents/)
-├── scripts/                   operational scripts (password bootstrap, config sync, keygen helpers, tests)
+├── scripts/                   operational scripts (password bootstrap, config sync, hook install, standards sync, tests)
 ├── skills/                    Cardinal skills (source of truth; sync out to .agents/skills & Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)

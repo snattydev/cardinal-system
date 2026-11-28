@@ -8,6 +8,7 @@
 FROM docker.io/oven/bun:1-slim
 WORKDIR /app
 
+# Slim image omits git; see "Git Auto-Commit Degradation" in deploy/README.md
 ENV NODE_ENV=production \
     PORT=8789 \
     CARDINAL_BACKEND_URL=http://127.0.0.1:8787 \
@@ -16,7 +17,6 @@ ENV NODE_ENV=production \
     CARDINAL_CONFIGS_ROOT=/data/configs \
     CARDINAL_INDEX_DB=/tmp/cardinal-mcp-index.db \
     CARDINAL_DENY_PREFIXES=personal \
-    # Slim image omits git; see "Git Auto-Commit Degradation" in deploy/README.md
     CARDINAL_GIT_AUTOCOMMIT=true
 
 # Workspace manifests (all members required for bun install resolution).
