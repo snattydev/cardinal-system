@@ -5,11 +5,28 @@ All notable changes to Cardinal System are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project follows `MAJOR.FASE.PATCH` versioning, where `FASE` is the current
 roadmap phase. The source of truth is the `version` field in root
-[`package.json`](package.json). Intermediate PATCH versions (`0.1.1` and
-`0.2.1` through `0.2.5`) are consolidated under their closing milestone
-sections (`0.2.0` and `0.2.6`).
+[`package.json`](package.json). Intermediate PATCH versions (`0.1.1`,
+`0.2.1`, `0.2.2`, `0.2.3`, and `0.2.5`) are consolidated under their closing
+milestone sections (`0.2.0` and `0.2.6`).
 
 ## [Unreleased]
+
+## [0.2.8] - 2026-11-28
+
+MCP deployment and review workflow groundwork for the next `dev` release.
+
+### Added
+
+- `deploy/Containerfile.mcp` and Quadlet `cardinal-mcp.container`: the
+  Streamable HTTP MCP Context Hub now runs inside the production pod on
+  `127.0.0.1:8789` with read-only vault and config bind mounts, a writable
+  `agent-state` mount, and `UserNS=keep-id:uid=1000,gid=1000` (#70).
+- `deploy/README.md` MCP deployment guide: architecture diagram, MCP image
+  build, bind mounts, SELinux `:Z` caveat, `git` auto-commit degradation, and
+  an optional `systemd --user` timer for `scripts/sync-configs.sh` (#70).
+- Three-tier PR review workflow templates in `.github/REVIEW_TEMPLATES/`
+  (quick, bug-finder, deep) with matching prompts, the `bug-finder` role, and
+  the synced `cardinal-pr` skill (PR #73 / #69).
 
 ### Changed
 
@@ -136,6 +153,7 @@ Phase 0 living skeleton complete (`dc15e26`).
 
 - Initial monorepo scaffold for root, backend, and frontend (`1c9d58c`).
 
-[Unreleased]: https://github.com/snattydev/cardinal-system/compare/v0.2.7...main
+[Unreleased]: https://github.com/snattydev/cardinal-system/compare/v0.2.8...main
+[0.2.8]: https://github.com/snattydev/cardinal-system/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/snattydev/cardinal-system/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/snattydev/cardinal-system/compare/9e8fed9...v0.2.6

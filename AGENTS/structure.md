@@ -36,11 +36,12 @@ cardinal-system/
 │   ├── Caddyfile.example
 │   ├── Containerfile
 │   ├── Containerfile.frontend
+│   ├── Containerfile.mcp
 │   ├── Containerfile.qmd
 │   ├── Containerfile.worker
 │   ├── env.example
 │   ├── nginx.conf
-│   ├── quadlet/
+│   ├── quadlet/                systemd units (pod, backend, frontend, mcp, caddy, data volume)
 │   └── README.md
 ├── docs/
 │   ├── features/              documentation of completed features
@@ -79,6 +80,8 @@ cardinal-system/
 ├── .agents/
 │   └── skills/              auto-discovered repo-local skills (synced from skills/)
 ├── .githooks/               enforced pre-commit & commit-msg hooks (core.hooksPath)
+├── context/                   ecosystem knowledge base (context/ecosystem.md, agents/)
+├── scripts/                   operational scripts (password bootstrap, config sync, keygen helpers, tests)
 ├── skills/                    Cardinal skills (source of truth; sync out to .agents/skills & Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)
