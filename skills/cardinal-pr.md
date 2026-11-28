@@ -52,10 +52,14 @@ If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged 
 
 ### 6. Reviewers
 
+All PRs follow the three-tier review workflow in `AGENTS/prs.md`:
+
 | PR to | Reviewers |
 |-------|-----------|
-| `dev` | None — implementing agent merges after green |
-| `main` | Standard Review (required), Security Review (if `auth/`, `keys/`, `ws/`, protocol) |
+| `dev` | Quick Review + Bug Finder (required; same-family fast models allowed); Cross-Family Deep Review required for orchestrated wave/feature PRs, security-sensitive paths (`auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, `packages/mcp/src/acl.ts`), and non-trivial multi-file changes (optional only for trivial 1-file typo fixes) |
+| `main` | Quick Review + Bug Finder + Cross-Family Deep Review (all required), incorporating Security Review when touching `auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, or `packages/mcp/src/acl.ts` |
+
+- Any `CRITICAL` finding or unresolved `UNKNOWN_INTENT` item from any tier forces Verdict = `REQUEST CHANGES` and blocks merge (including on `dev`) until the repo owner answers on the PR and the decision is recorded in a PR comment.
 
 ## Pre-PR checks
 
@@ -66,6 +70,8 @@ If local `HEAD` is many unique commits ahead of `origin/dev`, split into staged 
 - [ ] PR title and description in English (`AGENTS/docs.md`)
 - [ ] Linked to GitHub Issue (`Closes #N`) with appropriate labels (`enhancement`, `bug`, etc.) per `AGENTS/issues.md`
 - [ ] PR template filled
+- [ ] Quick Review + Bug Finder completed (`.github/REVIEW_TEMPLATES/`)
+- [ ] Cross-Family Deep Review completed when required by `AGENTS/prs.md`
 - [ ] `docs/features/` updated when required
 - [ ] PR targets `dev` (unless this is the release PR to `main`)
 - [ ] Skills synced if `skills/*.md` changed: `bash skills/sync-skills.sh` (updates `.agents/skills/<name>/SKILL.md` and Hermes)

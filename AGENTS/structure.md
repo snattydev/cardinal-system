@@ -9,6 +9,7 @@ cardinal-system/
 │   └── rules/
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
+│   ├── REVIEW_TEMPLATES/    PR report templates (quick, bug-finder, deep)
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/ci.yml     CI verification (typecheck, test, build)
 ├── .opencode/
@@ -44,8 +45,22 @@ cardinal-system/
 ├── docs/
 │   ├── features/              documentation of completed features
 │   ├── agents/                SOULs, prompts, canonical roles, checklists
-│   │   ├── prompts/
+│   │   ├── prompts/           one-shot prompts (standard, security, quick, bug-finder)
+│   │   │   ├── standard-review.md
+│   │   │   ├── security-review-checklist.md
+│   │   │   ├── quick-review.md
+│   │   │   └── bug-finder.md
 │   │   ├── roles/             canonical roles (agnostic)
+│   │   │   ├── bug-finder.md
+│   │   │   ├── builder.md
+│   │   │   ├── docs.md
+│   │   │   ├── frontend.md
+│   │   │   ├── herdr-dispatcher.md
+│   │   │   ├── reviewer.md
+│   │   │   ├── security-reviewer.md
+│   │   │   ├── tester.md
+│   │   │   ├── verifier.md
+│   │   │   └── ws-protocol.md
 │   │   └── cursor-workflow.md delegation in Cursor
 │   ├── guides/                live manuals (router, pitfalls)
 │   ├── sprints/               sprint logs (historical record)
@@ -67,6 +82,7 @@ cardinal-system/
 ├── skills/                    Cardinal skills (source of truth; sync out to .agents/skills & Hermes)
 ├── AGENTS/                    development rules (split by topic)
 ├── AGENTS.md                  rules index (this file)
+├── CHANGELOG.md               release history (Keep a Changelog)
 ├── LICENSE                    MIT license
 ├── SECURITY.md                vulnerability disclosure and hardening checklist
 ├── compose.yaml               local Podman dev stack (backend, frontend, mcp, optional qmd)
