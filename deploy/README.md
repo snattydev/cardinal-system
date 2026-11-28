@@ -26,6 +26,8 @@ between them.
 └─────────────────────────────────────────────────────┘
 ```
 
+Note: Quadlet covers the core web pod (`Caddy` -> `nginx` -> `backend`). `cardinal-mcp` (`:8789`) and the optional `cardinal-qmd` (`:8181`) sidecar currently run via root `compose.yaml` (see root [`README.md`](../README.md) and [`docs/features/2026-11-25-mcp-context-hub-v2.md`](../docs/features/2026-11-25-mcp-context-hub-v2.md)).
+
 ## Prerequisites
 
 - Podman >= 4.6 (rootless)
@@ -46,19 +48,22 @@ cp -r deploy/quadlet/* ~/.config/containers/systemd/
 mkdir -p ~/.config/cardinal
 cp deploy/env.example ~/.config/cardinal/env
 cp deploy/Caddyfile ~/.config/cardinal/Caddyfile
-# Edit ~/.config/cardinal/env — set ADMIN_PASSWORD_HASH and JWT_SECRET
+# Edit ~/.config/cardinal/env — set ADMIN_PASSWORD_HASH, JWT_SECRET, POOL_SECRET (and optional INTERNAL_SERVICE_SECRET)
 # 4. Reload systemd and start the pod
 systemctl --user daemon-reload
 systemctl --user start cardinal-pod.service
 
 # 5. Verify
-curl http://localhost:8080/api/health
+curl http://127.0.0.1:8080/api/health
 ```
+
+`deploy/Caddyfile` includes a commented `cardinal.example.com` block for enabling automatic TLS on a real domain.
 
 ## Image Build Details
 
 ### cardinal-backend (`deploy/Containerfile`)
 - Base: `oven/bun:1-slim`
+- Runs as non-root `USER bun` with `/data` owned by `bun:bun`
 - Backend source only (no frontend build)
 - `package.json` at root is included for the `/api/health` version endpoint
 - HEALTHCHECK: Bun's built-in `fetch` against `/api/health`
@@ -67,6 +72,7 @@ curl http://localhost:8080/api/health
 - Multi-stage: builds React app with `oven/bun:1`, serves with `nginx:alpine`
 - nginx config at `deploy/nginx.conf`
 - Serves static SPA with fallback to `index.html`
+- Blocks `/api/internal/*` (`403`) from external clients and preserves `X-Forwarded-Proto`
 - Proxies `/api/` and `/ws` to `cardinal-backend:8787`
 
 ## Quadlet Files (`deploy/quadlet/`)
@@ -83,20 +89,17 @@ Copy all `.pod`, `.container`, and `.volume` files to `~/.config/containers/syst
 
 ## Environment & Secrets
 
-> **Cloud blocker (2026-08-20):** do **not** create or rotate the admin
-> password via an AI agent. Local testing may use any throwaway password.
-> Production (even single-user) must use a TTY-only bootstrap: human types the
-> password (`read -s`), the host hashes it, only `ADMIN_PASSWORD_HASH` is
-> stored. See `docs/security.md`. This script is backlog item 11 — required
-> before the first cloud deploy.
+> **Production rule:** Do **not** create or rotate the admin password via an AI agent. Use a TTY-only bootstrap (`bun run bootstrap:password --cloud` / `scripts/bootstrap-admin-password.sh` on a host with Bun, or stdin piping via `podman run --rm -i docker.io/oven/bun:1`) so only `ADMIN_PASSWORD_HASH` is written. Never pass a plaintext password as a CLI argument. See [`docs/security.md`](../docs/security.md).
 
 The backend expects these environment variables (via `~/.config/cardinal/env`):
 
 | Variable | Description |
 |----------|-------------|
 | `ADMIN_USER` | Admin username |
-| `ADMIN_PASSWORD_HASH` | Bcrypt hash (generate with `bun -e 'console.log(await Bun.password.hash("your-password"))'`) |
-| `JWT_SECRET` | 64-char hex (generate with `openssl rand -hex 32`) |
+| `ADMIN_PASSWORD_HASH` | Argon2id/bcrypt hash (`bun run bootstrap:password --cloud` or stdin via `podman run --rm -i docker.io/oven/bun:1`) |
+| `JWT_SECRET` | 64-char hex (`openssl rand -hex 32`) |
+| `POOL_SECRET` | 64-char hex (`openssl rand -hex 32`), AES-256-GCM key for provider secrets |
+| `INTERNAL_SERVICE_SECRET` | Optional 64-char hex (`openssl rand -hex 32`), shared secret for `/api/internal/*` between MCP and backend |
 | `PORT` | Default 8787 |
 | `DB_PATH` | Default `/data/cardinal.db` (on the volume) |
 

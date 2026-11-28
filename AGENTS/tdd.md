@@ -31,8 +31,8 @@ Repo TDD rules. Policy: RED → GREEN → REFACTOR → COMMIT.
 
 ## Repo commands
 
-- `bun test` — full suite (packages + backend)
-- `bun run typecheck` — `tsc --noEmit` backend + frontend
+- `bun test` — full suite (packages + backend + scripts)
+- `bun run typecheck` — `tsc --noEmit` across `backend`, `packages/mcp`, and `frontend`
 - `bun run build` — frontend production build
 
-These three commands are the "gate" before merge.
+These three commands are the "gate" before merge. GitHub Actions CI (`.github/workflows/ci.yml`) runs `typecheck`, `test`, and `build` on pushes and PRs targeting `dev` and `main`.

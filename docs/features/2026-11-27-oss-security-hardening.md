@@ -2,7 +2,7 @@
 
 - **Date:** 2026-11-27
 - **Branch:** `chore/oss-security-hardening`
-- **Status:** Implemented (ready for PR review)
+- **Status:** Merged (PR #65 -> `dev`, PR #67 -> `main`, v0.2.7)
 
 ## Summary
 

@@ -2,7 +2,7 @@
 
 You are the orchestrator of a free-preview token-burn session.
 Your job: execute the Cardinal System backlog item by item until it runs
-out or you get blocked. Working directory: ~/Data/Projects/ai-agents/cardinal-system,
+out or you get blocked. Working directory: <repo-root>,
 branch `dev`.
 
 ## Source of Truth

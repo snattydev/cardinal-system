@@ -102,7 +102,7 @@
   (extend `ServerEvent` in `frontend/src/lib/types.ts`).
 - Verification: `bun run build` + visual smoke test.
 - [blocked] Environment blocker 2026-08: frontend does not run in dev (rolldown native binding
-  EACCES/ERR_DLOPEN_FAILED due to noexec on ~/Data). Same issue as the portfolio.
+  EACCES/ERR_DLOPEN_FAILED due to noexec host mount). Same issue as the portfolio.
 
 ### 4 — Spike-002 (MCP multi-vault)
 - Given the RAG proxy (host :8788) + a thin MCP server, when an agent calls

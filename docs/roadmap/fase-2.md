@@ -2,7 +2,7 @@
 
 > Spec: [`../superpowers/specs/2026-08-12-cardinal-v2-architecture.md`](../superpowers/specs/2026-08-12-cardinal-v2-architecture.md)
 > Execution plan: [`../superpowers/plans/2026-08-17-cardinal-v2-backlog.md`](../superpowers/plans/2026-08-17-cardinal-v2-backlog.md)
-> Status: Closing on `dev` (v0.2.6, updated 2026-09-14). Freeze: PR [#12](https://github.com/snattydev/cardinal-system/pull/12) / issue [#16](https://github.com/snattydev/cardinal-system/issues/16).
+> Status: Complete (`v0.2.6` shipped on `main` via PR [#12](https://github.com/snattydev/cardinal-system/pull/12); superseded by Context Hub v2 in `v0.2.7` / [#62](https://github.com/snattydev/cardinal-system/issues/62)).
 > Router surface sprint: [`../sprints/2026-09-03-router-surface.md`](../sprints/2026-09-03-router-surface.md)
 > Index: [`../features/2026-09-03-router-surface.md`](../features/2026-09-03-router-surface.md)
 
