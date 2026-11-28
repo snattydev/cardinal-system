@@ -2,30 +2,32 @@
 
 Repo PR flow. Detailed execution steps live in the `cardinal-pr` skill.
 
-## Flow `feature/* → dev`
+## Flow `feature/* -> dev`
 
 1. The implementing agent opens the PR to `dev`.
-2. Verifies evidence before marking ready: `bun test` and `bun run build`.
-3. The merge to `dev` is done by that same agent after green.
-4. If there are changes in `auth/`, `keys/`, `ws/`, or protocol → also apply Security Review.
-5. Note: GitHub only auto-closes `Closes #N` when merging into the default branch (`main`). Keep `Closes #N` in the PR body for traceability, and either wait for `dev -> main` or close manually once verified on `dev`.
+2. Verifies evidence before marking ready: `bun run typecheck`, `bun test`, and `bun run build`.
+3. Runs the required review tiers (Quick Review + Bug Finder on every PR, plus Cross-Family Deep Review when required below).
+4. When touching `auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, or `packages/mcp/src/acl.ts`, Deep Review incorporates Security Review (`docs/agents/prompts/security-review-checklist.md`).
+5. Once checks pass with 0 `CRITICAL` findings and 0 unresolved `UNKNOWN_INTENT` items, the implementing agent merges to `dev`.
+6. Note: GitHub only auto-closes `Closes #N` when merging into the default branch (`main`). Keep `Closes #N` in the PR body for traceability, and either wait for `dev -> main` or close manually once verified on `dev`.
 
-## Flow `dev → main`
+## Flow `dev -> main`
 
 1. `dev` accumulates features, fixes, docs.
-2. When stable → open a PR from `dev` to `main`.
-3. The orchestrator opens the PR.
+2. When stable, open a PR from `dev` to `main`.
+3. The orchestrator opens the PR and runs Quick Review, Bug Finder, and Cross-Family Deep Review (incorporating Security Review when touching sensitive paths).
 4. The human (outside the repo) reviews and merges.
 5. **Never auto-merge.**
 
 ## Pre-merge checklist (required)
 
 - [ ] `bun test` passes completely (all packages + backend)
-- [ ] `bun run build` passes (frontend/)
+- [ ] `bun run build` passes (`frontend/`)
 - [ ] Leak audit: keys, tokens, absolute paths, emails
 - [ ] Quick Review approved (scope, conventions, clarity)
-- [ ] Bug Finder: 0 `CRITICAL` and 0 unresolved `UNKNOWN_INTENT`
-- [ ] Deep Review approved for large or cross-package changes, with Security Review if there were changes in `auth/`, `keys/`, `ws/`, or protocol
+- [ ] Bug Finder approved: 0 `CRITICAL` findings and 0 unresolved `UNKNOWN_INTENT` items
+- [ ] Cross-Family Deep Review approved (required on `dev -> main`, orchestrated wave/feature PRs, security-sensitive paths, and non-trivial multi-file changes; optional only for trivial 1-file typo fixes on `dev`), incorporating Security Review when touching `auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, or `packages/mcp/src/acl.ts`
+- [ ] Any `CRITICAL` finding or `UNKNOWN_INTENT` item from any tier has an explicit repo owner decision recorded on the PR
 - [ ] Version bump in `package.json` if applicable
 - [ ] `docs/features/<date>-<name>.md` created or updated
 - [ ] PR title, body, and any new comments/docs in English (`AGENTS/docs.md`)
@@ -33,20 +35,18 @@ Repo PR flow. Detailed execution steps live in the `cardinal-pr` skill.
 
 ## Review workflow (multi-tier)
 
-Every PR runs through three review tiers before merge. The tiers can run in parallel; each one reports with its own template in [`.github/REVIEW_TEMPLATES/`](../.github/REVIEW_TEMPLATES/).
+Every PR (including docs-only PRs) runs Tier 1 (Quick Review) and Tier 2 (Bug Finder) before merge. Tier 3 (Cross-Family Deep Review) is required on every `dev -> main` PR, every orchestrated wave/feature PR, every PR touching security-sensitive paths (`auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, `packages/mcp/src/acl.ts`, DB migrations, or container builds), and any non-trivial multi-file diff. Only trivial 1-file typo fixes on `dev` may omit Tier 3. Tiers may run in parallel; each reports with its template in [`.github/REVIEW_TEMPLATES/`](../.github/REVIEW_TEMPLATES/).
 
-| Tier | Model | Goal | Template |
-|------|-------|------|----------|
-| Quick Reviewer | fast, small | scope, conventions, clarity, obvious gaps | [`quick-review.md`](../.github/REVIEW_TEMPLATES/quick-review.md) |
-| Bug Finder | fast | logic bugs, edge cases, regressions, container and env mismatches | [`bug-finder.md`](../.github/REVIEW_TEMPLATES/bug-finder.md) |
-| Deep Reviewer | cross-family (different family than the author) | architecture, policy, correctness, security and leak audit | [`deep-review.md`](../.github/REVIEW_TEMPLATES/deep-review.md) |
+| Tier | Model & Role | Goal | Severity Buckets | Template |
+|------|--------------|------|------------------|----------|
+| Tier 1: Quick Reviewer | fast, small (same-family allowed), role `reviewer` | scope, conventions, clarity, obvious gaps | `CRITICAL`, `HIGH`, `LOW` | [`quick-review.md`](../.github/REVIEW_TEMPLATES/quick-review.md) |
+| Tier 2: Bug Finder | fast (same-family allowed), role `bug-finder` | logic bugs, edge cases, regressions, container/env mismatches | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN_INTENT` | [`bug-finder.md`](../.github/REVIEW_TEMPLATES/bug-finder.md) |
+| Tier 3: Deep Reviewer | cross-family (different model family than author, recorded by model name), role `reviewer` + `security-reviewer` | architecture, policy, correctness, security and leak audit | `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN_INTENT` | [`deep-review.md`](../.github/REVIEW_TEMPLATES/deep-review.md) |
 
-- Prompts: [`docs/agents/prompts/quick-review.md`](../docs/agents/prompts/quick-review.md), [`docs/agents/prompts/bug-finder.md`](../docs/agents/prompts/bug-finder.md).
+- Prompts: [`docs/agents/prompts/quick-review.md`](../docs/agents/prompts/quick-review.md), [`docs/agents/prompts/bug-finder.md`](../docs/agents/prompts/bug-finder.md), and [`docs/agents/prompts/standard-review.md`](../docs/agents/prompts/standard-review.md) (legacy one-shot quality prompt).
 - Bug Finder role: [`docs/agents/roles/bug-finder.md`](../docs/agents/roles/bug-finder.md).
-- Run Deep Review for large diffs, cross-package changes, and anything touching `auth/`, `keys/`, `ws/`, protocol, DB migrations, or the container build.
-- Findings go into a severity bucket: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`. Bug Finder and Deep Review also report `UNKNOWN_INTENT` when the intended behavior is ambiguous or undocumented.
-- Human checkpoint: a `CRITICAL` finding or an unresolved `UNKNOWN_INTENT` blocks merge until the owner answers it on the PR. Agents do not resolve `UNKNOWN_INTENT` by assumption.
-- Security Review (checklist: [`docs/agents/prompts/security-review-checklist.md`](../docs/agents/prompts/security-review-checklist.md)) is part of the Deep Review tier when the change touches `auth/`, `keys/`, `ws/`, or protocol.
+- Security Review checklist: [`docs/agents/prompts/security-review-checklist.md`](../docs/agents/prompts/security-review-checklist.md) (part of Tier 3 when sensitive paths change).
+- Human checkpoint: any `CRITICAL` finding or unresolved `UNKNOWN_INTENT` item from any tier forces Verdict = `REQUEST CHANGES` and blocks merge (including on `dev`) until the repo owner explicitly answers on the PR, the decision is recorded in a PR comment, and affected tiers re-run if code or specs changed.
 
 ## Merge strategy
 
@@ -56,7 +56,7 @@ Every PR runs through three review tiers before merge. The tiers can run in para
 
 | PR to | Reviewers |
 |-------|-----------|
-| `dev` | Quick Review and Bug Finder (required), Deep Review for large or sensitive changes |
-| `main` | Deep Review (required, cross-family), Security Review (if changes in `auth/`, `keys/`, `ws/`, protocol) |
+| `dev` | Quick Review + Bug Finder (required); Cross-Family Deep Review (required for orchestrated wave/feature PRs, security-sensitive paths, and non-trivial multi-file diffs; optional only for trivial 1-file typo fixes) |
+| `main` | Quick Review + Bug Finder + Cross-Family Deep Review (all required), incorporating Security Review when touching `auth/`, `keys/`, `ws/`, `protocol`, `deploy/`, or `packages/mcp/src/acl.ts` |
 
 Step-by-step execution reference: [`skills/cardinal-pr.md`](../skills/cardinal-pr.md).

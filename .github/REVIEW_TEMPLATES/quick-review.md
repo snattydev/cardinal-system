@@ -45,4 +45,4 @@ Paste the report as a PR comment. Fill every section. Write `(none)` when a seve
 
 APPROVE | APPROVE WITH COMMENTS | REQUEST CHANGES
 
-<one line justification>
+<one line justification. Any `CRITICAL` finding requires `REQUEST CHANGES` and blocks merge.>

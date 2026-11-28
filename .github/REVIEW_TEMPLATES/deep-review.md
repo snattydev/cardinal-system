@@ -14,8 +14,8 @@ Paste the report as a PR comment. Fill every section. Write `(none)` when a seve
 ## Context
 
 - PR: #{pr_number} {pr_title}
-- Author family: <model family>
-- Reviewer family: <model family, different from the author>
+- Author model / family: <model name and family>
+- Reviewer model / family: <model name and family, different from the author>
 - Files reviewed: N
 - Review depth: full diff and the modules it touches
 
@@ -85,4 +85,4 @@ If the section is empty, write `(none)`.
 
 APPROVE | APPROVE WITH COMMENTS | REQUEST CHANGES
 
-<one line justification. A human decides on any `CRITICAL` or unresolved `UNKNOWN_INTENT` before merge.>
+<one line justification. Any `CRITICAL` finding or unresolved `UNKNOWN_INTENT` item requires `REQUEST CHANGES` and blocks merge until the owner answers on the PR.>

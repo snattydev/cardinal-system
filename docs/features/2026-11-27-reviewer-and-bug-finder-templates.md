@@ -19,9 +19,10 @@ Added a three-tier PR review workflow with report templates, prompts, and a cano
 - **`docs/agents/prompts/bug-finder.md`:** Single-pass prompt inside `<!-- REGION: bug-finder-prompt -->` that explicitly tells the model to report `UNKNOWN_INTENT` when intended behavior is ambiguous or undocumented.
 
 ### Repo rules and templates
-- **`.github/PULL_REQUEST_TEMPLATE.md`:** New `## Review` section with checklist items for Quick Review, Bug Finder (0 `CRITICAL`, 0 unresolved `UNKNOWN_INTENT`), and Deep Review, plus links to `.github/REVIEW_TEMPLATES/`.
-- **`AGENTS/prs.md`:** New "Review workflow (multi-tier)" section, updated pre-merge checklist, and updated reviewer table for PRs to `dev` and `main`.
-- **`AGENTS/structure.md`:** Indexed `.github/REVIEW_TEMPLATES/`, the two new prompts, and the new role.
+- **`.github/PULL_REQUEST_TEMPLATE.md`:** Appended 4 review checklist items under `## Checklist` covering Quick Review, Bug Finder (0 `CRITICAL` findings, 0 unresolved `UNKNOWN_INTENT` items), Cross-Family Deep Review, and owner resolution of blocking items, plus plain repo path references to `.github/REVIEW_TEMPLATES/` and `AGENTS/prs.md`.
+- **`AGENTS/prs.md`:** New "Review workflow (multi-tier)" section, updated `feature/* -> dev` and `dev -> main` flows, updated pre-merge checklist, and updated reviewer table for PRs to `dev` and `main`.
+- **`skills/cardinal-pr.md` & `.agents/skills/cardinal-pr/SKILL.md`:** Synced §6 Reviewers and Pre-PR checks with the three-tier workflow in `AGENTS/prs.md`.
+- **`AGENTS/structure.md`:** Indexed `.github/REVIEW_TEMPLATES/`, the two new prompts, all 10 role files under `docs/agents/roles/`, and `CHANGELOG.md`.
 
 ## Why
 
@@ -37,12 +38,12 @@ The tiers separate concerns: quick review covers conventions and clarity, bug fi
 ## Decisions
 
 - **Three tiers, three templates, one report shape per tier:** A single shared template would either hide the `UNKNOWN_INTENT` field from quick reviews or force deep reviews to use shallow sections. Each tier gets only the sections it must fill.
-- **`UNKNOWN_INTENT` is a merge blocker, not a finding:** It is a question for a human. Treating it as a bug would push agents to guess; treating it as a note would let ambiguity merge silently.
+- **`UNKNOWN_INTENT` is a blocking ambiguity item, not a bug finding:** It is a question for the repo owner. Treating it as a bug would push agents to guess; forcing `REQUEST CHANGES` until answered prevents ambiguity from merging silently.
 - **Bug Finder is a separate role, not a `reviewer` mode:** The role has different rules (confirmed triggers only, no intent guessing, runtime assumption checks) and a different output. Keeping it separate keeps `reviewer.md` focused on quality.
-- **Cross-family for the deep tier:** The deep reviewer must come from a different model family than the author. Same-family review is still allowed for the quick and bug-finder tiers.
+- **Cross-family for the deep tier:** The deep reviewer must come from a different model family than the author (verified by recording model names in the PR report `Context` block). Same-family review is still allowed for the quick and bug-finder tiers, and Deep Review is optional only for trivial 1-file typo fixes on `dev`.
 - **Templates live in `.github/REVIEW_TEMPLATES/` as plain Markdown:** They are copy-paste report shapes, not automation. No bot, no new dependency, no CI job.
 - **Prompts stay in `docs/agents/prompts/`:** That is where the existing standard review prompt lives, and the BMAD-lite region delimiters let an agent load only the prompt it needs.
-- **No `CHANGELOG.md` entry:** The repo does not keep a changelog; release notes come from GitHub.
+- **No `CHANGELOG.md` edit in this PR:** Release changelog history is tracked separately in #47.
 
 ## Alternatives Considered
 
@@ -64,3 +65,5 @@ The tiers separate concerns: quick review covers conventions and clarity, bug fi
 - Modified: `.github/PULL_REQUEST_TEMPLATE.md`
 - Modified: `AGENTS/prs.md`
 - Modified: `AGENTS/structure.md`
+- Modified: `skills/cardinal-pr.md`
+- Modified: `.agents/skills/cardinal-pr/SKILL.md`

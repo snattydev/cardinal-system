@@ -7,7 +7,7 @@ PR report template for a fast bug-finder pass. It looks for logic bugs, edge cas
 
 Paste the report as a PR comment. Fill every section. Write `(none)` when a severity bucket is empty.
 
-`UNKNOWN_INTENT` is not a finding. It is a question for the author. Report it whenever the intended behavior is ambiguous or undocumented instead of guessing. An unresolved `UNKNOWN_INTENT` blocks merge until a human answers it.
+`UNKNOWN_INTENT` is an ambiguity item (a question for the author), not a speculative bug report. Report it whenever the intended behavior is ambiguous or undocumented instead of guessing. Any unresolved `UNKNOWN_INTENT` item forces Verdict = `REQUEST CHANGES` and blocks merge (including on `dev`) until the repo owner answers on the PR.
 
 ---
 
@@ -59,4 +59,4 @@ If the section is empty, write `(none)`.
 
 APPROVE | APPROVE WITH COMMENTS | REQUEST CHANGES
 
-<one line justification. Mention any unresolved `UNKNOWN_INTENT` that blocks merge.>
+<one line justification. Any `CRITICAL` finding or unresolved `UNKNOWN_INTENT` item requires `REQUEST CHANGES` and blocks merge until the owner answers on the PR.>

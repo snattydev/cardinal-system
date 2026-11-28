@@ -2,7 +2,7 @@
 
 Single-pass prompt for the fast reviewer tier. Inject it into a one-shot agent with a small, fast model and `max_turns=1`. It reports in the shape of [`.github/REVIEW_TEMPLATES/quick-review.md`](../../../.github/REVIEW_TEMPLATES/quick-review.md).
 
-Use it for small, low-risk diffs. Escalate to the bug-finder prompt or the deep review prompt when the diff touches critical logic or crosses package boundaries.
+Use it for small, low-risk diffs and as Tier 1 on every PR. Escalate findings to the bug-finder prompt ([`bug-finder.md`](./bug-finder.md)) or the deep review template ([`.github/REVIEW_TEMPLATES/deep-review.md`](../../../.github/REVIEW_TEMPLATES/deep-review.md)) when needed.
 
 ---
 
@@ -88,10 +88,10 @@ You have exactly ONE response. Make it complete. No "I need more context": every
 
 ```typescript
 const prompt = QUICK_REVIEW_PROMPT
-  .replace('{pr_title}', context.pr_title)
-  .replace('{pr_description}', context.pr_description)
-  .replace('{changed_files}', context.changed_files.join(', '))
-  .replace('{repo}', context.repo)
-  .replace('{pr_number}', String(context.pr_number))
-  .replace('{pr_diff}', context.pr_diff);
+  .replaceAll('{pr_title}', () => context.pr_title)
+  .replaceAll('{pr_description}', () => context.pr_description)
+  .replaceAll('{changed_files}', () => context.changed_files.join(', '))
+  .replaceAll('{repo}', () => context.repo)
+  .replaceAll('{pr_number}', () => String(context.pr_number))
+  .replaceAll('{pr_diff}', () => context.pr_diff);
 ```

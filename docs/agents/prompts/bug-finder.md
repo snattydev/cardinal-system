@@ -36,7 +36,7 @@ Never invent intent to justify a finding. Never drop a real ambiguity because th
 ## RULES
 - Report confirmed findings only. Each one needs a concrete trigger.
 - Do not report speculation. If you cannot name the input or sequence, it is not a finding.
-- Read-only. You may read code, run tests, and inspect the diff.
+- Read-only on tracked workspace files. You may read code, inspect the diff, and run tests when execution tools are available (without modifying tracked files).
 
 ## YOUR OUTPUT
 Use exactly this shape:
@@ -45,8 +45,8 @@ Use exactly this shape:
 - PR: #{pr_number} {pr_title}
 - Changed files: N
 - Risk areas touched: <auth | keys | ws | db | router | api | frontend | docs | build | container>
-- Entry points exercised: <endpoints, commands, or flows that reach the change>
-- Runtime assumptions checked: <containers, env vars, paths>
+- Entry points exercised: <endpoints, commands, or flows checked; or n/a from diff if no execution tools>
+- Runtime assumptions checked: <containers, env vars, paths; or n/a from diff if not applicable>
 
 ## Confirmed Bugs / Edge Cases
 A table: location, trigger, observed or expected failure, severity.
@@ -67,7 +67,7 @@ If there is none, write (none).
 
 ## Verdict
 APPROVE | APPROVE WITH COMMENTS | REQUEST CHANGES
-<one line justification, including any unresolved UNKNOWN_INTENT that blocks merge>
+<one line justification. Any CRITICAL finding or unresolved UNKNOWN_INTENT item requires REQUEST CHANGES and blocks merge.>
 
 Each empty section must explicitly state (none). Never omit a section.
 
@@ -105,10 +105,10 @@ You have exactly ONE response. Make it complete. If the intended behavior is not
 
 ```typescript
 const prompt = BUG_FINDER_PROMPT
-  .replace('{pr_title}', context.pr_title)
-  .replace('{pr_description}', context.pr_description)
-  .replace('{changed_files}', context.changed_files.join(', '))
-  .replace('{repo}', context.repo)
-  .replace('{pr_number}', String(context.pr_number))
-  .replace('{pr_diff}', context.pr_diff);
+  .replaceAll('{pr_title}', () => context.pr_title)
+  .replaceAll('{pr_description}', () => context.pr_description)
+  .replaceAll('{changed_files}', () => context.changed_files.join(', '))
+  .replaceAll('{repo}', () => context.repo)
+  .replaceAll('{pr_number}', () => String(context.pr_number))
+  .replaceAll('{pr_diff}', () => context.pr_diff);
 ```
