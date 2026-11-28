@@ -1,10 +1,13 @@
 [Unit]
-Description=Cardinal frontend container — nginx serving React SPA
+Description=Cardinal frontend container - nginx serving React SPA
 After=network-online.target
 
 [Container]
 Image=localhost/cardinal-frontend:latest
 Pod=cardinal.pod
+# Pod uses UserNS=keep-id, which otherwise demotes containers without USER to
+# UID 1000 and breaks nginx /var/cache/nginx initialization and worker drop.
+User=0
 
 [Service]
 Restart=always

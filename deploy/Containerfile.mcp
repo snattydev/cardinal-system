@@ -1,5 +1,5 @@
 # Cardinal System - MCP Context Hub container
-# Build: podman build -t localhost/cardinal-mcp:latest -f deploy/Containerfile.mcp .
+# Build: podman build --format docker -t localhost/cardinal-mcp:latest -f deploy/Containerfile.mcp .
 #
 # Streamable HTTP MCP server (POST /mcp, GET /health) on port 8789.
 # Runs non-root as USER bun. Source vaults are read-only, agent writes are
@@ -16,6 +16,7 @@ ENV NODE_ENV=production \
     CARDINAL_CONFIGS_ROOT=/data/configs \
     CARDINAL_INDEX_DB=/tmp/cardinal-mcp-index.db \
     CARDINAL_DENY_PREFIXES=personal \
+    # Slim image omits git; see "Git Auto-Commit Degradation" in deploy/README.md
     CARDINAL_GIT_AUTOCOMMIT=true
 
 # Workspace manifests (all members required for bun install resolution).

@@ -11,7 +11,7 @@ Thesis: **orchestration and routing are commodity**. Cardinal focuses on identit
 | 0 | Living skeleton (JWT, WS hub, keys, dashboard) | Complete |
 | 1 | Context Store (profiles, souls, skills, memory, RAG, devices) | Complete |
 | 2 | Blackboard, MCP hub, key pool / router | Complete (`v0.2.6`) |
-| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Shipped (`v0.2.7`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
+| **Hub v2** | **Streamable HTTP MCP Context Hub (ACL + FTS5/QMD + usage gate)** | **Shipped (`v0.2.7` on `main`; Quadlet MCP packaging in `v0.2.8`; 30-day usage gate active, [#62](https://github.com/snattydev/cardinal-system/issues/62))** |
 
 Roadmap: [`docs/roadmap.md`](docs/roadmap.md). Vision: [`docs/vision.md`](docs/vision.md). Context Hub v2 spec: [`docs/features/2026-11-25-mcp-context-hub-v2.md`](docs/features/2026-11-25-mcp-context-hub-v2.md).
 

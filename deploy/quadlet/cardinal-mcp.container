@@ -5,11 +5,13 @@ After=network-online.target cardinal-backend.service
 [Container]
 Image=localhost/cardinal-mcp:latest
 Pod=cardinal.pod
-EnvironmentFile=%h/.config/cardinal/env
+User=1000:1000
+# Dedicated MCP env file isolates MCP from backend secrets (JWT_SECRET,
+# POOL_SECRET, ADMIN_PASSWORD_HASH) in ~/.config/cardinal/env.
+EnvironmentFile=%h/.config/cardinal/mcp.env
 
-# The shared env file carries PORT=8787 for the backend. These explicit
-# Environment= lines follow EnvironmentFile and win, so MCP listens on 8789
-# and never binds the backend port.
+# Explicit Environment= lines follow EnvironmentFile as defense-in-depth so
+# MCP always binds 8789 and keeps fixed container mount paths.
 Environment=PORT=8789
 Environment=CARDINAL_BACKEND_URL=http://127.0.0.1:8787
 Environment=CARDINAL_VAULTS_ROOT=/data/vaults
@@ -22,9 +24,9 @@ Environment=CARDINAL_INDEX_DB=/tmp/cardinal-mcp-index.db
 #   mkdir -p %h/.local/share/cardinal/{vaults,agent-state,configs}
 # Point these at your own markdown vaults, agent-state, and redacted config
 # snapshots if they live elsewhere. Source vaults stay read-only; only
-# agent-state is writable.
+# agent-state is writable (and must be treated as untrusted until reviewed).
 # SELinux note: add ",Z" only on SELinux-enforcing hosts. Never add it blindly
-# to shared personal folders, because relabeling mutates the host data.
+# to shared personal folders, because relabeling mutates host metadata.
 Volume=%h/.local/share/cardinal/vaults:/data/vaults:ro
 Volume=%h/.local/share/cardinal/agent-state:/data/agent-state:rw
 Volume=%h/.local/share/cardinal/configs:/data/configs:ro

@@ -1,5 +1,5 @@
-# Cardinal System — Frontend container
-# Build: podman build -t cardinal-frontend:latest -f deploy/Containerfile.frontend .
+# Cardinal System - Frontend container
+# Build: podman build --format docker -t localhost/cardinal-frontend:latest -f deploy/Containerfile.frontend .
 #
 # Multi-stage: builds the React app with Bun, then serves it via nginx.
 # Nginx also proxies /api and /ws to the backend container within the pod.

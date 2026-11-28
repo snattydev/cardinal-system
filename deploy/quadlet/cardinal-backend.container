@@ -1,16 +1,17 @@
 [Unit]
-Description=Cardinal backend container — Bun API + WebSocket server
+Description=Cardinal backend container - Bun API + WebSocket server
 After=network-online.target
 Requires=cardinal-data.volume
 
 [Container]
 AutoUpdate=registry
 Image=localhost/cardinal-backend:latest
+User=1000:1000
 EnvironmentFile=%h/.config/cardinal/env
 Volume=cardinal-data.volume:/data:Z
 Pod=cardinal.pod
 
-# ── Optional: Podman secrets (more secure than env file) ──
+# Optional: Podman secrets (more secure than env file)
 # Create secrets first:
 #   podman secret create cardinal-jwt-secret <(echo '<your-jwt-secret>')
 #   podman secret create cardinal-admin-password <(echo '<your-password-hash>')

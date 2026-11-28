@@ -40,6 +40,7 @@ cardinal-system/
 │   ├── Containerfile.qmd
 │   ├── Containerfile.worker
 │   ├── env.example
+│   ├── mcp.env.example
 │   ├── nginx.conf
 │   ├── quadlet/                systemd units (pod, backend, frontend, mcp, caddy, data volume)
 │   └── README.md
